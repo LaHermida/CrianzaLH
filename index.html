@@ -604,18 +604,20 @@ function excelDateToISO(val){
 }
 
 function excelTimeToHHMM(val){
-  if(!val) return null;
-  if(typeof val==='string'){
-    const s = val.trim();
-    if(!s) return null;
-    // Already HH:MM
-    if(/^\d{1,2}:\d{2}$/.test(s)) return s.padStart(5,'0');
-    // Just a number like "23" -> "23:00"
-    if(/^\d{1,2}$/.test(s)) return s.padStart(2,'0')+':00';
-    return s.slice(0,5);
+  if(val===null||val===undefined||val==='') return null;
+  let s = String(val).trim();
+  if(!s) return null;
+  // HH:MM:SS -> HH:MM
+  if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)){
+    const parts=s.split(':');
+    return parts[0].padStart(2,'0')+':'+parts[1];
   }
-  if(typeof val==='number'){
-    const t=Math.round(val*1440);
+  // Just hours like "23" or "9"
+  if(/^\d{1,2}$/.test(s)) return s.padStart(2,'0')+':00';
+  // Excel decimal time
+  if(typeof val==='number'||(!isNaN(parseFloat(s))&&s.includes('.'))){
+    const n=parseFloat(s);
+    const t=Math.round(n*1440);
     return String(Math.floor(t/60)%24).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
   }
   return null;
@@ -706,24 +708,27 @@ async function confirmImport(){
   btn.innerHTML='<span class="spinner"></span> Importando...';btn.disabled=true;
   const table=importType==='partos'?'partos_crianza':'pesajes_crianza';
   let inserted=0, errors=0;
-  for(let i=0;i<importQueue.length;i+=50){
-    const batch=importQueue.slice(i,i+50);
-    const res=await sbFetch(table,'POST',batch);
-    if(res.ok!==undefined){
-      if(res.ok) inserted+=batch.length;
-      else { 
+  // Insert one by one to catch individual row errors
+  for(let i=0;i<importQueue.length;i++){
+    const row=importQueue[i];
+    try{
+      const url=`${SUPABASE_URL}/rest/v1/${table}`;
+      const res=await fetch(url,{method:'POST',headers:{
+        'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,
+        'Content-Type':'application/json','Prefer':'return=minimal'
+      },body:JSON.stringify(row)});
+      if(res.ok){ inserted++; }
+      else{
         const err=await res.json().catch(()=>({}));
-        console.error('Supabase error:', err);
-        errors+=batch.length;
+        console.error(`Row ${i+1} error:`,err,'Data:',row);
+        errors++;
       }
-    } else {
-      inserted+=batch.length;
-    }
+    }catch(e){ console.error(`Row ${i+1} exception:`,e); errors++; }
   }
   document.getElementById('importModal').classList.remove('open');
   btn.innerHTML='Importar';btn.disabled=false;
-  if(errors>0) alert('⚠️ '+inserted+' importados, '+errors+' con error. Revisa la consola.');
-  else alert('✅ '+importQueue.length+' registros importados correctamente.');
+  if(errors>0) alert('⚠️ '+inserted+' importados, '+errors+' con error. Revisa consola (F12).');
+  else alert('✅ '+inserted+' registros importados correctamente.');
   if(importType==='partos') await loadPartos();
   else await loadPesajes();
 }
