@@ -347,7 +347,7 @@ function renderStats(data){
   const hembras=data.filter(r=>r.sexo==='H').length;
   const hoy=new Date().toISOString().slice(0,7);
   const mes=data.filter(r=>r.fecha_parto&&r.fecha_parto.slice(0,7)===hoy).length;
-  const difíciles=data.filter(r=>r.dificultad==='Dificil').length;
+  const difíciles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase().includes('dificil')).length;
   document.getElementById('statsRow').innerHTML=`
     <div class="stat-card"><div class="val">${total}</div><div class="lbl">Total Partos</div></div>
     <div class="stat-card"><div class="val">${hembras}</div><div class="lbl">Hembras</div></div>
