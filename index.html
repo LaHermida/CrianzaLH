@@ -565,6 +565,18 @@ async function importPesajes(event){
 }
 
 async function readFile(file){
+  const isCSV = file.name.toLowerCase().endsWith('.csv');
+  if(isCSV){
+    // Try ISO-8859-1 first (common in Spanish Excel exports), fallback to UTF-8
+    const buf = await file.arrayBuffer();
+    let text;
+    try { text = new TextDecoder('iso-8859-1').decode(buf); }
+    catch(e){ text = new TextDecoder('utf-8').decode(buf); }
+    // Parse CSV manually via XLSX
+    const wb = XLSX.read(text, {type:'string'});
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    return XLSX.utils.sheet_to_json(ws,{defval:null,raw:false});
+  }
   const data=await file.arrayBuffer();
   const wb=XLSX.read(data);
   const ws=wb.Sheets[wb.SheetNames[0]];
@@ -683,12 +695,25 @@ async function confirmImport(){
   const btn=document.getElementById('importConfirmBtn');
   btn.innerHTML='<span class="spinner"></span> Importando...';btn.disabled=true;
   const table=importType==='partos'?'partos_crianza':'pesajes_crianza';
+  let inserted=0, errors=0;
   for(let i=0;i<importQueue.length;i+=50){
-    await sbFetch(table,'POST',importQueue.slice(i,i+50));
+    const batch=importQueue.slice(i,i+50);
+    const res=await sbFetch(table,'POST',batch);
+    if(res.ok!==undefined){
+      if(res.ok) inserted+=batch.length;
+      else { 
+        const err=await res.json().catch(()=>({}));
+        console.error('Supabase error:', err);
+        errors+=batch.length;
+      }
+    } else {
+      inserted+=batch.length;
+    }
   }
   document.getElementById('importModal').classList.remove('open');
   btn.innerHTML='Importar';btn.disabled=false;
-  alert('✅ '+importQueue.length+' registros importados.');
+  if(errors>0) alert('⚠️ '+inserted+' importados, '+errors+' con error. Revisa la consola.');
+  else alert('✅ '+importQueue.length+' registros importados correctamente.');
   if(importType==='partos') await loadPartos();
   else await loadPesajes();
 }
