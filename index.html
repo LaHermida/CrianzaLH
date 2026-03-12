@@ -90,6 +90,10 @@
     <div class="form-group"><label>Usuario</label><input type="text" id="loginUser" placeholder="usuario"/></div>
     <div class="form-group"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"/></div>
     <div class="error-msg hidden" id="loginError">Usuario o contraseña incorrectos</div>
+    <div style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem;margin-bottom:.25rem">
+      <input type="checkbox" id="rememberMe" style="width:auto;cursor:pointer"/>
+      <label for="rememberMe" style="text-transform:none;font-size:.85rem;cursor:pointer;color:var(--text-muted)">Recordarme</label>
+    </div>
     <button class="btn btn-primary" onclick="doLogin()">Entrar</button>
   </div>
 </div>
@@ -282,7 +286,7 @@
 const SUPABASE_URL = 'https://qlgctjnrndzhvqondjvz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZ2N0am5ybmR6aHZxb25kanZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNjQzNjgsImV4cCI6MjA4Nzc0MDM2OH0._4KqKFG0N_zrS2ovwxpvi5SzQpQcPMK71wGZ3N3Cilo';
 
-const USERS = { 'Admin':{ pass:'lh2024', role:'admin' }, 'Captura':{ pass:'crianza1', role:'user' } };
+const USERS = { 'Admin':{ pass:'lh2024', role:'admin' }, 'Ale@LaHermida':{ pass:'5678', role:'admin' }, 'Captura':{ pass:'crianza1', role:'user' } };
 let currentUser = null;
 let editingId = null;
 
@@ -291,14 +295,29 @@ function doLogin(){
   const p = document.getElementById('loginPass').value;
   if(USERS[u] && USERS[u].pass===p){
     currentUser={name:u,role:USERS[u].role};
-    document.getElementById('loginView').classList.add('hidden');
-    document.getElementById('appView').classList.remove('hidden');
-    document.getElementById('userLabel').textContent=u;
-    loadPartos(); loadPesajes();
+    if(document.getElementById('rememberMe').checked){
+      sessionStorage.setItem('clh_user', u);
+    }
+    launchApp(u);
   } else {
     document.getElementById('loginError').classList.remove('hidden');
   }
 }
+function launchApp(u){
+  currentUser={name:u,role:USERS[u].role};
+  document.getElementById('loginView').classList.add('hidden');
+  document.getElementById('appView').classList.remove('hidden');
+  document.getElementById('userLabel').textContent=u;
+  loadPartos(); loadPesajes();
+}
+// Auto-login if remembered
+window.addEventListener('DOMContentLoaded',()=>{
+  const saved = sessionStorage.getItem('clh_user');
+  if(saved && USERS[saved]){
+    document.getElementById('loginUser').value=saved;
+    launchApp(saved);
+  }
+});
 document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 
 async function sbFetch(path, method='GET', body=null){
