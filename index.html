@@ -125,8 +125,10 @@
           <thead>
             <tr>
               <th rowspan="2">Fecha</th>
+              <th rowspan="2">Tipo</th>
               <th rowspan="2">Madre</th>
               <th rowspan="2">Hembra</th>
+              <th rowspan="2">Raza</th>
               <th rowspan="2">Partero</th>
               <th rowspan="2">H.Parto</th>
               <th rowspan="2">D/N</th>
@@ -147,7 +149,7 @@
               <th class="g4">Lts</th><th class="g4">Calidad</th>
             </tr>
           </thead>
-          <tbody id="partosBody"><tr><td colspan="25" class="empty">Cargando...</td></tr></tbody>
+          <tbody id="partosBody"><tr><td colspan="27" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -200,6 +202,7 @@
           <div class="form-group"><label>Peso Nacer (kg)</label><input type="number" id="f_peso_nacer" step="0.1"/></div>
           <div class="form-group"><label>Días Gestación</label><input type="number" id="f_dias_gest"/></div>
           <div class="form-group"><label>Días en Reto</label><input type="number" id="f_dias_reto"/></div>
+          <div class="form-group"><label>Raza</label><select id="f_raza"><option value="">—</option><option value="H">H (Holstein)</option><option value="J">J (Jersey)</option></select></div>
           <div class="form-group wide"><label>Observaciones</label><input type="text" id="f_obs"/></div>
         </div>
       </div>
@@ -355,12 +358,14 @@ function renderStats(data){
 
 function renderPartos(data){
   const tbody=document.getElementById('partosBody');
-  if(!data||!data.length){tbody.innerHTML='<tr><td colspan="25" class="empty">Sin registros.</td></tr>';return;}
+  if(!data||!data.length){tbody.innerHTML='<tr><td colspan="27" class="empty">Sin registros.</td></tr>';return;}
   tbody.innerHTML=data.map(r=>`
     <tr>
       <td class="mono">${r.fecha_parto||'—'}</td>
-      <td class="mono">${r.madre_vaca?'🐄 '+r.madre_vaca : r.madre_vaquilla?'🐮 '+r.madre_vaquilla:'—'}</td>
+      <td>${r.madre_vaca?'<span class="badge badge-dn">Vaca</span>':r.madre_vaquilla?'<span class="badge badge-nn">Vaquilla</span>':'—'}</td>
+      <td class="mono">${r.madre_vaca||r.madre_vaquilla||'—'}</td>
       <td class="mono">${r.hembra||'—'}</td>
+      <td>${r.raza?'<span class="badge" style="background:#e8f5e9;color:#1b5e20">'+r.raza+'</span>':'—'}</td>
       <td>${r.partero||'—'}</td>
       <td class="mono">${r.hora_parto||'—'}</td>
       <td>${r.dia_noche?`<span class="badge ${r.dia_noche==='Dia'?'badge-dn':'badge-nn'}">${r.dia_noche}</span>`:'—'}</td>
@@ -403,7 +408,7 @@ function clearPartoForm(){
    'f_c1_hora','f_c1_lts','f_c1_calidad','f_c1_calostrero',
    'f_c2_hora','f_c2_lts','f_c2_calidad','f_c2_calostrero',
    'f_o1_lts','f_o1_refrac','f_o2_lts','f_o2_calidad'].forEach(id=>document.getElementById(id).value='');
-  ['f_dia_noche','f_dificultad','f_c1_sonda','f_c2_sonda'].forEach(id=>document.getElementById(id).value='');
+  ['f_dia_noche','f_dificultad','f_c1_sonda','f_c2_sonda','f_raza'].forEach(id=>document.getElementById(id).value='');
 }
 
 async function editParto(id){
@@ -432,6 +437,7 @@ async function editParto(id){
   document.getElementById('f_c2_calidad').value=r.c2_calidad??'';
   document.getElementById('f_c2_calostrero').value=r.c2_calostrero||'';
   document.getElementById('f_c2_sonda').value=r.c2_sonda||'';
+  document.getElementById('f_raza').value=r.raza||'';
   document.getElementById('f_o1_lts').value=r.o1_lts??'';
   document.getElementById('f_o1_refrac').value=r.o1_refrac??'';
   document.getElementById('f_o2_lts').value=r.o2_lts??'';
@@ -472,6 +478,7 @@ async function saveParto(){
     o1_refrac:parseFloat(document.getElementById('f_o1_refrac').value)||null,
     o2_lts:parseFloat(document.getElementById('f_o2_lts').value)||null,
     o2_calidad:parseFloat(document.getElementById('f_o2_calidad').value)||null,
+    raza:document.getElementById('f_raza').value||null,
   };
   try{
     if(editingId) await sbFetch(`partos_crianza?id=eq.${editingId}`,'PATCH',payload);
