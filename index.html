@@ -567,13 +567,15 @@ async function importPesajes(event){
 async function readFile(file){
   const isCSV = file.name.toLowerCase().endsWith('.csv');
   if(isCSV){
-    // Try ISO-8859-1 first (common in Spanish Excel exports), fallback to UTF-8
     const buf = await file.arrayBuffer();
     let text;
     try { text = new TextDecoder('iso-8859-1').decode(buf); }
     catch(e){ text = new TextDecoder('utf-8').decode(buf); }
-    // Parse CSV manually via XLSX
-    const wb = XLSX.read(text, {type:'string'});
+    // Detect delimiter: semicolon or comma
+    const firstLine = text.split('\n')[0];
+    const delim = (firstLine.split(';').length > firstLine.split(',').length) ? ';' : ',';
+    // Parse using XLSX with detected delimiter
+    const wb = XLSX.read(text, {type:'string', FS: delim});
     const ws = wb.Sheets[wb.SheetNames[0]];
     return XLSX.utils.sheet_to_json(ws,{defval:null,raw:false});
   }
