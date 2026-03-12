@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CrianzaLH — Partos</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f5f2eb;
+    --surface: #ffffff;
+    --border: #d4cfc4;
+    --accent: #2d6a4f;
+    --accent2: #e76f51;
+    --text: #1a1a1a;
+    --text-muted: #6b6760;
+    --input-bg: #fafaf7;
+    --row-hover: #f0ede5;
+    --red: #c62828;
+    --yellow: #f9a825;
+    --green: #2d6a4f;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    background: var(--accent);
+    color: white;
+    padding: 0 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    border-bottom: 3px solid #1b4332;
+  }
+  header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+  header span {
+    font-size: 0.75rem;
+    opacity: 0.75;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* NAV TABS */
+  nav {
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    padding: 0 2rem;
+    display: flex;
+    gap: 0;
+  }
+  nav button {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.75rem 1.25rem;
+    border: none;
+    background: none;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.15s;
+  }
+  nav button.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  nav button:hover:not(.active) {
+    color: var(--text);
+    background: var(--row-hover);
+  }
+
+  /* MAIN */
+  main { padding: 1.5rem 2rem; max-width: 1600px; }
+
+  /* SECTION HEADER */
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+  }
+  .section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* BTN */
+  .btn {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.5rem 1.1rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-primary { background: var(--accent); color: white; }
+  .btn-primary:hover { background: #1b4332; }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1.5px solid var(--border); }
+  .btn-secondary:hover { background: var(--row-hover); }
+  .btn-danger { background: var(--red); color: white; }
+  .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: 8px;
+    width: 900px;
+    max-width: 96vw;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+  .modal-header {
+    padding: 1.25rem 1.5rem;
+    border-bottom: 1.5px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0;
+    background: var(--surface);
+    z-index: 1;
+  }
+  .modal-header h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.95rem;
+    color: var(--accent);
+  }
+  .modal-close {
+    background: none; border: none; cursor: pointer;
+    font-size: 1.3rem; color: var(--text-muted);
+    line-height: 1;
+  }
+  .modal-body { padding: 1.5rem; }
+  .modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1.5px solid var(--border);
+    display: flex; gap: 0.75rem; justify-content: flex-end;
+    position: sticky; bottom: 0;
+    background: var(--surface);
+  }
+
+  /* FORM */
+  .form-section {
+    margin-bottom: 1.5rem;
+  }
+  .form-section-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1.5px solid var(--border);
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 0.75rem;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 0.3rem; }
+  .form-group.wide { grid-column: span 2; }
+  label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  input, select {
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 0.88rem;
+    padding: 0.45rem 0.65rem;
+    border: 1.5px solid var(--border);
+    border-radius: 4px;
+    background: var(--input-bg);
+    color: var(--text);
+    transition: border-color 0.15s;
+    width: 100%;
+  }
+  input:focus, select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  /* TABLE */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  thead tr {
+    background: var(--accent);
+    color: white;
+  }
+  th {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 0.65rem 0.75rem;
+    text-align: left;
+    white-space: nowrap;
+  }
+  th.group-calostro1 { background: #1b6ca8; }
+  th.group-calostro2 { background: #6a1b9a; }
+  th.group-ordena1 { background: #c77800; }
+  th.group-ordena2 { background: #c62828; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--row-hover); }
+  td {
+    padding: 0.55rem 0.75rem;
+    color: var(--text);
+    vertical-align: middle;
+  }
+  td.mono { font-family: 'IBM Plex Mono', monospace; font-size: 0.8rem; }
+
+  /* BADGE */
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 3px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  .badge-m { background: #e3f2fd; color: #1565c0; }
+  .badge-h { background: #fce4ec; color: #880e4f; }
+  .badge-ok { background: #e8f5e9; color: #1b5e20; }
+  .badge-mal { background: #ffebee; color: #b71c1c; }
+
+  /* EMPTY STATE */
+  .empty {
+    text-align: center;
+    padding: 3rem;
+    color: var(--text-muted);
+    font-size: 0.88rem;
+  }
+
+  /* STATS */
+  .stats-row {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .stat-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1.25rem;
+    min-width: 120px;
+  }
+  .stat-card .val {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.6rem;
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .stat-card .lbl {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* LOGIN */
+  .login-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+  }
+  .login-box {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 2.5rem;
+    width: 360px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.08);
+  }
+  .login-box h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.4rem;
+    color: var(--accent);
+    margin-bottom: 0.3rem;
+  }
+  .login-box p { font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem; }
+  .login-box .form-group { margin-bottom: 1rem; }
+  .login-box label { display: block; margin-bottom: 0.3rem; }
+  .login-box input { width: 100%; }
+  .login-box .btn { width: 100%; margin-top: 0.5rem; padding: 0.65rem; font-size: 0.9rem; }
+  .error-msg { color: var(--red); font-size: 0.8rem; margin-top: 0.5rem; }
+
+  .hidden { display: none !important; }
+
+  /* SPINNER */
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div class="login-wrap" id="loginView">
+  <div class="login-box">
+    <h1>CrianzaLH</h1>
+    <p>Sistema de Crianza — La Hermida</p>
+    <div class="form-group">
+      <label>Usuario</label>
+      <input type="text" id="loginUser" placeholder="usuario" />
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" id="loginPass" placeholder="••••••••" />
+    </div>
+    <div class="error-msg hidden" id="loginError">Usuario o contraseña incorrectos</div>
+    <button class="btn btn-primary" onclick="doLogin()">Entrar</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appView" class="hidden">
+  <header>
+    <h1>🐄 CrianzaLH</h1>
+    <span id="userLabel"></span>
+  </header>
+  <nav>
+    <button class="active" onclick="showTab('partos', this)">Partos</button>
+    <button onclick="showTab('desarrollo', this)">Desarrollo / Pesajes</button>
+  </nav>
+  <main>
+
+    <!-- TAB PARTOS -->
+    <div id="tab-partos">
+      <div class="stats-row" id="statsRow"></div>
+      <div class="section-header">
+        <span class="section-title">Registro de Partos</span>
+        <button class="btn btn-primary" onclick="openModal()">+ Nuevo Parto</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th rowspan="2">Fecha</th>
+              <th rowspan="2">Vaca</th>
+              <th rowspan="2">Vaquilla</th>
+              <th rowspan="2">Sexo</th>
+              <th rowspan="2">Partero</th>
+              <th rowspan="2">H. Parto</th>
+              <th colspan="5" class="group-calostro1" style="text-align:center">1ª Toma Calostro</th>
+              <th colspan="5" class="group-calostro2" style="text-align:center">2ª Toma Calostro</th>
+              <th colspan="2" class="group-ordena1" style="text-align:center">1ª Ordeña</th>
+              <th colspan="2" class="group-ordena2" style="text-align:center">2ª Ordeña</th>
+              <th rowspan="2">Acciones</th>
+            </tr>
+            <tr>
+              <th class="group-calostro1">H. Toma</th>
+              <th class="group-calostro1">Lts</th>
+              <th class="group-calostro1">Calidad</th>
+              <th class="group-calostro1">Calostrero</th>
+              <th class="group-calostro1">Sonda</th>
+              <th class="group-calostro2">H. Toma</th>
+              <th class="group-calostro2">Lts</th>
+              <th class="group-calostro2">Calidad</th>
+              <th class="group-calostro2">Calostrero</th>
+              <th class="group-calostro2">Sonda</th>
+              <th class="group-ordena1">Lts</th>
+              <th class="group-ordena1">Refrac</th>
+              <th class="group-ordena2">Lts</th>
+              <th class="group-ordena2">Calidad</th>
+            </tr>
+          </thead>
+          <tbody id="partosBody">
+            <tr><td colspan="20" class="empty">Cargando datos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TAB DESARROLLO -->
+    <div id="tab-desarrollo" class="hidden">
+      <div class="section-header">
+        <span class="section-title">Desarrollo / Pesajes</span>
+        <button class="btn btn-primary" onclick="openPesajeModal()">+ Nuevo Pesaje</button>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Fecha</th>
+              <th>Vaquilla</th>
+              <th>Peso (kg)</th>
+              <th>Días de Vida</th>
+              <th>GDP (kg/día)</th>
+              <th>Notas</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="pesajesBody">
+            <tr><td colspan="7" class="empty">Cargando datos...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL NUEVO PARTO -->
+<div class="modal-overlay" id="partoModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 id="modalTitle">Nuevo Parto</h2>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+
+      <div class="form-section">
+        <div class="form-section-title">Datos del Parto</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Fecha Parto *</label>
+            <input type="date" id="f_fecha" />
+          </div>
+          <div class="form-group">
+            <label>Vaca (Madre)</label>
+            <input type="text" id="f_vaca" placeholder="No. arete" />
+          </div>
+          <div class="form-group">
+            <label>Vaquilla / Becerro</label>
+            <input type="text" id="f_vaquilla" placeholder="No. arete cría" />
+          </div>
+          <div class="form-group">
+            <label>Sexo</label>
+            <select id="f_sexo">
+              <option value="H">Hembra</option>
+              <option value="M">Macho</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Partero</label>
+            <input type="text" id="f_partero" placeholder="Nombre" />
+          </div>
+          <div class="form-group">
+            <label>Hora de Parto</label>
+            <input type="time" id="f_hora_parto" />
+          </div>
+          <div class="form-group">
+            <label>Peso al Nacer (kg)</label>
+            <input type="number" id="f_peso_nacer" step="0.1" placeholder="0.0" />
+          </div>
+          <div class="form-group wide">
+            <label>Observaciones</label>
+            <input type="text" id="f_obs" placeholder="Parto distócico, gemelar, etc." />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title" style="color:#1b6ca8">1ª Toma de Calostro</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Hora 1ª Toma</label>
+            <input type="time" id="f_c1_hora" />
+          </div>
+          <div class="form-group">
+            <label>Litros</label>
+            <input type="number" id="f_c1_lts" step="0.1" placeholder="0.0" />
+          </div>
+          <div class="form-group">
+            <label>Calidad</label>
+            <input type="number" id="f_c1_calidad" placeholder="Brix/IgG" />
+          </div>
+          <div class="form-group">
+            <label>Calostrero</label>
+            <input type="text" id="f_c1_calostrero" placeholder="Nombre" />
+          </div>
+          <div class="form-group">
+            <label>Sonda</label>
+            <select id="f_c1_sonda">
+              <option value="">—</option>
+              <option value="Si">Sí</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title" style="color:#6a1b9a">2ª Toma de Calostro</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Hora 2ª Toma</label>
+            <input type="time" id="f_c2_hora" />
+          </div>
+          <div class="form-group">
+            <label>Litros</label>
+            <input type="number" id="f_c2_lts" step="0.1" placeholder="0.0" />
+          </div>
+          <div class="form-group">
+            <label>Calidad</label>
+            <input type="number" id="f_c2_calidad" placeholder="Brix/IgG" />
+          </div>
+          <div class="form-group">
+            <label>Calostrero</label>
+            <input type="text" id="f_c2_calostrero" placeholder="Nombre" />
+          </div>
+          <div class="form-group">
+            <label>Sonda</label>
+            <select id="f_c2_sonda">
+              <option value="">—</option>
+              <option value="Si">Sí</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title" style="color:#c77800">1ª Ordeña de Calostro</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Litros Ordeñados</label>
+            <input type="number" id="f_o1_lts" step="0.1" placeholder="0.0" />
+          </div>
+          <div class="form-group">
+            <label>Refractómetro</label>
+            <input type="number" id="f_o1_refrac" step="0.1" placeholder="0.0" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title" style="color:#c62828">2ª Ordeña de Calostro</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Litros Ordeñados</label>
+            <input type="number" id="f_o2_lts" step="0.1" placeholder="0.0" />
+          </div>
+          <div class="form-group">
+            <label>Calidad</label>
+            <input type="number" id="f_o2_calidad" placeholder="Brix/IgG" />
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" id="saveBtn" onclick="saveParto()">Guardar Parto</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PESAJE -->
+<div class="modal-overlay" id="pesajeModal">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-header">
+      <h2>Nuevo Pesaje</h2>
+      <button class="modal-close" onclick="closePesajeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Fecha *</label>
+          <input type="date" id="p_fecha" />
+        </div>
+        <div class="form-group">
+          <label>Vaquilla *</label>
+          <input type="text" id="p_vaquilla" placeholder="No. arete" />
+        </div>
+        <div class="form-group">
+          <label>Peso (kg) *</label>
+          <input type="number" id="p_peso" step="0.1" placeholder="0.0" />
+        </div>
+        <div class="form-group wide">
+          <label>Notas</label>
+          <input type="text" id="p_notas" placeholder="Observaciones..." />
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closePesajeModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="savePesaje()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===================== CONFIG =====================
+const SUPABASE_URL = 'https://qlgctjnrndzhvqondjvz.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZ2N0am5ybmR6aHZxb25kanZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNjQzNjgsImV4cCI6MjA4Nzc0MDM2OH0._4KqKFG0N_zrS2ovwxpvi5SzQpQcPMK71wGZ3N3Cilo';
+
+const USERS = {
+  'Admin': { pass: 'lh2024', role: 'admin' },
+  'Captura': { pass: 'crianza1', role: 'user' }
+};
+
+let currentUser = null;
+let editingId = null;
+
+// ===================== AUTH =====================
+function doLogin() {
+  const u = document.getElementById('loginUser').value.trim();
+  const p = document.getElementById('loginPass').value;
+  const err = document.getElementById('loginError');
+  if (USERS[u] && USERS[u].pass === p) {
+    currentUser = { name: u, role: USERS[u].role };
+    document.getElementById('loginView').classList.add('hidden');
+    document.getElementById('appView').classList.remove('hidden');
+    document.getElementById('userLabel').textContent = u;
+    loadPartos();
+    loadPesajes();
+  } else {
+    err.classList.remove('hidden');
+  }
+}
+document.getElementById('loginPass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+// ===================== SUPABASE =====================
+async function sbFetch(table, method='GET', body=null, id=null) {
+  let url = `${SUPABASE_URL}/rest/v1/${table}`;
+  if (id) url += `?id=eq.${id}`;
+  if (method === 'GET') url += (id ? '&' : '?') + 'order=fecha_parto.desc';
+  const opts = {
+    method,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : 'return=minimal'
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  if (method === 'GET') return res.json();
+  return res;
+}
+
+// ===================== PARTOS =====================
+async function loadPartos() {
+  const data = await sbFetch('partos_crianza');
+  renderPartos(data);
+  renderStats(data);
+}
+
+function renderStats(data) {
+  const total = data.length;
+  const hembras = data.filter(r => r.sexo === 'H').length;
+  const machos = data.filter(r => r.sexo === 'M').length;
+  const hoy = new Date().toISOString().slice(0,10);
+  const esteMes = data.filter(r => r.fecha_parto && r.fecha_parto.slice(0,7) === hoy.slice(0,7)).length;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="val">${total}</div><div class="lbl">Total Partos</div></div>
+    <div class="stat-card"><div class="val">${hembras}</div><div class="lbl">Hembras</div></div>
+    <div class="stat-card"><div class="val">${machos}</div><div class="lbl">Machos</div></div>
+    <div class="stat-card"><div class="val">${esteMes}</div><div class="lbl">Este Mes</div></div>
+  `;
+}
+
+function renderPartos(data) {
+  const tbody = document.getElementById('partosBody');
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="20" class="empty">Sin registros aún. Agrega el primer parto.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td class="mono">${r.fecha_parto || '—'}</td>
+      <td class="mono">${r.vaca || '—'}</td>
+      <td class="mono">${r.vaquilla || '—'}</td>
+      <td><span class="badge ${r.sexo==='H'?'badge-h':'badge-m'}">${r.sexo==='H'?'♀ H':'♂ M'}</span></td>
+      <td>${r.partero || '—'}</td>
+      <td class="mono">${r.hora_parto || '—'}</td>
+      <td class="mono">${r.c1_hora || '—'}</td>
+      <td class="mono">${r.c1_lts ?? '—'}</td>
+      <td class="mono">${r.c1_calidad ?? '—'}</td>
+      <td>${r.c1_calostrero || '—'}</td>
+      <td>${r.c1_sonda ? '<span class="badge badge-ok">Sí</span>' : '—'}</td>
+      <td class="mono">${r.c2_hora || '—'}</td>
+      <td class="mono">${r.c2_lts ?? '—'}</td>
+      <td class="mono">${r.c2_calidad ?? '—'}</td>
+      <td>${r.c2_calostrero || '—'}</td>
+      <td>${r.c2_sonda ? '<span class="badge badge-ok">Sí</span>' : '—'}</td>
+      <td class="mono">${r.o1_lts ?? '—'}</td>
+      <td class="mono">${r.o1_refrac ?? '—'}</td>
+      <td class="mono">${r.o2_lts ?? '—'}</td>
+      <td class="mono">${r.o2_calidad ?? '—'}</td>
+      <td>
+        <button class="btn btn-secondary btn-sm" onclick="editParto(${r.id})">✏️</button>
+        ${currentUser.role==='admin' ? `<button class="btn btn-danger btn-sm" onclick="deleteParto(${r.id})" style="margin-left:4px">🗑</button>` : ''}
+      </td>
+    </tr>
+  `).join('');
+}
+
+function openModal(id=null) {
+  editingId = id;
+  document.getElementById('modalTitle').textContent = id ? 'Editar Parto' : 'Nuevo Parto';
+  if (!id) clearForm();
+  document.getElementById('partoModal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('partoModal').classList.remove('open');
+  editingId = null;
+}
+
+function clearForm() {
+  ['f_fecha','f_vaca','f_vaquilla','f_partero','f_hora_parto','f_peso_nacer','f_obs',
+   'f_c1_hora','f_c1_lts','f_c1_calidad','f_c1_calostrero',
+   'f_c2_hora','f_c2_lts','f_c2_calidad','f_c2_calostrero',
+   'f_o1_lts','f_o1_refrac','f_o2_lts','f_o2_calidad'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f_sexo').value = 'H';
+  document.getElementById('f_c1_sonda').value = '';
+  document.getElementById('f_c2_sonda').value = '';
+}
+
+async function editParto(id) {
+  const data = await sbFetch(`partos_crianza?id=eq.${id}`);
+  if (!data || !data[0]) return;
+  const r = data[0];
+  document.getElementById('f_fecha').value = r.fecha_parto || '';
+  document.getElementById('f_vaca').value = r.vaca || '';
+  document.getElementById('f_vaquilla').value = r.vaquilla || '';
+  document.getElementById('f_sexo').value = r.sexo || 'H';
+  document.getElementById('f_partero').value = r.partero || '';
+  document.getElementById('f_hora_parto').value = r.hora_parto || '';
+  document.getElementById('f_peso_nacer').value = r.peso_nacer || '';
+  document.getElementById('f_obs').value = r.observaciones || '';
+  document.getElementById('f_c1_hora').value = r.c1_hora || '';
+  document.getElementById('f_c1_lts').value = r.c1_lts ?? '';
+  document.getElementById('f_c1_calidad').value = r.c1_calidad ?? '';
+  document.getElementById('f_c1_calostrero').value = r.c1_calostrero || '';
+  document.getElementById('f_c1_sonda').value = r.c1_sonda || '';
+  document.getElementById('f_c2_hora').value = r.c2_hora || '';
+  document.getElementById('f_c2_lts').value = r.c2_lts ?? '';
+  document.getElementById('f_c2_calidad').value = r.c2_calidad ?? '';
+  document.getElementById('f_c2_calostrero').value = r.c2_calostrero || '';
+  document.getElementById('f_c2_sonda').value = r.c2_sonda || '';
+  document.getElementById('f_o1_lts').value = r.o1_lts ?? '';
+  document.getElementById('f_o1_refrac').value = r.o1_refrac ?? '';
+  document.getElementById('f_o2_lts').value = r.o2_lts ?? '';
+  document.getElementById('f_o2_calidad').value = r.o2_calidad ?? '';
+  openModal(id);
+}
+
+async function saveParto() {
+  const fecha = document.getElementById('f_fecha').value;
+  if (!fecha) { alert('La fecha es obligatoria'); return; }
+  const btn = document.getElementById('saveBtn');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+
+  const payload = {
+    fecha_parto: fecha,
+    vaca: document.getElementById('f_vaca').value || null,
+    vaquilla: document.getElementById('f_vaquilla').value || null,
+    sexo: document.getElementById('f_sexo').value,
+    partero: document.getElementById('f_partero').value || null,
+    hora_parto: document.getElementById('f_hora_parto').value || null,
+    peso_nacer: parseFloat(document.getElementById('f_peso_nacer').value) || null,
+    observaciones: document.getElementById('f_obs').value || null,
+    c1_hora: document.getElementById('f_c1_hora').value || null,
+    c1_lts: parseFloat(document.getElementById('f_c1_lts').value) || null,
+    c1_calidad: parseFloat(document.getElementById('f_c1_calidad').value) || null,
+    c1_calostrero: document.getElementById('f_c1_calostrero').value || null,
+    c1_sonda: document.getElementById('f_c1_sonda').value || null,
+    c2_hora: document.getElementById('f_c2_hora').value || null,
+    c2_lts: parseFloat(document.getElementById('f_c2_lts').value) || null,
+    c2_calidad: parseFloat(document.getElementById('f_c2_calidad').value) || null,
+    c2_calostrero: document.getElementById('f_c2_calostrero').value || null,
+    c2_sonda: document.getElementById('f_c2_sonda').value || null,
+    o1_lts: parseFloat(document.getElementById('f_o1_lts').value) || null,
+    o1_refrac: parseFloat(document.getElementById('f_o1_refrac').value) || null,
+    o2_lts: parseFloat(document.getElementById('f_o2_lts').value) || null,
+    o2_calidad: parseFloat(document.getElementById('f_o2_calidad').value) || null,
+  };
+
+  try {
+    if (editingId) {
+      await sbFetch(`partos_crianza?id=eq.${editingId}`, 'PATCH', payload);
+    } else {
+      await sbFetch('partos_crianza', 'POST', payload);
+    }
+    closeModal();
+    await loadPartos();
+  } catch(e) {
+    alert('Error al guardar. Verifica la conexión con Supabase.');
+  }
+  btn.innerHTML = 'Guardar Parto';
+  btn.disabled = false;
+}
+
+async function deleteParto(id) {
+  if (!confirm('¿Eliminar este registro de parto?')) return;
+  await sbFetch(`partos_crianza?id=eq.${id}`, 'DELETE');
+  await loadPartos();
+}
+
+// ===================== PESAJES =====================
+async function loadPesajes() {
+  const partos = await sbFetch('partos_crianza?order=fecha_parto.asc');
+  const pesajes = await sbFetch('pesajes_crianza?order=fecha.desc');
+  renderPesajes(pesajes, partos);
+}
+
+function renderPesajes(pesajes, partos) {
+  const tbody = document.getElementById('pesajesBody');
+  if (!pesajes || pesajes.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Sin pesajes registrados.</td></tr>';
+    return;
+  }
+  // Build birth date map
+  const birthMap = {};
+  if (partos) partos.forEach(p => { if(p.vaquilla) birthMap[p.vaquilla] = p.fecha_parto; });
+
+  tbody.innerHTML = pesajes.map(r => {
+    const nacimiento = birthMap[r.vaquilla];
+    let dias = '—', gdp = '—';
+    if (nacimiento && r.fecha) {
+      const d = Math.floor((new Date(r.fecha) - new Date(nacimiento)) / 86400000);
+      dias = d >= 0 ? d : '—';
+    }
+    if (r.peso && nacimiento && r.fecha) {
+      const d2 = Math.floor((new Date(r.fecha) - new Date(nacimiento)) / 86400000);
+      if (d2 > 0) gdp = (r.peso / d2).toFixed(3);
+    }
+    return `
+      <tr>
+        <td class="mono">${r.fecha || '—'}</td>
+        <td class="mono">${r.vaquilla || '—'}</td>
+        <td class="mono">${r.peso ?? '—'} kg</td>
+        <td class="mono">${dias}</td>
+        <td class="mono">${gdp !== '—' ? gdp + ' kg/día' : '—'}</td>
+        <td>${r.notas || '—'}</td>
+        <td>
+          ${currentUser?.role==='admin' ? `<button class="btn btn-danger btn-sm" onclick="deletePesaje(${r.id})">🗑</button>` : ''}
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function openPesajeModal() {
+  document.getElementById('pesajeModal').classList.add('open');
+}
+function closePesajeModal() {
+  document.getElementById('pesajeModal').classList.remove('open');
+}
+
+async function savePesaje() {
+  const fecha = document.getElementById('p_fecha').value;
+  const vaquilla = document.getElementById('p_vaquilla').value;
+  const peso = parseFloat(document.getElementById('p_peso').value);
+  if (!fecha || !vaquilla || !peso) { alert('Fecha, vaquilla y peso son obligatorios'); return; }
+  const payload = {
+    fecha,
+    vaquilla,
+    peso,
+    notas: document.getElementById('p_notas').value || null
+  };
+  await sbFetch('pesajes_crianza', 'POST', payload);
+  closePesajeModal();
+  document.getElementById('p_fecha').value = '';
+  document.getElementById('p_vaquilla').value = '';
+  document.getElementById('p_peso').value = '';
+  document.getElementById('p_notas').value = '';
+  await loadPesajes();
+}
+
+async function deletePesaje(id) {
+  if (!confirm('¿Eliminar este pesaje?')) return;
+  await sbFetch(`pesajes_crianza?id=eq.${id}`, 'DELETE');
+  await loadPesajes();
+}
+
+// ===================== TABS =====================
+function showTab(tab, btn) {
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-partos').classList.add('hidden');
+  document.getElementById('tab-desarrollo').classList.add('hidden');
+  document.getElementById('tab-' + tab).classList.remove('hidden');
+}
+</script>
+</body>
+</html>
