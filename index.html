@@ -885,6 +885,8 @@ function renderDashOrdenas(fd){
       avgO2LtsH:avg(o2lts('H')), avgO2CalH:avg(o2cal('H')),
       avgO1LtsJ:avg(o1lts('J')), avgO1CalJ:avg(o1cal('J')),
       avgO2LtsJ:avg(o2lts('J')), avgO2CalJ:avg(o2cal('J')),
+      dos2: ol2.length,
+      pctDos2: ol1.length ? Math.round(ol2.length/ol1.length*100) : 0,
     };
   }
   const sA=ordStats(dataA);
@@ -894,15 +896,12 @@ function renderDashOrdenas(fd){
     kpiCard('Lts 1ª Ordeña (prom)', fmtN(sA.avgO1Lts), fmtN(sB.avgO1Lts), `min ${fmtN(sA.minO1Lts)} / max ${fmtN(sA.maxO1Lts)}`, compare?`min ${fmtN(sB.minO1Lts)} / max ${fmtN(sB.maxO1Lts)}`:'', compare)+
     kpiCard('Lts 1ª Ordeña Holstein', fmtN(sA.avgO1LtsH), fmtN(sB.avgO1LtsH), '', '', compare)+
     kpiCard('Lts 1ª Ordeña Jersey', fmtN(sA.avgO1LtsJ), fmtN(sB.avgO1LtsJ), '', '', compare)+
-    kpiCard('Lts 2ª Ordeña (prom)', fmtN(sA.avgO2Lts), fmtN(sB.avgO2Lts), `min ${fmtN(sA.minO2Lts)} / max ${fmtN(sA.maxO2Lts)}`, compare?`min ${fmtN(sB.minO2Lts)} / max ${fmtN(sB.maxO2Lts)}`:'', compare)+
-    kpiCard('Lts 2ª Ordeña Holstein', fmtN(sA.avgO2LtsH), fmtN(sB.avgO2LtsH), '', '', compare)+
-    kpiCard('Lts 2ª Ordeña Jersey', fmtN(sA.avgO2LtsJ), fmtN(sB.avgO2LtsJ), '', '', compare)+
     kpiCard('Cal. 1ª Ordeña (prom)', fmtN(sA.avgO1Cal,1), fmtN(sB.avgO1Cal,1), '', '', compare)+
     kpiCard('Cal. 1ª Ordeña Holstein', fmtN(sA.avgO1CalH,1), fmtN(sB.avgO1CalH,1), '', '', compare)+
     kpiCard('Cal. 1ª Ordeña Jersey', fmtN(sA.avgO1CalJ,1), fmtN(sB.avgO1CalJ,1), '', '', compare)+
+    kpiCard('Lts 2ª Ordeña (prom)', fmtN(sA.avgO2Lts), fmtN(sB.avgO2Lts), `min ${fmtN(sA.minO2Lts)} / max ${fmtN(sA.maxO2Lts)}`, compare?`min ${fmtN(sB.minO2Lts)} / max ${fmtN(sB.maxO2Lts)}`:'', compare)+
     kpiCard('Cal. 2ª Ordeña (prom)', fmtN(sA.avgO2Cal,0), fmtN(sB.avgO2Cal,0), '', '', compare)+
-    kpiCard('Cal. 2ª Ordeña Holstein', fmtN(sA.avgO2CalH,0), fmtN(sB.avgO2CalH,0), '', '', compare)+
-    kpiCard('Cal. 2ª Ordeña Jersey', fmtN(sA.avgO2CalJ,0), fmtN(sB.avgO2CalJ,0), '', '', compare);
+    kpiCard('Ordeñadas 2 veces', `${sA.dos2} (${sA.pctDos2}%)`, compare?`${sB.dos2} (${sB.pctDos2}%)`:'—', 'del total con 1ª ordeña', '', compare);
 
   function monthOrdChart(cid, field, color, labelA, dataBset, labelB){
     const {keys:mA,map:mapA}=groupByMonth(dataA, r=>r[field]);
