@@ -158,25 +158,58 @@
     <span id="userLabel"></span>
   </header>
   <nav id="mainNav">
-    <button onclick="showTab('dash-partos',this)">📊 Partos</button>
-    <button onclick="showTab('dash-pesos',this)">⚖️ Pesos al Nacer</button>
-    <button onclick="showTab('dash-tomas',this)">🥛 Calostro — Tomas</button>
-    <button onclick="showTab('dash-ordenas',this)">🧪 Calostro — Ordeñas</button>
+    <button onclick="showTab('dashboard',this)">📊 Dashboard</button>
     <div class="nav-sep"></div>
     <button onclick="showTab('reg-partos',this)">🐄 Registro Partos</button>
     <button onclick="showTab('reg-pesajes',this)">📏 Registro Pesajes</button>
   </nav>
   <main>
 
-    <!-- ===== DASH PARTOS ===== -->
-    <div id="tab-dash-partos" class="hidden">
+    <!-- ===== DASHBOARD UNIFICADO ===== -->
+    <div id="tab-dashboard" class="hidden">
       <div class="section-header">
-        <span class="section-title">Dashboard — Partos</span>
+        <span class="section-title">Dashboard</span>
       </div>
-      <div id="dp-controls"></div>
-      <div id="dp-kpis" class="kpi-grid"></div>
+
+      <!-- Filtros globales -->
+      <div class="dash-controls" id="dash-global-controls">
+        <div class="form-group">
+          <label>Desde</label>
+          <input type="date" id="dash-desde" oninput="renderDashboard()"/>
+        </div>
+        <div class="form-group">
+          <label>Hasta</label>
+          <input type="date" id="dash-hasta" oninput="renderDashboard()"/>
+        </div>
+        <div class="form-group" style="flex:0">
+          <label>&nbsp;</label>
+          <div class="quick-filters">
+            <button class="quick-btn" onclick="setQuickDash('m0')">Este mes</button>
+            <button class="quick-btn" onclick="setQuickDash('m1')">Mes ant.</button>
+            <button class="quick-btn" onclick="setQuickDash('q0')">T1 2026</button>
+            <button class="quick-btn active" id="qbtn-all" onclick="setQuickDash('all')">Todo</button>
+          </div>
+        </div>
+        <div class="form-group" style="flex:0;min-width:210px">
+          <label>&nbsp;</label>
+          <label class="compare-toggle">
+            <input type="checkbox" id="dash-cmp" onchange="toggleCompare()"/>
+            Comparar periodos
+          </label>
+        </div>
+      </div>
+      <!-- Panel comparación -->
+      <div id="dash-cmp-panel" style="display:none" class="dash-controls">
+        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-a)"></span>Periodo A — Desde</label><input type="date" id="dash-a-desde" oninput="renderDashboard()"/></div>
+        <div class="form-group"><label>Hasta</label><input type="date" id="dash-a-hasta" oninput="renderDashboard()"/></div>
+        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-b)"></span>Periodo B — Desde</label><input type="date" id="dash-b-desde" oninput="renderDashboard()"/></div>
+        <div class="form-group"><label>Hasta</label><input type="date" id="dash-b-hasta" oninput="renderDashboard()"/></div>
+      </div>
+
+      <!-- PARTOS -->
       <div class="dash-section">
-        <div class="dash-section-title">Distribución</div>
+        <div class="dash-section-title">📊 Partos</div>
+        <div id="dp-kpis" class="kpi-grid"></div>
         <div class="chart-grid">
           <div class="chart-card"><h4>Partos por Mes</h4><canvas id="ch-dp-mes"></canvas></div>
           <div class="chart-card"><h4>Sexo</h4><canvas id="ch-dp-sexo"></canvas></div>
@@ -184,33 +217,21 @@
           <div class="chart-card"><h4>Día vs Noche</h4><canvas id="ch-dp-dn"></canvas></div>
         </div>
       </div>
-    </div>
 
-    <!-- ===== DASH PESOS ===== -->
-    <div id="tab-dash-pesos" class="hidden">
-      <div class="section-header">
-        <span class="section-title">Dashboard — Pesos al Nacer</span>
-      </div>
-      <div id="pp-controls"></div>
-      <div id="pp-kpis" class="kpi-grid"></div>
+      <!-- PESOS -->
       <div class="dash-section">
-        <div class="dash-section-title">Distribución de Pesos</div>
+        <div class="dash-section-title">⚖️ Pesos al Nacer</div>
+        <div id="pp-kpis" class="kpi-grid"></div>
         <div class="chart-grid">
           <div class="chart-card"><h4>Promedio por Mes</h4><canvas id="ch-pp-mes"></canvas></div>
           <div class="chart-card"><h4>Histograma de Pesos</h4><canvas id="ch-pp-hist"></canvas></div>
         </div>
       </div>
-    </div>
 
-    <!-- ===== DASH TOMAS ===== -->
-    <div id="tab-dash-tomas" class="hidden">
-      <div class="section-header">
-        <span class="section-title">Dashboard — Calostro · Tomas</span>
-      </div>
-      <div id="pt-controls"></div>
-      <div id="pt-kpis" class="kpi-grid"></div>
+      <!-- TOMAS -->
       <div class="dash-section">
-        <div class="dash-section-title">Calidad & Refractometría</div>
+        <div class="dash-section-title">🥛 Calostro — Tomas</div>
+        <div id="pt-kpis" class="kpi-grid"></div>
         <div class="chart-grid">
           <div class="chart-card"><h4>Calidad 1ª Toma por Mes</h4><canvas id="ch-pt-cal1"></canvas></div>
           <div class="chart-card"><h4>Calidad 2ª Toma por Mes</h4><canvas id="ch-pt-cal2"></canvas></div>
@@ -218,17 +239,11 @@
           <div class="chart-card"><h4>Litros 1ª vs 2ª Toma</h4><canvas id="ch-pt-lts"></canvas></div>
         </div>
       </div>
-    </div>
 
-    <!-- ===== DASH ORDEÑAS ===== -->
-    <div id="tab-dash-ordenas" class="hidden">
-      <div class="section-header">
-        <span class="section-title">Dashboard — Calostro · Ordeñas</span>
-      </div>
-      <div id="po-controls"></div>
-      <div id="po-kpis" class="kpi-grid"></div>
+      <!-- ORDEÑAS -->
       <div class="dash-section">
-        <div class="dash-section-title">Producción por Mes</div>
+        <div class="dash-section-title">🧪 Calostro — Ordeñas</div>
+        <div id="po-kpis" class="kpi-grid"></div>
         <div class="chart-grid">
           <div class="chart-card"><h4>Litros 1ª Ordeña por Mes</h4><canvas id="ch-po-lts1"></canvas></div>
           <div class="chart-card"><h4>Litros 2ª Ordeña por Mes</h4><canvas id="ch-po-lts2"></canvas></div>
@@ -236,6 +251,7 @@
           <div class="chart-card"><h4>Calidad 2ª Ordeña por Mes</h4><canvas id="ch-po-cal2"></canvas></div>
         </div>
       </div>
+
     </div>
 
     <!-- ===== REG PARTOS ===== -->
@@ -428,9 +444,9 @@ function launchApp(u){
   document.getElementById('appView').classList.remove('hidden');
   document.getElementById('userLabel').textContent=u;
   loadPartos(); loadPesajes();
-  // Show first tab
+  // Show dashboard tab
   const firstBtn=document.querySelector('#mainNav button');
-  showTab('dash-partos',firstBtn);
+  showTab('dashboard',firstBtn);
 }
 window.addEventListener('DOMContentLoaded',()=>{
   const saved=sessionStorage.getItem('clh_user');
@@ -456,18 +472,13 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dash-partos','dash-pesos','dash-tomas','dash-ordenas','reg-partos','reg-pesajes'].forEach(t=>{
+  ['dashboard','reg-partos','reg-pesajes'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
   const el=document.getElementById('tab-'+tab);
   if(el) el.classList.remove('hidden');
-
-  // Render dashboard if needed
-  if(tab==='dash-partos') renderDashPartos();
-  else if(tab==='dash-pesos') renderDashPesos();
-  else if(tab==='dash-tomas') renderDashTomas();
-  else if(tab==='dash-ordenas') renderDashOrdenas();
+  if(tab==='dashboard') renderDashboard();
 }
 
 // ==================== DATA LOAD ====================
@@ -480,107 +491,67 @@ async function loadPartos(){
 
 // ==================== DASHBOARD HELPERS ====================
 
-// Filter data by date range and optionally partero
-function filterByRange(data, desde, hasta, partero=''){
-  return data.filter(r=>{
-    if(!r.fecha_parto) return false;
-    const f=r.fecha_parto.slice(0,10);
-    if(desde && f < desde) return false;
-    if(hasta && f > hasta) return false;
-    if(partero && r.partero !== partero) return false;
-    return true;
-  });
+// ==================== UNIFIED DASHBOARD ====================
+function toggleCompare(){
+  const on=document.getElementById('dash-cmp').checked;
+  document.getElementById('dash-cmp-panel').style.display=on?'flex':'none';
+  renderDashboard();
 }
 
-// Build controls HTML and return state object
-function buildControls(containerId, dashId, onUpdate){
-  const container=document.getElementById(containerId);
-  // Get unique parteros from allPartos
-  const parteros=[...new Set(allPartos.map(r=>r.partero).filter(Boolean))].sort();
-  const parteroOptions=parteros.map(p=>`<option value="${p}">${p}</option>`).join('');
-  container.innerHTML=`
-    <div class="dash-controls">
-      <div class="form-group">
-        <label>Desde</label>
-        <input type="date" id="${dashId}-desde" onchange="${onUpdate}()"/>
-      </div>
-      <div class="form-group">
-        <label>Hasta</label>
-        <input type="date" id="${dashId}-hasta" onchange="${onUpdate}()"/>
-      </div>
-      <div class="form-group" style="min-width:150px">
-        <label>Partero</label>
-        <select id="${dashId}-partero" onchange="${onUpdate}()">
-          <option value="">Todos</option>
-          ${parteroOptions}
-        </select>
-      </div>
-      <div class="form-group" style="flex:0">
-        <label>&nbsp;</label>
-        <div class="quick-filters">
-          <button class="quick-btn" onclick="setQuick('${dashId}','m0','${onUpdate}')">Este mes</button>
-          <button class="quick-btn" onclick="setQuick('${dashId}','m1','${onUpdate}')">Mes ant.</button>
-          <button class="quick-btn" onclick="setQuick('${dashId}','q0','${onUpdate}')">T1 2026</button>
-          <button class="quick-btn active" onclick="setQuick('${dashId}','all','${onUpdate}')">Todo</button>
-        </div>
-      </div>
-      <div class="form-group" style="flex:0;min-width:200px">
-        <label>&nbsp;</label>
-        <label class="compare-toggle">
-          <input type="checkbox" id="${dashId}-cmp" onchange="${onUpdate}()"/>
-          Comparar periodos
-        </label>
-      </div>
-      <div id="${dashId}-cmp-panel" class="hidden" style="display:none;gap:.75rem;flex-wrap:wrap">
-        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-a)"></span>Periodo A — Desde</label><input type="date" id="${dashId}-a-desde" onchange="${onUpdate}()"/></div>
-        <div class="form-group"><label>Hasta</label><input type="date" id="${dashId}-a-hasta" onchange="${onUpdate}()"/></div>
-        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-b)"></span>Periodo B — Desde</label><input type="date" id="${dashId}-b-desde" onchange="${onUpdate}()"/></div>
-        <div class="form-group"><label>Hasta</label><input type="date" id="${dashId}-b-hasta" onchange="${onUpdate}()"/></div>
-      </div>
-    </div>
-  `;
-  // Toggle compare panel
-  document.getElementById(dashId+'-cmp').addEventListener('change',function(){
-    const panel=document.getElementById(dashId+'-cmp-panel');
-    panel.style.display=this.checked?'flex':'none';
-  });
-}
-
-function setQuick(dashId, preset, onUpdate){
+function setQuickDash(preset){
   const now=new Date();
   const y=now.getFullYear();
   const m=String(now.getMonth()+1).padStart(2,'0');
   const prevM=String(now.getMonth()===0?12:now.getMonth()).padStart(2,'0');
   const prevY=now.getMonth()===0?y-1:y;
-  const desdeEl=document.getElementById(dashId+'-desde');
-  const hastaEl=document.getElementById(dashId+'-hasta');
+  const desdeEl=document.getElementById('dash-desde');
+  const hastaEl=document.getElementById('dash-hasta');
   if(preset==='m0'){desdeEl.value=`${y}-${m}-01`;hastaEl.value=`${y}-${m}-31`;}
   else if(preset==='m1'){desdeEl.value=`${prevY}-${prevM}-01`;hastaEl.value=`${prevY}-${prevM}-31`;}
   else if(preset==='q0'){desdeEl.value=`${y}-01-01`;hastaEl.value=`${y}-03-31`;}
   else{desdeEl.value='';hastaEl.value='';}
-  document.querySelectorAll(`#${dashId}-controls .quick-btn, .dash-controls .quick-btn`).forEach(b=>b.classList.remove('active'));
-  window[onUpdate]();
+  document.querySelectorAll('.quick-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('qbtn-all')?.classList[preset==='all'?'add':'remove']('active');
+  renderDashboard();
 }
 
-function getFilteredData(dashId){
-  const desde=document.getElementById(dashId+'-desde')?.value||'';
-  const hasta=document.getElementById(dashId+'-hasta')?.value||'';
-  const partero=document.getElementById(dashId+'-partero')?.value||'';
-  const cmp=document.getElementById(dashId+'-cmp')?.checked;
+function getGlobalFD(){
+  const desde=document.getElementById('dash-desde')?.value||'';
+  const hasta=document.getElementById('dash-hasta')?.value||'';
+  const cmp=document.getElementById('dash-cmp')?.checked;
   if(!cmp){
-    return { single: filterByRange(allPartos, desde, hasta, partero), compare:false };
+    return{single:filterByRange(allPartos,desde,hasta),compare:false};
   }
-  const aDesde=document.getElementById(dashId+'-a-desde')?.value||'';
-  const aHasta=document.getElementById(dashId+'-a-hasta')?.value||'';
-  const bDesde=document.getElementById(dashId+'-b-desde')?.value||'';
-  const bHasta=document.getElementById(dashId+'-b-hasta')?.value||'';
-  return {
-    compare: true,
-    a: filterByRange(allPartos, aDesde, aHasta, partero),
-    b: filterByRange(allPartos, bDesde, bHasta, partero),
-    aLabel: (aDesde&&aHasta)?`${aDesde} → ${aHasta}`:'Periodo A',
-    bLabel: (bDesde&&bHasta)?`${bDesde} → ${bHasta}`:'Periodo B',
+  const aDesde=document.getElementById('dash-a-desde')?.value||'';
+  const aHasta=document.getElementById('dash-a-hasta')?.value||'';
+  const bDesde=document.getElementById('dash-b-desde')?.value||'';
+  const bHasta=document.getElementById('dash-b-hasta')?.value||'';
+  return{
+    compare:true,
+    a:filterByRange(allPartos,aDesde,aHasta),
+    b:filterByRange(allPartos,bDesde,bHasta),
+    aLabel:(aDesde&&aHasta)?`${aDesde} → ${aHasta}`:'Periodo A',
+    bLabel:(bDesde&&bHasta)?`${bDesde} → ${bHasta}`:'Periodo B',
   };
+}
+
+function renderDashboard(){
+  const fd=getGlobalFD();
+  renderDashPartos(fd);
+  renderDashPesos(fd);
+  renderDashTomas(fd);
+  renderDashOrdenas(fd);
+}
+
+// Filter data by date range
+function filterByRange(data, desde, hasta){
+  return data.filter(r=>{
+    if(!r.fecha_parto) return false;
+    const f=r.fecha_parto.slice(0,10);
+    if(desde && f < desde) return false;
+    if(hasta && f > hasta) return false;
+    return true;
+  });
 }
 
 function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null; }
@@ -648,12 +619,7 @@ function computePartoKPIs(data){
 }
 
 // ==================== DASH PARTOS ====================
-function renderDashPartos(){
-  buildControls('dp-controls','dp','renderDashPartos');
-  _renderDashPartos();
-}
-function _renderDashPartos(){
-  const fd=getFilteredData('dp');
+function renderDashPartos(fd){
   const compare=fd.compare;
   const dataA=compare?fd.a:fd.single;
   const dataB=compare?fd.b:[];
@@ -689,12 +655,7 @@ function _renderDashPartos(){
 }
 
 // ==================== DASH PESOS ====================
-function renderDashPesos(){
-  buildControls('pp-controls','pp','renderDashPesos');
-  _renderDashPesos();
-}
-function _renderDashPesos(){
-  const fd=getFilteredData('pp');
+function renderDashPesos(fd){
   const compare=fd.compare;
   const dataA=compare?fd.a:fd.single;
   const dataB=compare?fd.b:[];
@@ -743,12 +704,7 @@ function _renderDashPesos(){
 }
 
 // ==================== DASH TOMAS ====================
-function renderDashTomas(){
-  buildControls('pt-controls','pt','renderDashTomas');
-  _renderDashTomas();
-}
-function _renderDashTomas(){
-  const fd=getFilteredData('pt');
+function renderDashTomas(fd){
   const compare=fd.compare;
   const dataA=compare?fd.a:fd.single;
   const dataB=compare?fd.b:[];
@@ -815,12 +771,7 @@ function _renderDashTomas(){
 }
 
 // ==================== DASH ORDEÑAS ====================
-function renderDashOrdenas(){
-  buildControls('po-controls','po','renderDashOrdenas');
-  _renderDashOrdenas();
-}
-function _renderDashOrdenas(){
-  const fd=getFilteredData('po');
+function renderDashOrdenas(fd){
   const compare=fd.compare;
   const dataA=compare?fd.a:fd.single;
   const dataB=compare?fd.b:[];
