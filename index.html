@@ -779,18 +779,18 @@ function renderDashTomas(fd){
   // Partero refractometría table
   const parteroMap={};
   dataA.forEach(r=>{
-    if(!r.partero||r.o1_refrac==null) return;
-    if(!parteroMap[r.partero]) parteroMap[r.partero]=[];
-    parteroMap[r.partero].push(r.o1_refrac);
+    if(!r.c1_calostrero||r.o1_refrac==null) return;
+    if(!parteroMap[r.c1_calostrero]) parteroMap[r.c1_calostrero]=[];
+    parteroMap[r.c1_calostrero].push(r.o1_refrac);
   });
   const parteroRows=Object.entries(parteroMap).sort((a,b)=>b[1].length-a[1].length);
   const parteroHtml=parteroRows.length?`
     <div class="dash-section" style="margin-top:1rem">
-      <div class="dash-section-title">Refractometría por Partero</div>
+      <div class="dash-section-title">Refractometría por Calostrero (1ª Toma)</div>
       <div class="table-wrap" style="max-width:600px">
         <table>
           <thead><tr>
-            <th>Partero</th><th>Partos</th><th>Refrac. Prom.</th><th>Mín</th><th>Máx</th><th>% ≥9</th>
+            <th>Calostrero</th><th>Tomas</th><th>Refrac. Prom.</th><th>Mín</th><th>Máx</th><th>% ≥9</th>
           </tr></thead>
           <tbody>
             ${parteroRows.map(([p,vals])=>{
