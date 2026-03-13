@@ -377,6 +377,7 @@
         <div class="form-grid">
           <div class="form-group"><label>Litros</label><input type="number" id="f_o1_lts" step="0.1"/></div>
           <div class="form-group"><label>Refractómetro</label><input type="number" id="f_o1_refrac" step="0.1"/></div>
+          <div class="form-group"><label>Calidad</label><input type="number" id="f_o1_calidad"/></div>
         </div>
       </div>
       <div class="form-section">
@@ -890,7 +891,7 @@ function clearPartoForm(){
    'f_peso_nacer','f_dias_gest','f_dias_reto','f_obs',
    'f_c1_hora','f_c1_lts','f_c1_calidad','f_c1_calostrero',
    'f_c2_hora','f_c2_lts','f_c2_calidad','f_c2_calostrero',
-   'f_o1_lts','f_o1_refrac','f_o2_lts','f_o2_calidad'].forEach(id=>document.getElementById(id).value='');
+   'f_o1_lts','f_o1_refrac','f_o1_calidad','f_o2_lts','f_o2_calidad'].forEach(id=>document.getElementById(id).value='');
   ['f_dia_noche','f_dificultad','f_c1_sonda','f_c2_sonda','f_raza'].forEach(id=>document.getElementById(id).value='');
 }
 async function editParto(id){
@@ -922,6 +923,7 @@ async function editParto(id){
   document.getElementById('f_raza').value=r.raza||'';
   document.getElementById('f_o1_lts').value=r.o1_lts??'';
   document.getElementById('f_o1_refrac').value=r.o1_refrac??'';
+  document.getElementById('f_o1_calidad').value=r.o1_calidad??'';
   document.getElementById('f_o2_lts').value=r.o2_lts??'';
   document.getElementById('f_o2_calidad').value=r.o2_calidad??'';
   openModal(id);
@@ -957,6 +959,7 @@ async function saveParto(){
     c2_sonda:document.getElementById('f_c2_sonda').value||null,
     o1_lts:parseFloat(document.getElementById('f_o1_lts').value)||null,
     o1_refrac:parseFloat(document.getElementById('f_o1_refrac').value)||null,
+    o1_calidad:parseFloat(document.getElementById('f_o1_calidad').value)||null,
     o2_lts:parseFloat(document.getElementById('f_o2_lts').value)||null,
     o2_calidad:parseFloat(document.getElementById('f_o2_calidad').value)||null,
     raza:document.getElementById('f_raza').value||null,
