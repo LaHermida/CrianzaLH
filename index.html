@@ -5,22 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CrianzaLH — Partos</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg:#f5f2eb;--surface:#fff;--border:#d4cfc4;--accent:#2d6a4f;
     --text:#1a1a1a;--text-muted:#6b6760;--input-bg:#fafaf7;--row-hover:#f0ede5;
     --red:#c62828;--yellow:#f9a825;--green:#2d6a4f;
+    --p1:#1b6ca8;--p2:#6a1b9a;--p3:#c77800;--p4:#c62828;
+    --cmp-a:#2d6a4f;--cmp-b:#c77800;
   }
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:'IBM Plex Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
   header{background:var(--accent);color:#fff;padding:0 2rem;display:flex;align-items:center;justify-content:space-between;height:56px;border-bottom:3px solid #1b4332}
   header h1{font-family:'IBM Plex Mono',monospace;font-size:1.1rem;font-weight:600;letter-spacing:.05em}
   header span{font-size:.75rem;opacity:.75;font-family:'IBM Plex Mono',monospace}
-  nav{background:var(--surface);border-bottom:2px solid var(--border);padding:0 2rem;display:flex}
-  nav button{font-family:'IBM Plex Sans',sans-serif;font-size:.85rem;font-weight:500;padding:.75rem 1.25rem;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s}
+
+  /* NAV */
+  nav{background:var(--surface);border-bottom:2px solid var(--border);padding:0 2rem;display:flex;overflow-x:auto}
+  nav button{font-family:'IBM Plex Sans',sans-serif;font-size:.85rem;font-weight:500;padding:.75rem 1.25rem;border:none;background:none;cursor:pointer;color:var(--text-muted);border-bottom:3px solid transparent;margin-bottom:-2px;transition:all .15s;white-space:nowrap}
   nav button.active{color:var(--accent);border-bottom-color:var(--accent)}
   nav button:hover:not(.active){color:var(--text);background:var(--row-hover)}
+  .nav-sep{width:1px;background:var(--border);margin:.5rem 0}
+
   main{padding:1.5rem 2rem;max-width:1800px}
   .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.25rem;flex-wrap:wrap;gap:.5rem}
   .section-title{font-family:'IBM Plex Mono',monospace;font-size:.9rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.08em}
@@ -29,6 +36,9 @@
   .btn-secondary{background:var(--surface);color:var(--text);border:1.5px solid var(--border)}.btn-secondary:hover{background:var(--row-hover)}
   .btn-danger{background:var(--red);color:#fff}
   .btn-sm{padding:.3rem .7rem;font-size:.78rem}
+  .btn-xs{padding:.2rem .5rem;font-size:.72rem}
+
+  /* MODAL */
   .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center}
   .modal-overlay.open{display:flex}
   .modal{background:var(--surface);border-radius:8px;width:960px;max-width:96vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)}
@@ -45,6 +55,8 @@
   label{font-size:.75rem;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
   input,select{font-family:'IBM Plex Sans',sans-serif;font-size:.88rem;padding:.45rem .65rem;border:1.5px solid var(--border);border-radius:4px;background:var(--input-bg);color:var(--text);transition:border-color .15s;width:100%}
   input:focus,select:focus{outline:none;border-color:var(--accent)}
+
+  /* TABLE */
   .table-wrap{overflow-x:auto;border:1.5px solid var(--border);border-radius:6px;background:var(--surface)}
   table{width:100%;border-collapse:collapse;font-size:.82rem;white-space:nowrap}
   thead tr{background:var(--accent);color:#fff}
@@ -60,10 +72,14 @@
   .badge-dn{background:#e8f5e9;color:#1b5e20}.badge-nn{background:#e3f2fd;color:#1565c0}
   .badge-dif{background:#ffebee;color:#b71c1c}.badge-nor{background:#f1f8e9;color:#33691e}
   .empty{text-align:center;padding:3rem;color:var(--text-muted);font-size:.88rem}
+
+  /* STATS */
   .stats-row{display:flex;gap:1rem;margin-bottom:1.25rem;flex-wrap:wrap}
   .stat-card{background:var(--surface);border:1.5px solid var(--border);border-radius:6px;padding:.75rem 1.25rem;min-width:120px}
   .stat-card .val{font-family:'IBM Plex Mono',monospace;font-size:1.6rem;font-weight:600;color:var(--accent)}
   .stat-card .lbl{font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em}
+
+  /* LOGIN */
   .login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg)}
   .login-box{background:var(--surface);border:1.5px solid var(--border);border-radius:8px;padding:2.5rem;width:360px;box-shadow:0 8px 30px rgba(0,0,0,.08)}
   .login-box h1{font-family:'IBM Plex Mono',monospace;font-size:1.4rem;color:var(--accent);margin-bottom:.3rem}
@@ -79,6 +95,44 @@
   .gdp-ok{color:#2d6a4f;font-weight:600}
   .gdp-warn{color:#e65100;font-weight:600}
   .gdp-bad{color:#c62828;font-weight:600}
+
+  /* DASHBOARD */
+  .dash-controls{background:var(--surface);border:1.5px solid var(--border);border-radius:6px;padding:1rem 1.25rem;margin-bottom:1.25rem;display:flex;gap:1rem;flex-wrap:wrap;align-items:flex-end}
+  .dash-controls .form-group{min-width:130px;flex:1}
+  .dash-controls label{margin-bottom:.25rem;display:block}
+  .period-badge{display:inline-flex;align-items:center;gap:.35rem;padding:.2rem .65rem;border-radius:3px;font-size:.72rem;font-weight:600;font-family:'IBM Plex Mono',monospace}
+  .period-a{background:#e8f5e9;color:#1b5e20;border:1.5px solid #a5d6a7}
+  .period-b{background:#fff3e0;color:#e65100;border:1.5px solid #ffcc80}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem}
+  .kpi-card{background:var(--surface);border:1.5px solid var(--border);border-radius:6px;padding:1rem 1.25rem}
+  .kpi-card .kpi-label{font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--text-muted);margin-bottom:.4rem}
+  .kpi-card .kpi-vals{display:flex;gap:.75rem;align-items:baseline}
+  .kpi-card .kpi-val-a{font-family:'IBM Plex Mono',monospace;font-size:1.5rem;font-weight:600;color:var(--cmp-a)}
+  .kpi-card .kpi-val-b{font-family:'IBM Plex Mono',monospace;font-size:1.5rem;font-weight:600;color:var(--cmp-b)}
+  .kpi-card .kpi-single{font-family:'IBM Plex Mono',monospace;font-size:1.5rem;font-weight:600;color:var(--accent)}
+  .kpi-card .kpi-sub{font-size:.72rem;color:var(--text-muted);margin-top:.2rem}
+  .kpi-divider{width:1px;background:var(--border);align-self:stretch}
+
+  .dash-section{margin-bottom:2rem}
+  .dash-section-title{font-family:'IBM Plex Mono',monospace;font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);padding-bottom:.4rem;border-bottom:1.5px solid var(--border);margin-bottom:1rem}
+  .chart-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:1rem}
+  .chart-card{background:var(--surface);border:1.5px solid var(--border);border-radius:6px;padding:1rem}
+  .chart-card h4{font-family:'IBM Plex Mono',monospace;font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.75rem}
+  .chart-card canvas{max-height:220px}
+
+  .refrac-bar{height:8px;border-radius:4px;background:var(--border);overflow:hidden;margin-top:.4rem}
+  .refrac-fill{height:100%;border-radius:4px;background:var(--green);transition:width .5s}
+  .refrac-fill.bad{background:var(--red)}
+
+  .quick-filters{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem}
+  .quick-btn{font-size:.75rem;padding:.25rem .65rem;border-radius:3px;border:1.5px solid var(--border);background:var(--surface);cursor:pointer;font-family:'IBM Plex Mono',monospace;color:var(--text-muted);transition:all .15s}
+  .quick-btn:hover,.quick-btn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+
+  .compare-toggle{display:flex;align-items:center;gap:.5rem;font-size:.82rem;color:var(--text-muted);cursor:pointer}
+  .compare-toggle input[type=checkbox]{width:auto;cursor:pointer}
+
+  .legend-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
 </style>
 </head>
 <body>
@@ -103,14 +157,89 @@
     <h1>🐄 CrianzaLH</h1>
     <span id="userLabel"></span>
   </header>
-  <nav>
-    <button class="active" onclick="showTab('partos',this)">Partos</button>
-    <button onclick="showTab('desarrollo',this)">Desarrollo / Pesajes</button>
+  <nav id="mainNav">
+    <button onclick="showTab('dash-partos',this)">📊 Partos</button>
+    <button onclick="showTab('dash-pesos',this)">⚖️ Pesos al Nacer</button>
+    <button onclick="showTab('dash-tomas',this)">🥛 Calostro — Tomas</button>
+    <button onclick="showTab('dash-ordenas',this)">🧪 Calostro — Ordeñas</button>
+    <div class="nav-sep"></div>
+    <button onclick="showTab('reg-partos',this)">🐄 Registro Partos</button>
+    <button onclick="showTab('reg-pesajes',this)">📏 Registro Pesajes</button>
   </nav>
   <main>
 
-    <!-- TAB PARTOS -->
-    <div id="tab-partos">
+    <!-- ===== DASH PARTOS ===== -->
+    <div id="tab-dash-partos" class="hidden">
+      <div class="section-header">
+        <span class="section-title">Dashboard — Partos</span>
+      </div>
+      <div id="dp-controls"></div>
+      <div id="dp-kpis" class="kpi-grid"></div>
+      <div class="dash-section">
+        <div class="dash-section-title">Distribución</div>
+        <div class="chart-grid">
+          <div class="chart-card"><h4>Partos por Mes</h4><canvas id="ch-dp-mes"></canvas></div>
+          <div class="chart-card"><h4>Sexo</h4><canvas id="ch-dp-sexo"></canvas></div>
+          <div class="chart-card"><h4>Dificultad</h4><canvas id="ch-dp-dif"></canvas></div>
+          <div class="chart-card"><h4>Día vs Noche</h4><canvas id="ch-dp-dn"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== DASH PESOS ===== -->
+    <div id="tab-dash-pesos" class="hidden">
+      <div class="section-header">
+        <span class="section-title">Dashboard — Pesos al Nacer</span>
+      </div>
+      <div id="pp-controls"></div>
+      <div id="pp-kpis" class="kpi-grid"></div>
+      <div class="dash-section">
+        <div class="dash-section-title">Distribución de Pesos</div>
+        <div class="chart-grid">
+          <div class="chart-card"><h4>Promedio por Mes</h4><canvas id="ch-pp-mes"></canvas></div>
+          <div class="chart-card"><h4>Histograma de Pesos</h4><canvas id="ch-pp-hist"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== DASH TOMAS ===== -->
+    <div id="tab-dash-tomas" class="hidden">
+      <div class="section-header">
+        <span class="section-title">Dashboard — Calostro · Tomas</span>
+      </div>
+      <div id="pt-controls"></div>
+      <div id="pt-kpis" class="kpi-grid"></div>
+      <div class="dash-section">
+        <div class="dash-section-title">Calidad & Refractometría</div>
+        <div class="chart-grid">
+          <div class="chart-card"><h4>Calidad 1ª Toma por Mes</h4><canvas id="ch-pt-cal1"></canvas></div>
+          <div class="chart-card"><h4>Calidad 2ª Toma por Mes</h4><canvas id="ch-pt-cal2"></canvas></div>
+          <div class="chart-card"><h4>Refractometría por Mes</h4><canvas id="ch-pt-refrac"></canvas></div>
+          <div class="chart-card"><h4>Litros 1ª vs 2ª Toma</h4><canvas id="ch-pt-lts"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== DASH ORDEÑAS ===== -->
+    <div id="tab-dash-ordenas" class="hidden">
+      <div class="section-header">
+        <span class="section-title">Dashboard — Calostro · Ordeñas</span>
+      </div>
+      <div id="po-controls"></div>
+      <div id="po-kpis" class="kpi-grid"></div>
+      <div class="dash-section">
+        <div class="dash-section-title">Producción por Mes</div>
+        <div class="chart-grid">
+          <div class="chart-card"><h4>Litros 1ª Ordeña por Mes</h4><canvas id="ch-po-lts1"></canvas></div>
+          <div class="chart-card"><h4>Litros 2ª Ordeña por Mes</h4><canvas id="ch-po-lts2"></canvas></div>
+          <div class="chart-card"><h4>Calidad 1ª Ordeña por Mes</h4><canvas id="ch-po-cal1"></canvas></div>
+          <div class="chart-card"><h4>Calidad 2ª Ordeña por Mes</h4><canvas id="ch-po-cal2"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== REG PARTOS ===== -->
+    <div id="tab-reg-partos" class="hidden">
       <div class="stats-row" id="statsRow"></div>
       <div class="section-header">
         <span class="section-title">Registro de Partos</span>
@@ -124,18 +253,10 @@
         <table>
           <thead>
             <tr>
-              <th rowspan="2">Fecha</th>
-              <th rowspan="2">Tipo</th>
-              <th rowspan="2">Madre</th>
-              <th rowspan="2">Hembra</th>
-              <th rowspan="2">Raza</th>
-              <th rowspan="2">Partero</th>
-              <th rowspan="2">H.Parto</th>
-              <th rowspan="2">D/N</th>
-              <th rowspan="2">Dificultad</th>
-              <th rowspan="2">Peso Nacer</th>
-              <th rowspan="2">Gest.</th>
-              <th rowspan="2">Reto</th>
+              <th rowspan="2">Fecha</th><th rowspan="2">Tipo</th><th rowspan="2">Madre</th>
+              <th rowspan="2">Hembra</th><th rowspan="2">Raza</th><th rowspan="2">Partero</th>
+              <th rowspan="2">H.Parto</th><th rowspan="2">D/N</th><th rowspan="2">Dificultad</th>
+              <th rowspan="2">Peso Nacer</th><th rowspan="2">Gest.</th><th rowspan="2">Reto</th>
               <th colspan="5" class="g1" style="text-align:center">1ª Toma Calostro</th>
               <th colspan="5" class="g2" style="text-align:center">2ª Toma Calostro</th>
               <th colspan="2" class="g3" style="text-align:center">1ª Ordeña</th>
@@ -154,8 +275,8 @@
       </div>
     </div>
 
-    <!-- TAB DESARROLLO -->
-    <div id="tab-desarrollo" class="hidden">
+    <!-- ===== REG PESAJES ===== -->
+    <div id="tab-reg-pesajes" class="hidden">
       <div class="section-header">
         <span class="section-title">Desarrollo / Pesajes</span>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
@@ -167,10 +288,7 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr>
-              <th>Fecha</th><th>Hembra</th><th>Peso (kg)</th>
-              <th>Días de Vida</th><th>ADG / GDP (kg/día)</th><th>Notas</th><th>Acciones</th>
-            </tr>
+            <tr><th>Fecha</th><th>Hembra</th><th>Peso (kg)</th><th>Días de Vida</th><th>ADG / GDP (kg/día)</th><th>Notas</th><th>Acciones</th></tr>
           </thead>
           <tbody id="pesajesBody"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
         </table>
@@ -274,7 +392,7 @@
     <div class="modal-body">
       <div id="importPreviewInfo" style="font-size:.9rem;line-height:1.9"></div>
       <div style="margin-top:1rem;padding:.75rem;background:var(--bg);border-radius:4px;font-size:.8rem;color:var(--text-muted)">
-        <strong>Partos:</strong> usa la Plantilla_CrianzaLH.xlsx o tu CSV con columnas en el orden correcto.<br><br>
+        <strong>Partos:</strong> usa la Plantilla_CrianzaLH.xlsx con columnas en el orden correcto.<br><br>
         <strong>Pesajes:</strong> Fecha | Hembra | Peso (kg) | Notas
       </div>
     </div>
@@ -288,23 +406,21 @@
 <script>
 const SUPABASE_URL = 'https://qlgctjnrndzhvqondjvz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZ2N0am5ybmR6aHZxb25kanZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNjQzNjgsImV4cCI6MjA4Nzc0MDM2OH0._4KqKFG0N_zrS2ovwxpvi5SzQpQcPMK71wGZ3N3Cilo';
-
 const USERS = { 'Admin':{ pass:'lh2024', role:'admin' }, 'Ale@LaHermida':{ pass:'5678', role:'admin' }, 'Captura':{ pass:'crianza1', role:'user' } };
 let currentUser = null;
 let editingId = null;
+let allPartos = [];
+const chartInstances = {};
 
+// ==================== AUTH ====================
 function doLogin(){
-  const u = document.getElementById('loginUser').value.trim();
-  const p = document.getElementById('loginPass').value;
-  if(USERS[u] && USERS[u].pass===p){
+  const u=document.getElementById('loginUser').value.trim();
+  const p=document.getElementById('loginPass').value;
+  if(USERS[u]&&USERS[u].pass===p){
     currentUser={name:u,role:USERS[u].role};
-    if(document.getElementById('rememberMe').checked){
-      sessionStorage.setItem('clh_user', u);
-    }
+    if(document.getElementById('rememberMe').checked) sessionStorage.setItem('clh_user',u);
     launchApp(u);
-  } else {
-    document.getElementById('loginError').classList.remove('hidden');
-  }
+  } else { document.getElementById('loginError').classList.remove('hidden'); }
 }
 function launchApp(u){
   currentUser={name:u,role:USERS[u].role};
@@ -312,23 +428,23 @@ function launchApp(u){
   document.getElementById('appView').classList.remove('hidden');
   document.getElementById('userLabel').textContent=u;
   loadPartos(); loadPesajes();
+  // Show first tab
+  const firstBtn=document.querySelector('#mainNav button');
+  showTab('dash-partos',firstBtn);
 }
-// Auto-login if remembered
 window.addEventListener('DOMContentLoaded',()=>{
-  const saved = sessionStorage.getItem('clh_user');
-  if(saved && USERS[saved]){
-    document.getElementById('loginUser').value=saved;
-    launchApp(saved);
-  }
+  const saved=sessionStorage.getItem('clh_user');
+  if(saved&&USERS[saved]){ document.getElementById('loginUser').value=saved; launchApp(saved); }
 });
-document.getElementById('loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginView').style.display!=='none')doLogin();});
 
-async function sbFetch(path, method='GET', body=null){
-  const url = `${SUPABASE_URL}/rest/v1/${path}`;
+// ==================== SUPABASE ====================
+async function sbFetch(path,method='GET',body=null){
+  const url=`${SUPABASE_URL}/rest/v1/${path}`;
   const opts={method,headers:{
     'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,
     'Content-Type':'application/json',
-    'Prefer': method==='POST'?'return=representation':'return=minimal'
+    'Prefer':method==='POST'?'return=representation':'return=minimal'
   }};
   if(body) opts.body=JSON.stringify(body);
   const res=await fetch(url,opts);
@@ -336,26 +452,436 @@ async function sbFetch(path, method='GET', body=null){
   return res;
 }
 
-// ==================== PARTOS ====================
-async function loadPartos(){
-  const data = await sbFetch('partos_crianza?order=fecha_parto.desc');
-  renderPartos(data); renderStats(data);
+// ==================== TABS ====================
+function showTab(tab,btn){
+  document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ['dash-partos','dash-pesos','dash-tomas','dash-ordenas','reg-partos','reg-pesajes'].forEach(t=>{
+    const el=document.getElementById('tab-'+t);
+    if(el) el.classList.add('hidden');
+  });
+  const el=document.getElementById('tab-'+tab);
+  if(el) el.classList.remove('hidden');
+
+  // Render dashboard if needed
+  if(tab==='dash-partos') renderDashPartos();
+  else if(tab==='dash-pesos') renderDashPesos();
+  else if(tab==='dash-tomas') renderDashTomas();
+  else if(tab==='dash-ordenas') renderDashOrdenas();
 }
 
+// ==================== DATA LOAD ====================
+async function loadPartos(){
+  const data=await sbFetch('partos_crianza?order=fecha_parto.desc');
+  allPartos=data;
+  renderPartos(data);
+  renderStats(data);
+}
+
+// ==================== DASHBOARD HELPERS ====================
+
+// Filter data by date range and optionally partero
+function filterByRange(data, desde, hasta, partero=''){
+  return data.filter(r=>{
+    if(!r.fecha_parto) return false;
+    const f=r.fecha_parto.slice(0,10);
+    if(desde && f < desde) return false;
+    if(hasta && f > hasta) return false;
+    if(partero && r.partero !== partero) return false;
+    return true;
+  });
+}
+
+// Build controls HTML and return state object
+function buildControls(containerId, dashId, onUpdate){
+  const container=document.getElementById(containerId);
+  // Get unique parteros from allPartos
+  const parteros=[...new Set(allPartos.map(r=>r.partero).filter(Boolean))].sort();
+  const parteroOptions=parteros.map(p=>`<option value="${p}">${p}</option>`).join('');
+  container.innerHTML=`
+    <div class="dash-controls">
+      <div class="form-group">
+        <label>Desde</label>
+        <input type="date" id="${dashId}-desde" onchange="${onUpdate}()"/>
+      </div>
+      <div class="form-group">
+        <label>Hasta</label>
+        <input type="date" id="${dashId}-hasta" onchange="${onUpdate}()"/>
+      </div>
+      <div class="form-group" style="min-width:150px">
+        <label>Partero</label>
+        <select id="${dashId}-partero" onchange="${onUpdate}()">
+          <option value="">Todos</option>
+          ${parteroOptions}
+        </select>
+      </div>
+      <div class="form-group" style="flex:0">
+        <label>&nbsp;</label>
+        <div class="quick-filters">
+          <button class="quick-btn" onclick="setQuick('${dashId}','m0','${onUpdate}')">Este mes</button>
+          <button class="quick-btn" onclick="setQuick('${dashId}','m1','${onUpdate}')">Mes ant.</button>
+          <button class="quick-btn" onclick="setQuick('${dashId}','q0','${onUpdate}')">T1 2026</button>
+          <button class="quick-btn active" onclick="setQuick('${dashId}','all','${onUpdate}')">Todo</button>
+        </div>
+      </div>
+      <div class="form-group" style="flex:0;min-width:200px">
+        <label>&nbsp;</label>
+        <label class="compare-toggle">
+          <input type="checkbox" id="${dashId}-cmp" onchange="${onUpdate}()"/>
+          Comparar periodos
+        </label>
+      </div>
+      <div id="${dashId}-cmp-panel" class="hidden" style="display:none;gap:.75rem;flex-wrap:wrap">
+        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-a)"></span>Periodo A — Desde</label><input type="date" id="${dashId}-a-desde" onchange="${onUpdate}()"/></div>
+        <div class="form-group"><label>Hasta</label><input type="date" id="${dashId}-a-hasta" onchange="${onUpdate}()"/></div>
+        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-b)"></span>Periodo B — Desde</label><input type="date" id="${dashId}-b-desde" onchange="${onUpdate}()"/></div>
+        <div class="form-group"><label>Hasta</label><input type="date" id="${dashId}-b-hasta" onchange="${onUpdate}()"/></div>
+      </div>
+    </div>
+  `;
+  // Toggle compare panel
+  document.getElementById(dashId+'-cmp').addEventListener('change',function(){
+    const panel=document.getElementById(dashId+'-cmp-panel');
+    panel.style.display=this.checked?'flex':'none';
+  });
+}
+
+function setQuick(dashId, preset, onUpdate){
+  const now=new Date();
+  const y=now.getFullYear();
+  const m=String(now.getMonth()+1).padStart(2,'0');
+  const prevM=String(now.getMonth()===0?12:now.getMonth()).padStart(2,'0');
+  const prevY=now.getMonth()===0?y-1:y;
+  const desdeEl=document.getElementById(dashId+'-desde');
+  const hastaEl=document.getElementById(dashId+'-hasta');
+  if(preset==='m0'){desdeEl.value=`${y}-${m}-01`;hastaEl.value=`${y}-${m}-31`;}
+  else if(preset==='m1'){desdeEl.value=`${prevY}-${prevM}-01`;hastaEl.value=`${prevY}-${prevM}-31`;}
+  else if(preset==='q0'){desdeEl.value=`${y}-01-01`;hastaEl.value=`${y}-03-31`;}
+  else{desdeEl.value='';hastaEl.value='';}
+  document.querySelectorAll(`#${dashId}-controls .quick-btn, .dash-controls .quick-btn`).forEach(b=>b.classList.remove('active'));
+  window[onUpdate]();
+}
+
+function getFilteredData(dashId){
+  const desde=document.getElementById(dashId+'-desde')?.value||'';
+  const hasta=document.getElementById(dashId+'-hasta')?.value||'';
+  const partero=document.getElementById(dashId+'-partero')?.value||'';
+  const cmp=document.getElementById(dashId+'-cmp')?.checked;
+  if(!cmp){
+    return { single: filterByRange(allPartos, desde, hasta, partero), compare:false };
+  }
+  const aDesde=document.getElementById(dashId+'-a-desde')?.value||'';
+  const aHasta=document.getElementById(dashId+'-a-hasta')?.value||'';
+  const bDesde=document.getElementById(dashId+'-b-desde')?.value||'';
+  const bHasta=document.getElementById(dashId+'-b-hasta')?.value||'';
+  return {
+    compare: true,
+    a: filterByRange(allPartos, aDesde, aHasta, partero),
+    b: filterByRange(allPartos, bDesde, bHasta, partero),
+    aLabel: (aDesde&&aHasta)?`${aDesde} → ${aHasta}`:'Periodo A',
+    bLabel: (bDesde&&bHasta)?`${bDesde} → ${bHasta}`:'Periodo B',
+  };
+}
+
+function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null; }
+function fmtN(v,dec=1){ return v!=null?v.toFixed(dec):'—'; }
+
+function destroyChart(id){
+  if(chartInstances[id]){ chartInstances[id].destroy(); delete chartInstances[id]; }
+}
+
+function mkChart(id, type, labels, datasets, opts={}){
+  destroyChart(id);
+  const ctx=document.getElementById(id);
+  if(!ctx) return;
+  chartInstances[id]=new Chart(ctx,{
+    type,
+    data:{labels, datasets},
+    options:{
+      responsive:true, maintainAspectRatio:true,
+      plugins:{legend:{display:datasets.length>1,labels:{font:{size:11},boxWidth:12}},tooltip:{mode:'index'}},
+      scales: type==='bar'||type==='line'?{y:{beginAtZero:false,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}:{},
+      ...opts
+    }
+  });
+}
+
+function groupByMonth(data, valFn){
+  const map={};
+  data.forEach(r=>{
+    if(!r.fecha_parto) return;
+    const k=r.fecha_parto.slice(0,7);
+    if(!map[k]) map[k]=[];
+    const v=valFn(r);
+    if(v!=null) map[k].push(v);
+  });
+  const keys=Object.keys(map).sort();
+  return {keys, map};
+}
+
+// KPI card HTML
+function kpiCard(label, valA, valB, subA='', subB='', compare=false){
+  if(!compare){
+    return `<div class="kpi-card">
+      <div class="kpi-label">${label}</div>
+      <div class="kpi-single">${valA}</div>
+      ${subA?`<div class="kpi-sub">${subA}</div>`:''}
+    </div>`;
+  }
+  return `<div class="kpi-card">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-vals">
+      <div><div class="kpi-val-a">${valA}</div>${subA?`<div class="kpi-sub" style="color:var(--cmp-a)">${subA}</div>`:''}</div>
+      <div class="kpi-divider"></div>
+      <div><div class="kpi-val-b">${valB}</div>${subB?`<div class="kpi-sub" style="color:var(--cmp-b)">${subB}</div>`:''}</div>
+    </div>
+  </div>`;
+}
+
+function computePartoKPIs(data){
+  const total=data.length;
+  const hembras=data.filter(r=>r.sexo==='H').length;
+  const machos=data.filter(r=>r.sexo==='M').length;
+  const dificiles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase().includes('dificil')).length;
+  const noche=data.filter(r=>r.dia_noche==='Noche').length;
+  return {total,hembras,machos,dificiles,noche};
+}
+
+// ==================== DASH PARTOS ====================
+function renderDashPartos(){
+  buildControls('dp-controls','dp','renderDashPartos');
+  _renderDashPartos();
+}
+function _renderDashPartos(){
+  const fd=getFilteredData('dp');
+  const compare=fd.compare;
+  const dataA=compare?fd.a:fd.single;
+  const dataB=compare?fd.b:[];
+
+  const kA=computePartoKPIs(dataA);
+  const kB=compare?computePartoKPIs(dataB):{};
+
+  document.getElementById('dp-kpis').innerHTML=
+    kpiCard('Total Partos', kA.total, kB.total, '', '', compare)+
+    kpiCard('Hembras', kA.hembras, kB.hembras, `${kA.total?Math.round(kA.hembras/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.hembras/kB.total*100):0}%`:'', compare)+
+    kpiCard('Machos', kA.machos, kB.machos, '', '', compare)+
+    kpiCard('Difíciles', kA.dificiles, kB.dificiles, `${kA.total?Math.round(kA.dificiles/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.dificiles/kB.total*100):0}%`:'', compare)+
+    kpiCard('Noche', kA.noche, kB.noche, '', '', compare);
+
+  // Charts
+  const {keys:mA, map:mapA}=groupByMonth(dataA, r=>1);
+  const countA=mA.map(k=>mapA[k].length);
+
+  if(compare){
+    const {keys:mB, map:mapB}=groupByMonth(dataB, r=>1);
+    const allMonths=[...new Set([...mA,...mB])].sort();
+    mkChart('ch-dp-mes','bar',allMonths,[
+      {label:fd.aLabel,data:allMonths.map(k=>mapA[k]?.length||0),backgroundColor:'rgba(45,106,79,.7)'},
+      {label:fd.bLabel,data:allMonths.map(k=>mapB[k]?.length||0),backgroundColor:'rgba(199,120,0,.7)'},
+    ]);
+  } else {
+    mkChart('ch-dp-mes','bar',mA,[{label:'Partos',data:countA,backgroundColor:'rgba(45,106,79,.7)'}]);
+  }
+
+  mkChart('ch-dp-sexo','doughnut',['Hembras','Machos'],[{data:[kA.hembras,kA.machos],backgroundColor:['#fce4ec','#e3f2fd'],borderColor:['#880e4f','#1565c0'],borderWidth:2}],{plugins:{legend:{display:true}}});
+  mkChart('ch-dp-dif','doughnut',['Normal','Difícil'],[{data:[kA.total-kA.dificiles,kA.dificiles],backgroundColor:['#f1f8e9','#ffebee'],borderColor:['#33691e','#b71c1c'],borderWidth:2}],{plugins:{legend:{display:true}}});
+  mkChart('ch-dp-dn','doughnut',['Día','Noche'],[{data:[kA.total-kA.noche,kA.noche],backgroundColor:['#fff8e1','#e3f2fd'],borderColor:['#f57f17','#1565c0'],borderWidth:2}],{plugins:{legend:{display:true}}});
+}
+
+// ==================== DASH PESOS ====================
+function renderDashPesos(){
+  buildControls('pp-controls','pp','renderDashPesos');
+  _renderDashPesos();
+}
+function _renderDashPesos(){
+  const fd=getFilteredData('pp');
+  const compare=fd.compare;
+  const dataA=compare?fd.a:fd.single;
+  const dataB=compare?fd.b:[];
+
+  function pesoStats(data){
+    const allH=data.filter(r=>r.peso_nacer!=null&&r.raza==='H').map(r=>r.peso_nacer);
+    const allJ=data.filter(r=>r.peso_nacer!=null&&r.raza==='J').map(r=>r.peso_nacer);
+    const all=data.filter(r=>r.peso_nacer!=null).map(r=>r.peso_nacer);
+    return {
+      avgH:avg(allH), minH:allH.length?Math.min(...allH):null, maxH:allH.length?Math.max(...allH):null,
+      avgJ:avg(allJ), minJ:allJ.length?Math.min(...allJ):null, maxJ:allJ.length?Math.max(...allJ):null,
+      avgAll:avg(all), minAll:all.length?Math.min(...all):null, maxAll:all.length?Math.max(...all):null,
+      allH, allJ
+    };
+  }
+  const sA=pesoStats(dataA);
+  const sB=compare?pesoStats(dataB):{};
+
+  document.getElementById('pp-kpis').innerHTML=
+    kpiCard('Prom. General (kg)', fmtN(sA.avgAll), fmtN(sB.avgAll), `min ${fmtN(sA.minAll)} / max ${fmtN(sA.maxAll)}`, compare?`min ${fmtN(sB.minAll)} / max ${fmtN(sB.maxAll)}`:'', compare)+
+    kpiCard('Prom. Holstein', fmtN(sA.avgH), fmtN(sB.avgH), `min ${fmtN(sA.minH)} / max ${fmtN(sA.maxH)}`, compare?`min ${fmtN(sB.minH)} / max ${fmtN(sB.maxH)}`:'', compare)+
+    kpiCard('Prom. Jersey', fmtN(sA.avgJ), fmtN(sB.avgJ), `min ${fmtN(sA.minJ)} / max ${fmtN(sA.maxJ)}`, compare?`min ${fmtN(sB.minJ)} / max ${fmtN(sB.maxJ)}`:'', compare);
+
+  // Chart por mes
+  const {keys:mA,map:mapA}=groupByMonth(dataA, r=>r.peso_nacer);
+  const avgA=mA.map(k=>{const v=avg(mapA[k]);return v?parseFloat(v.toFixed(1)):null;});
+  if(compare){
+    const {keys:mB,map:mapB}=groupByMonth(dataB, r=>r.peso_nacer);
+    const allM=[...new Set([...mA,...mB])].sort();
+    mkChart('ch-pp-mes','line',allM,[
+      {label:fd.aLabel,data:allM.map(k=>{const v=avg(mapA[k]);return v?parseFloat(v.toFixed(1)):null;}),borderColor:'var(--cmp-a)',backgroundColor:'rgba(45,106,79,.1)',tension:.3,fill:true},
+      {label:fd.bLabel,data:allM.map(k=>{const v=avg(mapB[k]);return v?parseFloat(v.toFixed(1)):null;}),borderColor:'var(--cmp-b)',backgroundColor:'rgba(199,120,0,.1)',tension:.3,fill:true},
+    ]);
+  } else {
+    mkChart('ch-pp-mes','line',mA,[{label:'Prom. kg',data:avgA,borderColor:'var(--accent)',backgroundColor:'rgba(45,106,79,.1)',tension:.3,fill:true}]);
+  }
+
+  // Histograma
+  const bins=[20,22,24,26,28,30,32,34,36,38,40];
+  const labelsH=bins.slice(0,-1).map((b,i)=>`${b}-${bins[i+1]}`);
+  function hist(arr){ return bins.slice(0,-1).map((b,i)=>arr.filter(v=>v>=b&&v<bins[i+1]).length); }
+  mkChart('ch-pp-hist','bar',labelsH,[
+    {label:'Holstein',data:hist(sA.allH),backgroundColor:'rgba(27,108,168,.6)'},
+    {label:'Jersey',data:hist(sA.allJ),backgroundColor:'rgba(199,120,0,.6)'},
+  ]);
+}
+
+// ==================== DASH TOMAS ====================
+function renderDashTomas(){
+  buildControls('pt-controls','pt','renderDashTomas');
+  _renderDashTomas();
+}
+function _renderDashTomas(){
+  const fd=getFilteredData('pt');
+  const compare=fd.compare;
+  const dataA=compare?fd.a:fd.single;
+  const dataB=compare?fd.b:[];
+
+  function tomaStats(data){
+    const c1cal=data.filter(r=>r.c1_calidad!=null).map(r=>r.c1_calidad);
+    const c2cal=data.filter(r=>r.c2_calidad!=null).map(r=>r.c2_calidad);
+    const c1lts=data.filter(r=>r.c1_lts!=null).map(r=>r.c1_lts);
+    const c2lts=data.filter(r=>r.c2_lts!=null).map(r=>r.c2_lts);
+    const refrac=data.filter(r=>r.o1_refrac!=null).map(r=>r.o1_refrac);
+    const refracOk=refrac.filter(v=>v>=9).length;
+    const refracBad=refrac.filter(v=>v<9).length;
+    return {
+      avgC1Cal:avg(c1cal), avgC2Cal:avg(c2cal),
+      avgC1Lts:avg(c1lts), avgC2Lts:avg(c2lts),
+      avgRefrac:avg(refrac), refracOk, refracBad,
+      pctRefracOk:refrac.length?Math.round(refracOk/refrac.length*100):0,
+      minRefrac:refrac.length?Math.min(...refrac):null,
+    };
+  }
+  const sA=tomaStats(dataA);
+  const sB=compare?tomaStats(dataB):{};
+
+  const refracBarA=`<div class="refrac-bar"><div class="refrac-fill" style="width:${sA.pctRefracOk}%"></div></div>`;
+
+  document.getElementById('pt-kpis').innerHTML=
+    kpiCard('Cal. 1ª Toma (prom)', fmtN(sA.avgC1Cal,0), fmtN(sB.avgC1Cal,0), '', '', compare)+
+    kpiCard('Cal. 2ª Toma (prom)', fmtN(sA.avgC2Cal,0), fmtN(sB.avgC2Cal,0), '', '', compare)+
+    kpiCard('Lts 1ª Toma (prom)', fmtN(sA.avgC1Lts), fmtN(sB.avgC1Lts), '', '', compare)+
+    kpiCard('Lts 2ª Toma (prom)', fmtN(sA.avgC2Lts), fmtN(sB.avgC2Lts), '', '', compare)+
+    `<div class="kpi-card">
+      <div class="kpi-label">Refractometría ≥9</div>
+      <div class="kpi-single">${sA.pctRefracOk}%</div>
+      ${refracBarA}
+      <div class="kpi-sub">✅ ${sA.refracOk} ok · ❌ ${sA.refracBad} bajo · mín ${fmtN(sA.minRefrac,1)}</div>
+    </div>`;
+
+  // Charts
+  function monthAvgChart(cid, dataSet, field, color, labelA, dataB2, labelB){
+    const {keys:mA,map:mapA}=groupByMonth(dataSet, r=>r[field]);
+    const vA=mA.map(k=>{const v=avg(mapA[k]);return v?parseFloat(v.toFixed(1)):null;});
+    if(compare && dataB2){
+      const {keys:mB,map:mapB}=groupByMonth(dataB2, r=>r[field]);
+      const allM=[...new Set([...mA,...mB])].sort();
+      mkChart(cid,'line',allM,[
+        {label:labelA,data:allM.map(k=>{const v=avg(mapA[k]);return v?parseFloat(v.toFixed(1)):null;}),borderColor:'var(--cmp-a)',tension:.3},
+        {label:labelB,data:allM.map(k=>{const v=avg(mapB[k]);return v?parseFloat(v.toFixed(1)):null;}),borderColor:'var(--cmp-b)',tension:.3},
+      ]);
+    } else {
+      mkChart(cid,'line',mA,[{label:'Promedio',data:vA,borderColor:color,tension:.3}]);
+    }
+  }
+  monthAvgChart('ch-pt-cal1',dataA,'c1_calidad','#1b6ca8',fd.aLabel,dataB,fd.bLabel);
+  monthAvgChart('ch-pt-cal2',dataA,'c2_calidad','#6a1b9a',fd.aLabel,dataB,fd.bLabel);
+  monthAvgChart('ch-pt-refrac',dataA,'o1_refrac','#c77800',fd.aLabel,dataB,fd.bLabel);
+
+  // Lts 1 vs 2
+  const {keys:mL,map:mLts1}=groupByMonth(dataA, r=>r.c1_lts);
+  const {map:mLts2}=groupByMonth(dataA, r=>r.c2_lts);
+  mkChart('ch-pt-lts','bar',mL,[
+    {label:'1ª Toma',data:mL.map(k=>{const v=avg(mLts1[k]);return v?parseFloat(v.toFixed(2)):null;}),backgroundColor:'rgba(27,108,168,.6)'},
+    {label:'2ª Toma',data:mL.map(k=>{const v=avg(mLts2[k]);return v?parseFloat(v.toFixed(2)):null;}),backgroundColor:'rgba(106,27,154,.6)'},
+  ]);
+}
+
+// ==================== DASH ORDEÑAS ====================
+function renderDashOrdenas(){
+  buildControls('po-controls','po','renderDashOrdenas');
+  _renderDashOrdenas();
+}
+function _renderDashOrdenas(){
+  const fd=getFilteredData('po');
+  const compare=fd.compare;
+  const dataA=compare?fd.a:fd.single;
+  const dataB=compare?fd.b:[];
+
+  function ordStats(data){
+    const o1lts=data.filter(r=>r.o1_lts!=null).map(r=>r.o1_lts);
+    const o2lts=data.filter(r=>r.o2_lts!=null).map(r=>r.o2_lts);
+    const o1cal=data.filter(r=>r.o1_refrac!=null).map(r=>r.o1_refrac);
+    const o2cal=data.filter(r=>r.o2_calidad!=null).map(r=>r.o2_calidad);
+    return {
+      avgO1Lts:avg(o1lts), avgO2Lts:avg(o2lts),
+      avgO1Cal:avg(o1cal), avgO2Cal:avg(o2cal),
+      minO1Lts:o1lts.length?Math.min(...o1lts):null, maxO1Lts:o1lts.length?Math.max(...o1lts):null,
+      minO2Lts:o2lts.length?Math.min(...o2lts):null, maxO2Lts:o2lts.length?Math.max(...o2lts):null,
+    };
+  }
+  const sA=ordStats(dataA);
+  const sB=compare?ordStats(dataB):{};
+
+  document.getElementById('po-kpis').innerHTML=
+    kpiCard('Lts 1ª Ordeña (prom)', fmtN(sA.avgO1Lts), fmtN(sB.avgO1Lts), `min ${fmtN(sA.minO1Lts)} / max ${fmtN(sA.maxO1Lts)}`, compare?`min ${fmtN(sB.minO1Lts)} / max ${fmtN(sB.maxO1Lts)}`:'', compare)+
+    kpiCard('Lts 2ª Ordeña (prom)', fmtN(sA.avgO2Lts), fmtN(sB.avgO2Lts), `min ${fmtN(sA.minO2Lts)} / max ${fmtN(sA.maxO2Lts)}`, compare?`min ${fmtN(sB.minO2Lts)} / max ${fmtN(sB.maxO2Lts)}`:'', compare)+
+    kpiCard('Cal. 1ª Ordeña (prom)', fmtN(sA.avgO1Cal,1), fmtN(sB.avgO1Cal,1), '', '', compare)+
+    kpiCard('Cal. 2ª Ordeña (prom)', fmtN(sA.avgO2Cal,0), fmtN(sB.avgO2Cal,0), '', '', compare);
+
+  function monthOrdChart(cid, field, color, labelA, dataBset, labelB){
+    const {keys:mA,map:mapA}=groupByMonth(dataA, r=>r[field]);
+    const vA=mA.map(k=>{const v=avg(mapA[k]);return v?parseFloat(v.toFixed(2)):null;});
+    if(compare && dataBset){
+      const {keys:mB,map:mapB}=groupByMonth(dataBset, r=>r[field]);
+      const allM=[...new Set([...mA,...mB])].sort();
+      mkChart(cid,'bar',allM,[
+        {label:labelA,data:allM.map(k=>{const v=avg(mapA[k]);return v?parseFloat(v.toFixed(2)):null;}),backgroundColor:'rgba(45,106,79,.7)'},
+        {label:labelB,data:allM.map(k=>{const v=avg(mapB[k]);return v?parseFloat(v.toFixed(2)):null;}),backgroundColor:'rgba(199,120,0,.7)'},
+      ]);
+    } else {
+      mkChart(cid,'bar',mA,[{label:'Prom. Lts',data:vA,backgroundColor:color}]);
+    }
+  }
+  monthOrdChart('ch-po-lts1','o1_lts','rgba(199,120,0,.7)',fd.aLabel,dataB,fd.bLabel);
+  monthOrdChart('ch-po-lts2','o2_lts','rgba(198,40,40,.7)',fd.aLabel,dataB,fd.bLabel);
+  monthOrdChart('ch-po-cal1','o1_refrac','rgba(199,120,0,.5)',fd.aLabel,dataB,fd.bLabel);
+  monthOrdChart('ch-po-cal2','o2_calidad','rgba(198,40,40,.5)',fd.aLabel,dataB,fd.bLabel);
+}
+
+// ==================== STATS MINI (REG TAB) ====================
 function renderStats(data){
   const total=data.length;
   const hembras=data.filter(r=>r.sexo==='H').length;
   const hoy=new Date().toISOString().slice(0,7);
   const mes=data.filter(r=>r.fecha_parto&&r.fecha_parto.slice(0,7)===hoy).length;
-  const difíciles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase().includes('dificil')).length;
+  const dificiles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase().includes('dificil')).length;
   document.getElementById('statsRow').innerHTML=`
     <div class="stat-card"><div class="val">${total}</div><div class="lbl">Total Partos</div></div>
     <div class="stat-card"><div class="val">${hembras}</div><div class="lbl">Hembras</div></div>
     <div class="stat-card"><div class="val">${mes}</div><div class="lbl">Este Mes</div></div>
-    <div class="stat-card"><div class="val">${difíciles}</div><div class="lbl">Difíciles</div></div>
+    <div class="stat-card"><div class="val">${dificiles}</div><div class="lbl">Difíciles</div></div>
   `;
 }
 
+// ==================== PARTOS TABLE ====================
 function renderPartos(data){
   const tbody=document.getElementById('partosBody');
   if(!data||!data.length){tbody.innerHTML='<tr><td colspan="27" class="empty">Sin registros.</td></tr>';return;}
@@ -369,24 +895,16 @@ function renderPartos(data){
       <td>${r.partero||'—'}</td>
       <td class="mono">${r.hora_parto||'—'}</td>
       <td>${r.dia_noche?`<span class="badge ${r.dia_noche==='Dia'?'badge-dn':'badge-nn'}">${r.dia_noche}</span>`:'—'}</td>
-      <td>${r.dificultad?`<span class="badge ${r.dificultad==='Dificil'?'badge-dif':'badge-nor'}">${r.dificultad}</span>`:'—'}</td>
+      <td>${r.dificultad?`<span class="badge ${r.dificultad.toLowerCase().includes('dificil')?'badge-dif':'badge-nor'}">${r.dificultad}</span>`:'—'}</td>
       <td class="mono">${r.peso_nacer!=null?r.peso_nacer+' kg':'—'}</td>
       <td class="mono">${r.dias_gestacion||'—'}</td>
       <td class="mono">${r.dias_reto||'—'}</td>
-      <td class="mono">${r.c1_hora||'—'}</td>
-      <td class="mono">${r.c1_lts!=null?r.c1_lts:'—'}</td>
-      <td class="mono">${r.c1_calidad!=null?r.c1_calidad:'—'}</td>
-      <td>${r.c1_calostrero||'—'}</td>
-      <td>${r.c1_sonda||'—'}</td>
-      <td class="mono">${r.c2_hora||'—'}</td>
-      <td class="mono">${r.c2_lts!=null?r.c2_lts:'—'}</td>
-      <td class="mono">${r.c2_calidad!=null?r.c2_calidad:'—'}</td>
-      <td>${r.c2_calostrero||'—'}</td>
-      <td>${r.c2_sonda||'—'}</td>
-      <td class="mono">${r.o1_lts!=null?r.o1_lts:'—'}</td>
-      <td class="mono">${r.o1_refrac!=null?r.o1_refrac:'—'}</td>
-      <td class="mono">${r.o2_lts!=null?r.o2_lts:'—'}</td>
-      <td class="mono">${r.o2_calidad!=null?r.o2_calidad:'—'}</td>
+      <td class="mono">${r.c1_hora||'—'}</td><td class="mono">${r.c1_lts!=null?r.c1_lts:'—'}</td>
+      <td class="mono">${r.c1_calidad!=null?r.c1_calidad:'—'}</td><td>${r.c1_calostrero||'—'}</td><td>${r.c1_sonda||'—'}</td>
+      <td class="mono">${r.c2_hora||'—'}</td><td class="mono">${r.c2_lts!=null?r.c2_lts:'—'}</td>
+      <td class="mono">${r.c2_calidad!=null?r.c2_calidad:'—'}</td><td>${r.c2_calostrero||'—'}</td><td>${r.c2_sonda||'—'}</td>
+      <td class="mono">${r.o1_lts!=null?r.o1_lts:'—'}</td><td class="mono">${r.o1_refrac!=null?r.o1_refrac:'—'}</td>
+      <td class="mono">${r.o2_lts!=null?r.o2_lts:'—'}</td><td class="mono">${r.o2_calidad!=null?r.o2_calidad:'—'}</td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick="editParto(${r.id})">✏️</button>
         ${currentUser&&currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deleteParto(${r.id})" style="margin-left:4px">🗑</button>`:''}
@@ -394,6 +912,7 @@ function renderPartos(data){
     </tr>`).join('');
 }
 
+// ==================== PARTO CRUD ====================
 function openModal(id=null){
   editingId=id;
   document.getElementById('modalTitle').textContent=id?'Editar Parto':'Nuevo Parto';
@@ -401,7 +920,6 @@ function openModal(id=null){
   document.getElementById('partoModal').classList.add('open');
 }
 function closeModal(){document.getElementById('partoModal').classList.remove('open');editingId=null;}
-
 function clearPartoForm(){
   ['f_fecha','f_madre_vaca','f_madre_vaquilla','f_hembra','f_partero','f_hora_parto',
    'f_peso_nacer','f_dias_gest','f_dias_reto','f_obs',
@@ -410,7 +928,6 @@ function clearPartoForm(){
    'f_o1_lts','f_o1_refrac','f_o2_lts','f_o2_calidad'].forEach(id=>document.getElementById(id).value='');
   ['f_dia_noche','f_dificultad','f_c1_sonda','f_c2_sonda','f_raza'].forEach(id=>document.getElementById(id).value='');
 }
-
 async function editParto(id){
   const data=await sbFetch(`partos_crianza?id=eq.${id}`);
   if(!data||!data[0]) return;
@@ -444,7 +961,6 @@ async function editParto(id){
   document.getElementById('f_o2_calidad').value=r.o2_calidad??'';
   openModal(id);
 }
-
 async function saveParto(){
   const fecha=document.getElementById('f_fecha').value;
   if(!fecha){alert('La fecha es obligatoria');return;}
@@ -487,7 +1003,6 @@ async function saveParto(){
   }catch(e){alert('Error al guardar.');}
   btn.innerHTML='Guardar';btn.disabled=false;
 }
-
 async function deleteParto(id){
   if(!confirm('¿Eliminar este registro?')) return;
   await sbFetch(`partos_crianza?id=eq.${id}`,'DELETE');
@@ -500,39 +1015,29 @@ async function loadPesajes(){
   const pesajes=await sbFetch('pesajes_crianza?order=fecha.desc');
   renderPesajes(pesajes,partos);
 }
-
 function renderPesajes(pesajes,partos){
   const tbody=document.getElementById('pesajesBody');
   if(!pesajes||!pesajes.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Sin pesajes.</td></tr>';return;}
   const birthMap={};
   if(partos) partos.forEach(p=>{if(p.hembra) birthMap[p.hembra]=p.fecha_parto;});
   tbody.innerHTML=pesajes.map(r=>{
-    const nac=birthMap[r.hembra]||birthMap[r.vaquilla];
+    const nac=birthMap[r.hembra];
     let dias='—',gdp='—',gdpClass='';
     if(nac&&r.fecha){
       const d=Math.floor((new Date(r.fecha)-new Date(nac))/86400000);
       if(d>=0) dias=d;
-      if(r.peso&&d>0){
-        const g=r.peso/d;
-        gdp=g.toFixed(3)+' kg/día';
-        gdpClass=g>=0.8?'gdp-ok':g>=0.6?'gdp-warn':'gdp-bad';
-      }
+      if(r.peso&&d>0){const g=r.peso/d;gdp=g.toFixed(3)+' kg/día';gdpClass=g>=0.8?'gdp-ok':g>=0.6?'gdp-warn':'gdp-bad';}
     }
     return `<tr>
-      <td class="mono">${r.fecha||'—'}</td>
-      <td class="mono">${r.hembra||r.vaquilla||'—'}</td>
-      <td class="mono">${r.peso!=null?r.peso+' kg':'—'}</td>
-      <td class="mono">${dias}</td>
-      <td class="mono ${gdpClass}">${gdp}</td>
-      <td>${r.notas||'—'}</td>
+      <td class="mono">${r.fecha||'—'}</td><td class="mono">${r.hembra||'—'}</td>
+      <td class="mono">${r.peso!=null?r.peso+' kg':'—'}</td><td class="mono">${dias}</td>
+      <td class="mono ${gdpClass}">${gdp}</td><td>${r.notas||'—'}</td>
       <td>${currentUser&&currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deletePesaje(${r.id})">🗑</button>`:''}</td>
     </tr>`;
   }).join('');
 }
-
 function openPesajeModal(){document.getElementById('pesajeModal').classList.add('open');}
 function closePesajeModal(){document.getElementById('pesajeModal').classList.remove('open');}
-
 async function savePesaje(){
   const fecha=document.getElementById('p_fecha').value;
   const hembra=document.getElementById('p_hembra').value;
@@ -543,7 +1048,6 @@ async function savePesaje(){
   ['p_fecha','p_hembra','p_peso','p_notas'].forEach(id=>document.getElementById(id).value='');
   await loadPesajes();
 }
-
 async function deletePesaje(id){
   if(!confirm('¿Eliminar este pesaje?')) return;
   await sbFetch(`pesajes_crianza?id=eq.${id}`,'DELETE');
@@ -551,171 +1055,113 @@ async function deletePesaje(id){
 }
 
 // ==================== IMPORT ====================
-let importQueue=[], importType='';
-
+let importQueue=[],importType='';
 async function importPartos(event){
-  const file=event.target.files[0]; if(!file) return; event.target.value='';
+  const file=event.target.files[0];if(!file)return;event.target.value='';
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
   importType='partos';
   importQueue=rows.map(mapPartoRowFromExcel).filter(r=>r.fecha_parto);
-  showImportPreview(importQueue.length, rows.length);
+  showImportPreview(importQueue.length,rows.length);
 }
-
 async function importPesajes(event){
-  const file=event.target.files[0]; if(!file) return; event.target.value='';
+  const file=event.target.files[0];if(!file)return;event.target.value='';
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
   importType='pesajes';
   importQueue=rows.map(mapPesajeRow).filter(r=>r.fecha&&r.hembra&&r.peso);
-  showImportPreview(importQueue.length, rows.length);
+  showImportPreview(importQueue.length,rows.length);
 }
-
 async function readFile(file){
-  const isCSV = file.name.toLowerCase().endsWith('.csv');
+  const isCSV=file.name.toLowerCase().endsWith('.csv');
   if(isCSV){
-    const buf = await file.arrayBuffer();
+    const buf=await file.arrayBuffer();
     let text;
-    try { text = new TextDecoder('iso-8859-1').decode(buf); }
-    catch(e){ text = new TextDecoder('utf-8').decode(buf); }
-    const firstLine = text.split('\n')[0];
-    const delim = (firstLine.split(';').length > firstLine.split(',').length) ? ';' : ',';
-    const wb = XLSX.read(text, {type:'string', FS: delim});
-    const ws = wb.Sheets[wb.SheetNames[0]];
-    // raw:false for CSV so dates come as strings
+    try{text=new TextDecoder('iso-8859-1').decode(buf);}catch(e){text=new TextDecoder('utf-8').decode(buf);}
+    const firstLine=text.split('\n')[0];
+    const delim=(firstLine.split(';').length>firstLine.split(',').length)?';':',';
+    const wb=XLSX.read(text,{type:'string',FS:delim});
+    const ws=wb.Sheets[wb.SheetNames[0]];
     return XLSX.utils.sheet_to_json(ws,{defval:null,raw:false});
   }
-  // For Excel: use raw:true so we get numeric serial dates/times, then convert manually
   const data=await file.arrayBuffer();
-  const wb=XLSX.read(data, {type:'array', cellDates:true});
+  const wb=XLSX.read(data,{type:'array',cellDates:true});
   const ws=wb.Sheets[wb.SheetNames[0]];
-  // Use raw:false but cellDates:true so XLSX handles date conversion
   return XLSX.utils.sheet_to_json(ws,{defval:null,raw:false});
 }
-
 function excelDateToISO(val){
   if(!val) return null;
-  if(typeof val==='string'){
-    // Try DD/MM/YYYY or YYYY-MM-DD
-    let m=val.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-    m=val.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    if(m) return val;
-    const d=new Date(val); if(!isNaN(d)) return d.toISOString().slice(0,10);
-    return null;
-  }
-  if(typeof val==='number'){
-    const d=new Date(Math.round((val-25569)*86400*1000));
-    return d.toISOString().slice(0,10);
-  }
+  const s=String(val).trim();
+  if(!s) return null;
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m) return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  const d=new Date(s);
+  if(!isNaN(d)) return d.toISOString().slice(0,10);
   return null;
 }
-
 function excelTimeToHHMM(val){
   if(val===null||val===undefined||val==='') return null;
-  let s = String(val).trim();
+  let s=String(val).trim();
   if(!s) return null;
-  // HH:MM:SS -> HH:MM
-  if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)){
-    const parts=s.split(':');
-    return parts[0].padStart(2,'0')+':'+parts[1];
-  }
-  // Just hours like "23" or "9"
+  if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)){const p=s.split(':');return p[0].padStart(2,'0')+':'+p[1];}
   if(/^\d{1,2}$/.test(s)) return s.padStart(2,'0')+':00';
-  // Excel decimal time
   if(typeof val==='number'||(!isNaN(parseFloat(s))&&s.includes('.'))){
-    const n=parseFloat(s);
-    const t=Math.round(n*1440);
+    const n=parseFloat(s);const t=Math.round(n*1440);
     return String(Math.floor(t/60)%24).padStart(2,'0')+':'+String(t%60).padStart(2,'0');
   }
   return null;
 }
-
-function toFloat(val){
-  if(val===null||val===''||val===undefined) return null;
-  return parseFloat(String(val).replace(',','.')) || null;
-}
-
-function toStr(val){ return val?String(val).trim()||null:null; }
-
+function toFloat(val){if(val===null||val===''||val===undefined)return null;return parseFloat(String(val).replace(',','.'))||null;}
+function toStr(val){return val?String(val).trim()||null:null;}
 function mapPartoRowFromExcel(row){
-  const b = k => {
-    // Try exact match first, then case-insensitive, then trimmed
+  const b=k=>{
     if(row[k]!==undefined) return row[k];
     const kl=k.toLowerCase().trim();
-    for(const rk of Object.keys(row)){
-      if(rk.toLowerCase().trim()===kl) return row[rk];
-    }
+    for(const rk of Object.keys(row)){if(rk.toLowerCase().trim()===kl)return row[rk];}
     return null;
   };
-
-  // Detect sexo: if Macho column has value = M
-  const esMacho = toStr(b('Macho'));
-  const sexo = esMacho ? 'M' : 'H';
-  const hembra = esMacho ? esMacho : toStr(b('HEMBRA'));
-
-  // Date: handle MM/DD/YYYY (Excel US format from this ranch)
-  const rawFecha = b('FECHA PARTO');
-  let fecha_parto = excelDateToISO(rawFecha);
-
+  const esMacho=toStr(b('Macho'));
+  const sexo=esMacho?'M':'H';
+  const hembra=esMacho?esMacho:toStr(b('HEMBRA'));
+  const rawFecha=b('FECHA PARTO');
+  const fecha_parto=excelDateToISO(rawFecha);
   return {
-    fecha_parto,
-    madre_vaca:     toStr(b('VACA')),
-    madre_vaquilla: toStr(b('VAQUILLA')),
-    hembra,
-    sexo,
-    raza:           toStr(b('Raza')),
-    dia_noche:      toStr(b('Dia/ Noche')||b(' Dia/ Noche')),
-    dificultad:     toStr(b('Dificil / Normal')),
-    peso_nacer:     toFloat(b('PESO  NACER')||b('PESO NACER')),
-    dias_gestacion: toFloat(b('DIAS GEST.')),
-    dias_reto:      toFloat(b('DIAS EN RETO')),
-    partero:        toStr(b('Partero')),
-    hora_parto:     excelTimeToHHMM(b('Hora de parto')),
-    c1_hora:        excelTimeToHHMM(b('Hora 1er Toma')),
-    c1_lts:         toFloat(b('Litros 1ra toma')),
-    c1_calidad:     toFloat(b('Calidad')),
-    c1_calostrero:  toStr(b('Calostrero')),
-    c1_sonda:       toStr(b('SONDA')),
-    c2_hora:        excelTimeToHHMM(b('Hora 2da Toma ')||b('Hora 2da Toma')),
-    c2_lts:         toFloat(b('Litros 2da toma')),
-    c2_calidad:     toFloat(b('Calidad 2da')),
-    c2_calostrero:  toStr(b('Calostrero 2da')),
-    c2_sonda:       toStr(b('SONDA 2da')),
-    o1_lts:         toFloat(b('1a Ordeña Lts.  De Calostro')),
-    o1_refrac:      toFloat(b('Refractometria')),
-    o2_lts:         toFloat(b('2a Ordeña Lts.  De Calostro')),
-    o2_calidad:     toFloat(b('Calidad de Calostros')),
+    fecha_parto, madre_vaca:toStr(b('VACA')), madre_vaquilla:toStr(b('VAQUILLA')),
+    hembra, sexo, raza:toStr(b('Raza')),
+    dia_noche:toStr(b('Dia/ Noche')||b('\xa0Dia/ Noche')),
+    dificultad:toStr(b('Dificil / Normal')),
+    peso_nacer:toFloat(b('PESO  NACER')||b('PESO NACER')),
+    dias_gestacion:toFloat(b('DIAS GEST.')), dias_reto:toFloat(b('DIAS EN RETO')),
+    partero:toStr(b('Partero')), hora_parto:excelTimeToHHMM(b('Hora de parto')),
+    c1_hora:excelTimeToHHMM(b('Hora 1er Toma')), c1_lts:toFloat(b('Litros 1ra toma')),
+    c1_calidad:toFloat(b('Calidad')), c1_calostrero:toStr(b('Calostrero')), c1_sonda:toStr(b('SONDA')),
+    c2_hora:excelTimeToHHMM(b('Hora 2da Toma ')||b('Hora 2da Toma')), c2_lts:toFloat(b('Litros 2da toma')),
+    c2_calidad:toFloat(b('Calidad 2da')), c2_calostrero:toStr(b('Calostrero 2da')), c2_sonda:toStr(b('SONDA 2da')),
+    o1_lts:toFloat(b('1a Ordeña Lts.  De Calostro')), o1_refrac:toFloat(b('Refractometria')),
+    o2_lts:toFloat(b('2a Ordeña Lts.  De Calostro')), o2_calidad:toFloat(b('Calidad de Calostros')),
   };
 }
-
 function mapPesajeRow(row){
-  const keys=Object.keys(row);
-  const g=i=>row[keys[i]]??null;
-  return{
-    fecha:excelDateToISO(g(0)),
-    hembra:toStr(g(1)),
-    peso:toFloat(g(2)),
-    notas:toStr(g(3))
-  };
+  const keys=Object.keys(row);const g=i=>row[keys[i]]??null;
+  return{fecha:excelDateToISO(g(0)),hembra:toStr(g(1)),peso:toFloat(g(2)),notas:toStr(g(3))};
 }
-
-function showImportPreview(valid, total){
+function showImportPreview(valid,total){
   const omitidos=total-valid;
   document.getElementById('importPreviewInfo').innerHTML=
     '<strong>'+total+'</strong> filas encontradas — '+
     '<span style="color:var(--green)">'+valid+' válidas</span>'+
-    (omitidos>0?' <span style="color:var(--red)">/ '+omitidos+' omitidas (sin fecha)</span>':'')+
+    (omitidos>0?' <span style="color:var(--red)">/ '+omitidos+' omitidas</span>':'')+
     '<br><small style="color:var(--text-muted)">Tipo: '+(importType==='partos'?'Partos':'Pesajes')+'</small>';
   document.getElementById('importModal').classList.add('open');
 }
-
 async function confirmImport(){
   const btn=document.getElementById('importConfirmBtn');
   btn.innerHTML='<span class="spinner"></span> Importando...';btn.disabled=true;
   const table=importType==='partos'?'partos_crianza':'pesajes_crianza';
-  let inserted=0, errors=0;
-  // Insert one by one to catch individual row errors
+  let inserted=0,errors=0;
   for(let i=0;i<importQueue.length;i++){
     const row=importQueue[i];
     try{
@@ -724,29 +1170,16 @@ async function confirmImport(){
         'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,
         'Content-Type':'application/json','Prefer':'return=minimal'
       },body:JSON.stringify(row)});
-      if(res.ok){ inserted++; }
-      else{
-        const err=await res.json().catch(()=>({}));
-        console.error(`Row ${i+1} error:`,err,'Data:',row);
-        errors++;
-      }
-    }catch(e){ console.error(`Row ${i+1} exception:`,e); errors++; }
+      if(res.ok){inserted++;}
+      else{const err=await res.json().catch(()=>({}));console.error(`Row ${i+1} error:`,err,'Data:',row);errors++;}
+    }catch(e){console.error(`Row ${i+1} exception:`,e);errors++;}
   }
   document.getElementById('importModal').classList.remove('open');
   btn.innerHTML='Importar';btn.disabled=false;
   if(errors>0) alert('⚠️ '+inserted+' importados, '+errors+' con error. Revisa consola (F12).');
   else alert('✅ '+inserted+' registros importados correctamente.');
-  if(importType==='partos') await loadPartos();
+  if(importType==='partos'){await loadPartos();}
   else await loadPesajes();
-}
-
-// ==================== TABS ====================
-function showTab(tab,btn){
-  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
-  btn.classList.add('active');
-  document.getElementById('tab-partos').classList.add('hidden');
-  document.getElementById('tab-desarrollo').classList.add('hidden');
-  document.getElementById('tab-'+tab).classList.remove('hidden');
 }
 </script>
 </body>
