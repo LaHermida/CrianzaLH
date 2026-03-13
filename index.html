@@ -280,11 +280,13 @@
           <thead>
             <tr>
               <th rowspan="2">Fecha</th><th rowspan="2">Tipo</th><th rowspan="2">Madre</th>
-              <th rowspan="2">Hembra</th><th rowspan="2">Raza</th><th rowspan="2">Partero</th>
-              <th rowspan="2">H.Parto</th><th rowspan="2">D/N</th><th rowspan="2">Dificultad</th>
+              <th rowspan="2">Hembra</th><th rowspan="2">Sexo</th><th rowspan="2">Raza</th>
+              <th rowspan="2">D/N</th><th rowspan="2">Dificultad</th>
               <th rowspan="2">Peso Nacer</th><th rowspan="2">Gest.</th><th rowspan="2">Reto</th>
+              <th rowspan="2">Partero</th><th rowspan="2">H.Parto</th>
               <th colspan="5" class="g1" style="text-align:center">1ª Toma Calostro</th>
               <th colspan="5" class="g2" style="text-align:center">2ª Toma Calostro</th>
+              <th rowspan="2" class="g2">Refrac.</th>
               <th colspan="2" class="g3" style="text-align:center">1ª Ordeña</th>
               <th colspan="2" class="g4" style="text-align:center">2ª Ordeña</th>
               <th rowspan="2">Acciones</th>
@@ -292,7 +294,7 @@
             <tr>
               <th class="g1">H.Toma</th><th class="g1">Lts</th><th class="g1">Calidad</th><th class="g1">Calostrero</th><th class="g1">Sonda</th>
               <th class="g2">H.Toma</th><th class="g2">Lts</th><th class="g2">Calidad</th><th class="g2">Calostrero</th><th class="g2">Sonda</th>
-              <th class="g3">Lts</th><th class="g3">Refrac</th>
+              <th class="g3">Lts</th><th class="g3">Calidad</th>
               <th class="g4">Lts</th><th class="g4">Calidad</th>
             </tr>
           </thead>
@@ -845,26 +847,28 @@ function renderStats(data){
 // ==================== PARTOS TABLE ====================
 function renderPartos(data){
   const tbody=document.getElementById('partosBody');
-  if(!data||!data.length){tbody.innerHTML='<tr><td colspan="27" class="empty">Sin registros.</td></tr>';return;}
+  if(!data||!data.length){tbody.innerHTML='<tr><td colspan="28" class="empty">Sin registros.</td></tr>';return;}
   tbody.innerHTML=data.map(r=>`
     <tr>
       <td class="mono">${r.fecha_parto||'—'}</td>
       <td>${r.madre_vaca?'<span class="badge badge-dn">Vaca</span>':r.madre_vaquilla?'<span class="badge badge-nn">Vaquilla</span>':'—'}</td>
       <td class="mono">${r.madre_vaca||r.madre_vaquilla||'—'}</td>
       <td class="mono">${r.hembra||'—'}</td>
+      <td>${r.sexo==='M'?'<span class="badge badge-m">M</span>':'<span class="badge badge-h">H</span>'}</td>
       <td>${r.raza?'<span class="badge" style="background:#e8f5e9;color:#1b5e20">'+r.raza+'</span>':'—'}</td>
-      <td>${r.partero||'—'}</td>
-      <td class="mono">${r.hora_parto||'—'}</td>
       <td>${r.dia_noche?`<span class="badge ${r.dia_noche==='Dia'?'badge-dn':'badge-nn'}">${r.dia_noche}</span>`:'—'}</td>
       <td>${r.dificultad?`<span class="badge ${r.dificultad.toLowerCase().includes('dificil')?'badge-dif':'badge-nor'}">${r.dificultad}</span>`:'—'}</td>
       <td class="mono">${r.peso_nacer!=null?r.peso_nacer+' kg':'—'}</td>
       <td class="mono">${r.dias_gestacion||'—'}</td>
       <td class="mono">${r.dias_reto||'—'}</td>
+      <td>${r.partero||'—'}</td>
+      <td class="mono">${r.hora_parto||'—'}</td>
       <td class="mono">${r.c1_hora||'—'}</td><td class="mono">${r.c1_lts!=null?r.c1_lts:'—'}</td>
       <td class="mono">${r.c1_calidad!=null?r.c1_calidad:'—'}</td><td>${r.c1_calostrero||'—'}</td><td>${r.c1_sonda||'—'}</td>
       <td class="mono">${r.c2_hora||'—'}</td><td class="mono">${r.c2_lts!=null?r.c2_lts:'—'}</td>
       <td class="mono">${r.c2_calidad!=null?r.c2_calidad:'—'}</td><td>${r.c2_calostrero||'—'}</td><td>${r.c2_sonda||'—'}</td>
-      <td class="mono">${r.o1_lts!=null?r.o1_lts:'—'}</td><td class="mono">${r.o1_refrac!=null?r.o1_refrac:'—'}</td>
+      <td class="mono">${r.o1_refrac!=null?r.o1_refrac:'—'}</td>
+      <td class="mono">${r.o1_lts!=null?r.o1_lts:'—'}</td><td class="mono">${r.o1_calidad!=null?r.o1_calidad:'—'}</td>
       <td class="mono">${r.o2_lts!=null?r.o2_lts:'—'}</td><td class="mono">${r.o2_calidad!=null?r.o2_calidad:'—'}</td>
       <td>
         <button class="btn btn-secondary btn-sm" onclick="editParto(${r.id})">✏️</button>
