@@ -165,7 +165,8 @@
     <span id="userLabel"></span>
   </header>
   <nav id="mainNav">
-    <button onclick="showTab('dashboard',this)">📊 Dashboard</button>
+    <button onclick="showTab('dashboard',this)">📊 Dashboard Partos</button>
+    <button onclick="showTab('dash-gdp',this)">📈 Dashboard GDP</button>
     <div class="nav-sep"></div>
     <button onclick="showTab('reg-partos',this)">🐄 Registro Partos</button>
     <button onclick="showTab('reg-pesajes',this)">📏 Registro Pesajes</button>
@@ -304,6 +305,50 @@
       </div>
     </div>
 
+    <!-- ===== DASH GDP ===== -->
+    <div id="tab-dash-gdp" class="hidden">
+      <div class="section-header">
+        <span class="section-title">📈 Dashboard GDP / Desarrollo</span>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+          <label style="font-size:.85rem;color:var(--text-muted)">Raza:</label>
+          <select id="gdp-raza" onchange="renderDashGDP()" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem">
+            <option value="">Todas</option>
+            <option value="H">Holstein</option>
+            <option value="J">Jersey</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- KPIs generales -->
+      <div class="kpi-group-label">📊 Indicadores Generales</div>
+      <div id="gdp-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
+
+      <!-- Tabla por semana -->
+      <div class="kpi-group-label">📅 GDP por Semana de Nacimiento</div>
+      <div class="table-wrap">
+        <table id="gdp-semana-table">
+          <thead>
+            <tr>
+              <th>Semana</th>
+              <th>Rango Fechas</th>
+              <th>Becerras</th>
+              <th>Aretes</th>
+              <th>1ª Pesada<br><small>Días prom.</small></th>
+              <th>1ª Pesada<br><small>Peso prom.</small></th>
+              <th>ADG 1ª<br><small>kg/día</small></th>
+              <th>2ª Pesada<br><small>Días prom.</small></th>
+              <th>2ª Pesada<br><small>Peso prom.</small></th>
+              <th>ADG 2ª<br><small>kg/día</small></th>
+              <th>ADG Entre<br><small>pesadas</small></th>
+            </tr>
+          </thead>
+          <tbody id="gdp-semana-body">
+            <tr><td colspan="11" class="empty">Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- ===== REG PESAJES ===== -->
     <div id="tab-reg-pesajes" class="hidden">
       <div class="section-header">
@@ -317,9 +362,9 @@
       <div class="table-wrap">
         <table>
           <thead>
-            <tr><th>Fecha</th><th>Hembra</th><th>Peso (kg)</th><th>Días de Vida</th><th>ADG / GDP (kg/día)</th><th>Notas</th><th>Acciones</th></tr>
+            <tr><th>Fecha</th><th>Hembra</th><th>Raza</th><th>Peso Nacer</th><th>Peso (kg)</th><th>Días de Vida</th><th>Cambio (kg)</th><th>ADG (kg/día)</th><th>Pesada #</th><th>Notas</th><th>Acciones</th></tr>
           </thead>
-          <tbody id="pesajesBody"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
+          <tbody id="pesajesBody"><tr><td colspan="11" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -486,7 +531,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','reg-partos','reg-pesajes'].forEach(t=>{
+  ['dashboard','dash-gdp','reg-partos','reg-pesajes'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -1073,26 +1118,52 @@ async function deleteParto(id){
 // ==================== PESAJES ====================
 async function loadPesajes(){
   const partos=await sbFetch('partos_crianza?order=fecha_parto.asc');
-  const pesajes=await sbFetch('pesajes_crianza?order=fecha.desc');
+  const pesajes=await sbFetch('pesajes_crianza?order=fecha.asc');
+  window._partos=partos||[];
+  window._pesajes=pesajes||[];
   renderPesajes(pesajes,partos);
 }
 function renderPesajes(pesajes,partos){
   const tbody=document.getElementById('pesajesBody');
-  if(!pesajes||!pesajes.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Sin pesajes.</td></tr>';return;}
-  const birthMap={};
-  if(partos) partos.forEach(p=>{if(p.hembra) birthMap[p.hembra]=p.fecha_parto;});
-  tbody.innerHTML=pesajes.map(r=>{
-    const nac=birthMap[r.hembra];
-    let dias='—',gdp='—',gdpClass='';
+  if(!pesajes||!pesajes.length){tbody.innerHTML='<tr><td colspan="11" class="empty">Sin pesajes.</td></tr>';return;}
+  const partoMap={};
+  if(partos) partos.forEach(p=>{if(p.hembra) partoMap[p.hembra]=p;});
+  // Count pesadas per hembra
+  const pesadaCount={};
+  [...pesajes].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).forEach(r=>{
+    if(!pesadaCount[r.hembra]) pesadaCount[r.hembra]=0;
+    pesadaCount[r.hembra]++;
+  });
+  const hemPesadaIdx={};
+  tbody.innerHTML=[...pesajes].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(r=>{
+    if(!hemPesadaIdx[r.hembra]) hemPesadaIdx[r.hembra]=0;
+    hemPesadaIdx[r.hembra]++;
+    const numPesada=hemPesadaIdx[r.hembra];
+    const parto=partoMap[r.hembra];
+    const nac=parto?parto.fecha_parto:null;
+    const pesoNacer=parto?parto.peso_nacer:null;
+    const raza=parto?parto.raza:'—';
+    let dias='—',cambio='—',adg='—',adgClass='';
     if(nac&&r.fecha){
       const d=Math.floor((new Date(r.fecha)-new Date(nac))/86400000);
       if(d>=0) dias=d;
-      if(r.peso&&d>0){const g=r.peso/d;gdp=g.toFixed(3)+' kg/día';gdpClass=g>=0.8?'gdp-ok':g>=0.6?'gdp-warn':'gdp-bad';}
+      if(r.peso&&d>0){
+        const g=((r.peso-(pesoNacer||0))/d);
+        adg=g.toFixed(3);adgClass=g>=0.8?'gdp-ok':g>=0.6?'gdp-warn':'gdp-bad';
+        if(pesoNacer) cambio=(r.peso-pesoNacer).toFixed(1)+' kg';
+      }
     }
     return `<tr>
-      <td class="mono">${r.fecha||'—'}</td><td class="mono">${r.hembra||'—'}</td>
-      <td class="mono">${r.peso!=null?r.peso+' kg':'—'}</td><td class="mono">${dias}</td>
-      <td class="mono ${gdpClass}">${gdp}</td><td>${r.notas||'—'}</td>
+      <td class="mono">${r.fecha||'—'}</td>
+      <td class="mono">${r.hembra||'—'}</td>
+      <td class="mono">${raza}</td>
+      <td class="mono">${pesoNacer!=null?pesoNacer+' kg':'—'}</td>
+      <td class="mono">${r.peso!=null?r.peso+' kg':'—'}</td>
+      <td class="mono">${dias}</td>
+      <td class="mono">${cambio}</td>
+      <td class="mono ${adgClass}">${adg}</td>
+      <td class="mono" style="text-align:center">${numPesada}ª</td>
+      <td>${r.notas||'—'}</td>
       <td>${currentUser&&currentUser.role==='admin'?`<button class="btn btn-danger btn-sm" onclick="deletePesaje(${r.id})">🗑</button>`:''}</td>
     </tr>`;
   }).join('');
@@ -1113,6 +1184,119 @@ async function deletePesaje(id){
   if(!confirm('¿Eliminar este pesaje?')) return;
   await sbFetch(`pesajes_crianza?id=eq.${id}`,'DELETE');
   await loadPesajes();
+}
+
+
+// ==================== DASH GDP ====================
+function renderDashGDP(){
+  const razaFilter=document.getElementById('gdp-raza').value;
+  const allPartos=window._partos||[];
+  const allPesajes=window._pesajes||[];
+
+  // Build partoMap
+  const partoMap={};
+  allPartos.forEach(p=>{if(p.hembra&&p.sexo==='H') partoMap[p.hembra]=p;});
+
+  // Filter by raza
+  const pesajes=allPesajes.filter(r=>{
+    const p=partoMap[r.hembra];
+    return p && (!razaFilter||p.raza===razaFilter);
+  });
+
+  // Group pesajes by hembra, sorted by date
+  const hembraMap={};
+  [...pesajes].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).forEach(r=>{
+    if(!hembraMap[r.hembra]) hembraMap[r.hembra]=[];
+    hembraMap[r.hembra].push(r);
+  });
+
+  // Build per-hembra stats
+  const hembraStats={};
+  Object.entries(hembraMap).forEach(([hembra,pesos])=>{
+    const parto=partoMap[hembra];
+    if(!parto||!parto.fecha_parto) return;
+    const nac=new Date(parto.fecha_parto);
+    const pesoNacer=parto.peso_nacer||0;
+    const p1=pesos[0], p2=pesos[1]||null;
+    const d1=p1?Math.floor((new Date(p1.fecha)-nac)/86400000):null;
+    const d2=p2?Math.floor((new Date(p2.fecha)-nac)/86400000):null;
+    const adg1=(p1&&d1>0)?((p1.peso-pesoNacer)/d1):null;
+    const adg2=(p2&&d2>0)?((p2.peso-pesoNacer)/d2):null;
+    const adgEntre=(p1&&p2&&d2>d1)?((p2.peso-p1.peso)/(d2-d1)):null;
+    hembraStats[hembra]={
+      parto, nac, pesoNacer,
+      p1peso:p1?p1.peso:null, d1, adg1,
+      p2peso:p2?p2.peso:null, d2, adg2, adgEntre,
+      semana: getISOWeek(nac), year: nac.getFullYear()
+    };
+  });
+
+  // KPIs generales
+  const stats=Object.values(hembraStats);
+  const adg1s=stats.filter(s=>s.adg1!=null).map(s=>s.adg1);
+  const adg2s=stats.filter(s=>s.adg2!=null).map(s=>s.adg2);
+  const adgEs=stats.filter(s=>s.adgEntre!=null).map(s=>s.adgEntre);
+  const con2=stats.filter(s=>s.p2peso!=null).length;
+
+  document.getElementById('gdp-kpis').innerHTML=
+    kpiCard('Becerras con pesaje',stats.length,'','','',false)+
+    kpiCard('Con 2ª pesada',`${con2} (${stats.length?Math.round(con2/stats.length*100):0}%)`,'','','',false)+
+    kpiCard('ADG 1ª Pesada (prom)',adg1s.length?avg(adg1s).toFixed(3)+' kg/día':'—','','','',false)+
+    kpiCard('ADG 2ª Pesada (prom)',adg2s.length?avg(adg2s).toFixed(3)+' kg/día':'—','','','',false)+
+    kpiCard('ADG Entre pesadas (prom)',adgEs.length?avg(adgEs).toFixed(3)+' kg/día':'—','','','',false);
+
+  // Group by semana
+  const semanaMap={};
+  Object.values(hembraStats).forEach(s=>{
+    const key=`${s.year}-W${String(s.semana).padStart(2,'0')}`;
+    if(!semanaMap[key]) semanaMap[key]={key,year:s.year,semana:s.semana,items:[]};
+    semanaMap[key].items.push(s);
+  });
+
+  const semanas=Object.values(semanaMap).sort((a,b)=>a.key.localeCompare(b.key));
+  const tbody=document.getElementById('gdp-semana-body');
+  if(!semanas.length){tbody.innerHTML='<tr><td colspan="11" class="empty">Sin datos de pesajes.</td></tr>';return;}
+
+  tbody.innerHTML=semanas.map(sem=>{
+    const items=sem.items;
+    // Get date range of births in this week
+    const fechas=items.map(s=>s.nac).sort((a,b)=>a-b);
+    const fechaMin=fechas[0].toISOString().slice(0,10);
+    const fechaMax=fechas[fechas.length-1].toISOString().slice(0,10);
+    const aretes=items.map(s=>s.parto.hembra).sort().join(', ');
+    const a1=items.filter(s=>s.adg1!=null).map(s=>s.adg1);
+    const a2=items.filter(s=>s.adg2!=null).map(s=>s.adg2);
+    const ae=items.filter(s=>s.adgEntre!=null).map(s=>s.adgEntre);
+    const d1s=items.filter(s=>s.d1!=null).map(s=>s.d1);
+    const d2s=items.filter(s=>s.d2!=null).map(s=>s.d2);
+    const p1s=items.filter(s=>s.p1peso!=null).map(s=>s.p1peso);
+    const p2s=items.filter(s=>s.p2peso!=null).map(s=>s.p2peso);
+    const adg1Prom=a1.length?avg(a1):null;
+    const adg2Prom=a2.length?avg(a2):null;
+    const adgEProm=ae.length?avg(ae):null;
+    const adgClass=v=>v==null?'':v>=0.8?'gdp-ok':v>=0.6?'gdp-warn':'gdp-bad';
+    return `<tr>
+      <td class="mono" style="font-weight:600">Sem ${sem.semana}</td>
+      <td class="mono" style="font-size:.8rem">${fechaMin===fechaMax?fechaMin:fechaMin+' – '+fechaMax}</td>
+      <td class="mono" style="text-align:center">${items.length}</td>
+      <td style="font-size:.78rem;max-width:180px;word-break:break-word">${aretes}</td>
+      <td class="mono">${d1s.length?Math.round(avg(d1s))+' días':'—'}</td>
+      <td class="mono">${p1s.length?avg(p1s).toFixed(1)+' kg':'—'}</td>
+      <td class="mono ${adgClass(adg1Prom)}">${adg1Prom!=null?adg1Prom.toFixed(3):'—'}</td>
+      <td class="mono">${d2s.length?Math.round(avg(d2s))+' días':'—'}</td>
+      <td class="mono">${p2s.length?avg(p2s).toFixed(1)+' kg':'—'}</td>
+      <td class="mono ${adgClass(adg2Prom)}">${adg2Prom!=null?adg2Prom.toFixed(3):'—'}</td>
+      <td class="mono ${adgClass(adgEProm)}">${adgEProm!=null?adgEProm.toFixed(3):'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+function getISOWeek(date){
+  const d=new Date(Date.UTC(date.getFullYear(),date.getMonth(),date.getDate()));
+  const dayNum=d.getUTCDay()||7;
+  d.setUTCDate(d.getUTCDate()+4-dayNum);
+  const yearStart=new Date(Date.UTC(d.getUTCFullYear(),0,1));
+  return Math.ceil((((d-yearStart)/86400000)+1)/7);
 }
 
 // ==================== IMPORT ====================
