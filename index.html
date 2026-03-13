@@ -870,15 +870,21 @@ function renderDashOrdenas(fd){
   const dataB=compare?fd.b:[];
 
   function ordStats(data){
-    const o1lts=data.filter(r=>r.o1_lts!=null).map(r=>r.o1_lts);
-    const o2lts=data.filter(r=>r.o2_lts!=null).map(r=>r.o2_lts);
-    const o1cal=data.filter(r=>r.o1_calidad!=null).map(r=>r.o1_calidad);
-    const o2cal=data.filter(r=>r.o2_calidad!=null).map(r=>r.o2_calidad);
+    const f=(raza)=>raza?data.filter(r=>r.raza===raza):data;
+    const o1lts=r=>f(r).filter(x=>x.o1_lts!=null).map(x=>x.o1_lts);
+    const o2lts=r=>f(r).filter(x=>x.o2_lts!=null).map(x=>x.o2_lts);
+    const o1cal=r=>f(r).filter(x=>x.o1_calidad!=null).map(x=>x.o1_calidad);
+    const o2cal=r=>f(r).filter(x=>x.o2_calidad!=null).map(x=>x.o2_calidad);
+    const ol1=o1lts(null),ol2=o2lts(null);
     return {
-      avgO1Lts:avg(o1lts), avgO2Lts:avg(o2lts),
-      avgO1Cal:avg(o1cal), avgO2Cal:avg(o2cal),
-      minO1Lts:o1lts.length?Math.min(...o1lts):null, maxO1Lts:o1lts.length?Math.max(...o1lts):null,
-      minO2Lts:o2lts.length?Math.min(...o2lts):null, maxO2Lts:o2lts.length?Math.max(...o2lts):null,
+      avgO1Lts:avg(ol1), avgO2Lts:avg(ol2),
+      avgO1Cal:avg(o1cal(null)), avgO2Cal:avg(o2cal(null)),
+      minO1Lts:ol1.length?Math.min(...ol1):null, maxO1Lts:ol1.length?Math.max(...ol1):null,
+      minO2Lts:ol2.length?Math.min(...ol2):null, maxO2Lts:ol2.length?Math.max(...ol2):null,
+      avgO1LtsH:avg(o1lts('H')), avgO1CalH:avg(o1cal('H')),
+      avgO2LtsH:avg(o2lts('H')), avgO2CalH:avg(o2cal('H')),
+      avgO1LtsJ:avg(o1lts('J')), avgO1CalJ:avg(o1cal('J')),
+      avgO2LtsJ:avg(o2lts('J')), avgO2CalJ:avg(o2cal('J')),
     };
   }
   const sA=ordStats(dataA);
