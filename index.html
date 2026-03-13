@@ -744,19 +744,29 @@ function renderDashTomas(fd){
   const dataB=compare?fd.b:[];
 
   function tomaStats(data){
-    const c1cal=data.filter(r=>r.c1_calidad!=null).map(r=>r.c1_calidad);
-    const c2cal=data.filter(r=>r.c2_calidad!=null).map(r=>r.c2_calidad);
-    const c1lts=data.filter(r=>r.c1_lts!=null).map(r=>r.c1_lts);
-    const c2lts=data.filter(r=>r.c2_lts!=null).map(r=>r.c2_lts);
-    const refrac=data.filter(r=>r.o1_refrac!=null).map(r=>r.o1_refrac);
-    const refracOk=refrac.filter(v=>v>=9).length;
-    const refracBad=refrac.filter(v=>v<9).length;
+    const f=(d,raza)=>raza?d.filter(r=>r.raza===raza):d;
+    const c1cal=r=>f(data,r).filter(x=>x.c1_calidad!=null).map(x=>x.c1_calidad);
+    const c2cal=r=>f(data,r).filter(x=>x.c2_calidad!=null).map(x=>x.c2_calidad);
+    const c1lts=r=>f(data,r).filter(x=>x.c1_lts!=null).map(x=>x.c1_lts);
+    const c2lts=r=>f(data,r).filter(x=>x.c2_lts!=null).map(x=>x.c2_lts);
+    const refrac=r=>f(data,r).filter(x=>x.o1_refrac!=null).map(x=>x.o1_refrac);
+    const rf=refrac(null);
+    const rfH=refrac('H'); const rfJ=refrac('J');
+    const refracOk=rf.filter(v=>v>=9).length;
+    const refracBad=rf.filter(v=>v<9).length;
     return {
-      avgC1Cal:avg(c1cal), avgC2Cal:avg(c2cal),
-      avgC1Lts:avg(c1lts), avgC2Lts:avg(c2lts),
-      avgRefrac:avg(refrac), refracOk, refracBad,
-      pctRefracOk:refrac.length?Math.round(refracOk/refrac.length*100):0,
-      minRefrac:refrac.length?Math.min(...refrac):null,
+      avgC1Cal:avg(c1cal(null)), avgC2Cal:avg(c2cal(null)),
+      avgC1Lts:avg(c1lts(null)), avgC2Lts:avg(c2lts(null)),
+      avgRefrac:avg(rf), refracOk, refracBad,
+      pctRefracOk:rf.length?Math.round(refracOk/rf.length*100):0,
+      minRefrac:rf.length?Math.min(...rf):null,
+      // Por raza
+      avgC1CalH:avg(c1cal('H')), avgC2CalH:avg(c2cal('H')),
+      avgC1LtsH:avg(c1lts('H')), avgC2LtsH:avg(c2lts('H')),
+      avgC1CalJ:avg(c1cal('J')), avgC2CalJ:avg(c2cal('J')),
+      avgC1LtsJ:avg(c1lts('J')), avgC2LtsJ:avg(c2lts('J')),
+      avgRefracH:avg(rfH), pctRefracOkH:rfH.length?Math.round(rfH.filter(v=>v>=9).length/rfH.length*100):0,
+      avgRefracJ:avg(rfJ), pctRefracOkJ:rfJ.length?Math.round(rfJ.filter(v=>v>=9).length/rfJ.length*100):0,
     };
   }
   const sA=tomaStats(dataA);
@@ -766,9 +776,19 @@ function renderDashTomas(fd){
 
   document.getElementById('pt-kpis').innerHTML=
     kpiCard('Cal. 1ª Toma (prom)', fmtN(sA.avgC1Cal,0), fmtN(sB.avgC1Cal,0), '', '', compare)+
+    kpiCard('Cal. 1ª Toma Holstein', fmtN(sA.avgC1CalH,0), fmtN(sB.avgC1CalH,0), '', '', compare)+
+    kpiCard('Cal. 1ª Toma Jersey', fmtN(sA.avgC1CalJ,0), fmtN(sB.avgC1CalJ,0), '', '', compare)+
     kpiCard('Cal. 2ª Toma (prom)', fmtN(sA.avgC2Cal,0), fmtN(sB.avgC2Cal,0), '', '', compare)+
+    kpiCard('Cal. 2ª Toma Holstein', fmtN(sA.avgC2CalH,0), fmtN(sB.avgC2CalH,0), '', '', compare)+
+    kpiCard('Cal. 2ª Toma Jersey', fmtN(sA.avgC2CalJ,0), fmtN(sB.avgC2CalJ,0), '', '', compare)+
     kpiCard('Lts 1ª Toma (prom)', fmtN(sA.avgC1Lts), fmtN(sB.avgC1Lts), '', '', compare)+
+    kpiCard('Lts 1ª Toma Holstein', fmtN(sA.avgC1LtsH), fmtN(sB.avgC1LtsH), '', '', compare)+
+    kpiCard('Lts 1ª Toma Jersey', fmtN(sA.avgC1LtsJ), fmtN(sB.avgC1LtsJ), '', '', compare)+
     kpiCard('Lts 2ª Toma (prom)', fmtN(sA.avgC2Lts), fmtN(sB.avgC2Lts), '', '', compare)+
+    kpiCard('Lts 2ª Toma Holstein', fmtN(sA.avgC2LtsH), fmtN(sB.avgC2LtsH), '', '', compare)+
+    kpiCard('Lts 2ª Toma Jersey', fmtN(sA.avgC2LtsJ), fmtN(sB.avgC2LtsJ), '', '', compare)+
+    kpiCard('Refrac. ≥9 Holstein', sA.pctRefracOkH+'%', sB.pctRefracOkH ? sB.pctRefracOkH+'%' : '—', `prom ${fmtN(sA.avgRefracH,1)}`, '', compare)+
+    kpiCard('Refrac. ≥9 Jersey', sA.pctRefracOkJ+'%', sB.pctRefracOkJ ? sB.pctRefracOkJ+'%' : '—', `prom ${fmtN(sA.avgRefracJ,1)}`, '', compare)+
     `<div class="kpi-card">
       <div class="kpi-label">Refractometría ≥9</div>
       <div class="kpi-single">${sA.pctRefracOk}%</div>
@@ -866,9 +886,17 @@ function renderDashOrdenas(fd){
 
   document.getElementById('po-kpis').innerHTML=
     kpiCard('Lts 1ª Ordeña (prom)', fmtN(sA.avgO1Lts), fmtN(sB.avgO1Lts), `min ${fmtN(sA.minO1Lts)} / max ${fmtN(sA.maxO1Lts)}`, compare?`min ${fmtN(sB.minO1Lts)} / max ${fmtN(sB.maxO1Lts)}`:'', compare)+
+    kpiCard('Lts 1ª Ordeña Holstein', fmtN(sA.avgO1LtsH), fmtN(sB.avgO1LtsH), '', '', compare)+
+    kpiCard('Lts 1ª Ordeña Jersey', fmtN(sA.avgO1LtsJ), fmtN(sB.avgO1LtsJ), '', '', compare)+
     kpiCard('Lts 2ª Ordeña (prom)', fmtN(sA.avgO2Lts), fmtN(sB.avgO2Lts), `min ${fmtN(sA.minO2Lts)} / max ${fmtN(sA.maxO2Lts)}`, compare?`min ${fmtN(sB.minO2Lts)} / max ${fmtN(sB.maxO2Lts)}`:'', compare)+
+    kpiCard('Lts 2ª Ordeña Holstein', fmtN(sA.avgO2LtsH), fmtN(sB.avgO2LtsH), '', '', compare)+
+    kpiCard('Lts 2ª Ordeña Jersey', fmtN(sA.avgO2LtsJ), fmtN(sB.avgO2LtsJ), '', '', compare)+
     kpiCard('Cal. 1ª Ordeña (prom)', fmtN(sA.avgO1Cal,1), fmtN(sB.avgO1Cal,1), '', '', compare)+
-    kpiCard('Cal. 2ª Ordeña (prom)', fmtN(sA.avgO2Cal,0), fmtN(sB.avgO2Cal,0), '', '', compare);
+    kpiCard('Cal. 1ª Ordeña Holstein', fmtN(sA.avgO1CalH,1), fmtN(sB.avgO1CalH,1), '', '', compare)+
+    kpiCard('Cal. 1ª Ordeña Jersey', fmtN(sA.avgO1CalJ,1), fmtN(sB.avgO1CalJ,1), '', '', compare)+
+    kpiCard('Cal. 2ª Ordeña (prom)', fmtN(sA.avgO2Cal,0), fmtN(sB.avgO2Cal,0), '', '', compare)+
+    kpiCard('Cal. 2ª Ordeña Holstein', fmtN(sA.avgO2CalH,0), fmtN(sB.avgO2CalH,0), '', '', compare)+
+    kpiCard('Cal. 2ª Ordeña Jersey', fmtN(sA.avgO2CalJ,0), fmtN(sB.avgO2CalJ,0), '', '', compare);
 
   function monthOrdChart(cid, field, color, labelA, dataBset, labelB){
     const {keys:mA,map:mapA}=groupByMonth(dataA, r=>r[field]);
