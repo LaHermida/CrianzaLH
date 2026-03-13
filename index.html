@@ -223,6 +223,7 @@
         <div id="pp-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
         <div class="kpi-group-label">🥛 Calostro — Tomas</div>
         <div id="pt-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
+        <div id="pt-partero"></div>
         <div class="kpi-group-label">🧪 Calostro — Ordeñas</div>
         <div id="po-kpis" class="kpi-grid"></div>
       </div>
@@ -800,7 +801,7 @@ function renderDashTomas(fd){
       </div>
     </div>`:'';
   // Insert after kpis
-  document.getElementById('pt-kpis').insertAdjacentHTML('afterend', parteroHtml);
+  document.getElementById('pt-partero').innerHTML=parteroHtml;
 
   // Charts
   function monthAvgChart(cid, dataSet, field, color, labelA, dataB2, labelB){
@@ -839,7 +840,7 @@ function renderDashOrdenas(fd){
   function ordStats(data){
     const o1lts=data.filter(r=>r.o1_lts!=null).map(r=>r.o1_lts);
     const o2lts=data.filter(r=>r.o2_lts!=null).map(r=>r.o2_lts);
-    const o1cal=data.filter(r=>r.o1_refrac!=null).map(r=>r.o1_refrac);
+    const o1cal=data.filter(r=>r.o1_calidad!=null).map(r=>r.o1_calidad);
     const o2cal=data.filter(r=>r.o2_calidad!=null).map(r=>r.o2_calidad);
     return {
       avgO1Lts:avg(o1lts), avgO2Lts:avg(o2lts),
@@ -873,7 +874,7 @@ function renderDashOrdenas(fd){
   }
   monthOrdChart('ch-po-lts1','o1_lts','rgba(199,120,0,.7)',fd.aLabel,dataB,fd.bLabel);
   monthOrdChart('ch-po-lts2','o2_lts','rgba(198,40,40,.7)',fd.aLabel,dataB,fd.bLabel);
-  monthOrdChart('ch-po-cal1','o1_refrac','rgba(199,120,0,.5)',fd.aLabel,dataB,fd.bLabel);
+  monthOrdChart('ch-po-cal1','o1_calidad','rgba(199,120,0,.5)',fd.aLabel,dataB,fd.bLabel);
   monthOrdChart('ch-po-cal2','o2_calidad','rgba(198,40,40,.5)',fd.aLabel,dataB,fd.bLabel);
 }
 
