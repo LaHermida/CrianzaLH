@@ -133,6 +133,13 @@
   .compare-toggle input[type=checkbox]{width:auto;cursor:pointer}
 
   .legend-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
+  .kpi-group-label{font-family:'IBM Plex Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:.5rem;padding:.2rem .5rem;background:rgba(45,106,79,.08);border-left:3px solid var(--accent);border-radius:0 3px 3px 0}
+  .chart-group-label{font-family:'IBM Plex Mono',monospace;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);margin-bottom:.75rem;padding:.2rem .5rem;background:rgba(45,106,79,.08);border-left:3px solid var(--accent);border-radius:0 3px 3px 0}
+  @media print{
+    nav,.dash-controls,#dash-cmp-panel,.btn,header{display:none!important}
+    .dash-section{break-inside:avoid}
+    body{background:#fff}
+  }
 </style>
 </head>
 <body>
@@ -169,6 +176,7 @@
     <div id="tab-dashboard" class="hidden">
       <div class="section-header">
         <span class="section-title">Dashboard</span>
+        <button class="btn btn-secondary" onclick="window.print()" title="Imprimir / Exportar PDF">🖨️ Exportar PDF</button>
       </div>
 
       <!-- Filtros globales -->
@@ -206,44 +214,46 @@
         <div class="form-group"><label>Hasta</label><input type="date" id="dash-b-hasta" oninput="renderDashboard()"/></div>
       </div>
 
-      <!-- PARTOS -->
+      <!-- TODOS LOS KPIs JUNTOS -->
       <div class="dash-section">
-        <div class="dash-section-title">📊 Partos</div>
-        <div id="dp-kpis" class="kpi-grid"></div>
-        <div class="chart-grid">
+        <div class="dash-section-title">Indicadores</div>
+        <div class="kpi-group-label">📊 Partos</div>
+        <div id="dp-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
+        <div class="kpi-group-label">⚖️ Pesos al Nacer</div>
+        <div id="pp-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
+        <div class="kpi-group-label">🥛 Calostro — Tomas</div>
+        <div id="pt-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
+        <div class="kpi-group-label">🧪 Calostro — Ordeñas</div>
+        <div id="po-kpis" class="kpi-grid"></div>
+      </div>
+
+      <!-- TODAS LAS GRÁFICAS JUNTAS -->
+      <div class="dash-section" id="dash-charts-section">
+        <div class="dash-section-title">Gráficas</div>
+
+        <div class="chart-group-label">📊 Partos</div>
+        <div class="chart-grid" style="margin-bottom:1.5rem">
           <div class="chart-card"><h4>Partos por Mes</h4><canvas id="ch-dp-mes"></canvas></div>
           <div class="chart-card"><h4>Sexo</h4><canvas id="ch-dp-sexo"></canvas></div>
           <div class="chart-card"><h4>Dificultad</h4><canvas id="ch-dp-dif"></canvas></div>
           <div class="chart-card"><h4>Día vs Noche</h4><canvas id="ch-dp-dn"></canvas></div>
         </div>
-      </div>
 
-      <!-- PESOS -->
-      <div class="dash-section">
-        <div class="dash-section-title">⚖️ Pesos al Nacer</div>
-        <div id="pp-kpis" class="kpi-grid"></div>
-        <div class="chart-grid">
+        <div class="chart-group-label">⚖️ Pesos al Nacer</div>
+        <div class="chart-grid" style="margin-bottom:1.5rem">
           <div class="chart-card"><h4>Promedio por Mes</h4><canvas id="ch-pp-mes"></canvas></div>
           <div class="chart-card"><h4>Histograma de Pesos</h4><canvas id="ch-pp-hist"></canvas></div>
         </div>
-      </div>
 
-      <!-- TOMAS -->
-      <div class="dash-section">
-        <div class="dash-section-title">🥛 Calostro — Tomas</div>
-        <div id="pt-kpis" class="kpi-grid"></div>
-        <div class="chart-grid">
+        <div class="chart-group-label">🥛 Calostro — Tomas</div>
+        <div class="chart-grid" style="margin-bottom:1.5rem">
           <div class="chart-card"><h4>Calidad 1ª Toma por Mes</h4><canvas id="ch-pt-cal1"></canvas></div>
           <div class="chart-card"><h4>Calidad 2ª Toma por Mes</h4><canvas id="ch-pt-cal2"></canvas></div>
           <div class="chart-card"><h4>Refractometría por Mes</h4><canvas id="ch-pt-refrac"></canvas></div>
           <div class="chart-card"><h4>Litros 1ª vs 2ª Toma</h4><canvas id="ch-pt-lts"></canvas></div>
         </div>
-      </div>
 
-      <!-- ORDEÑAS -->
-      <div class="dash-section">
-        <div class="dash-section-title">🧪 Calostro — Ordeñas</div>
-        <div id="po-kpis" class="kpi-grid"></div>
+        <div class="chart-group-label">🧪 Calostro — Ordeñas</div>
         <div class="chart-grid">
           <div class="chart-card"><h4>Litros 1ª Ordeña por Mes</h4><canvas id="ch-po-lts1"></canvas></div>
           <div class="chart-card"><h4>Litros 2ª Ordeña por Mes</h4><canvas id="ch-po-lts2"></canvas></div>
