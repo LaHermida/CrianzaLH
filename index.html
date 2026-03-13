@@ -1143,7 +1143,15 @@ async function readFile(file){
   const data=await file.arrayBuffer();
   const wb=XLSX.read(data,{type:'array',cellDates:true});
   const ws=wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json(ws,{defval:null,raw:false});
+  // Use header:1 to get raw arrays - avoids duplicate column name issues
+  const arrays=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+  if(!arrays.length) return [];
+  // Convert to objects using first row as header, but keep positional access too
+  const headers=arrays[0];
+  return arrays.slice(1).map(row=>({
+    __row: row, // raw positional array
+    ...Object.fromEntries(headers.map((h,i)=>[h,row[i]]))
+  }));
 }
 function excelDateToISO(val){
   if(!val) return null;
@@ -1173,33 +1181,48 @@ function excelTimeToHHMM(val){
 function toFloat(val){if(val===null||val===''||val===undefined)return null;return parseFloat(String(val).replace(',','.'))||null;}
 function toStr(val){return val?String(val).trim()||null:null;}
 function mapPartoRowFromExcel(row){
-  const b=k=>{
-    if(row[k]!==undefined) return row[k];
-    const kl=k.toLowerCase().trim();
-    for(const rk of Object.keys(row)){if(rk.toLowerCase().trim()===kl)return row[rk];}
-    return null;
-  };
-  const esMacho=toStr(b('Macho'));
-  const sexo=esMacho?'M':'H';
-  const hembra=esMacho?esMacho:toStr(b('HEMBRA'));
-  const rawFecha=b('FECHA PARTO');
-  const fecha_parto=excelDateToISO(rawFecha);
+  // Lee por posicion usando __row para evitar problemas con nombres duplicados/espacios
+  // 0=fecha,1=vaca,2=vaquilla,3=hembra,4=macho,5=raza,6=dia_noche
+  // 7=dificultad,8=peso,9=gest,10=reto,11=partero,12=hora_parto
+  // 13=c1_hora,14=c1_lts,15=c1_calidad,16=c1_calostrero,17=c1_sonda
+  // 18=c2_hora,19=c2_lts,20=c2_calidad,21=c2_calostrero,22=c2_sonda
+  // 23=o1_refrac,24=o1_lts,25=o1_calidad,26=o2_lts,27=o2_calidad
+  const p = row.__row || [];
+  const g = i => (p[i]!==undefined && p[i]!==null && p[i]!=='') ? p[i] : null;
+  const macho_val = g(4);
+  const es_macho = macho_val && String(macho_val).trim() !== '';
   return {
-    fecha_parto, madre_vaca:toStr(b('VACA')), madre_vaquilla:toStr(b('VAQUILLA')),
-    hembra, sexo, raza:toStr(b('Raza')),
-    dia_noche:toStr(b('Dia/ Noche')||b('\xa0Dia/ Noche')),
-    dificultad:toStr(b('Dificil / Normal')),
-    peso_nacer:toFloat(b('PESO  NACER')||b('PESO NACER')),
-    dias_gestacion:toFloat(b('DIAS GEST.')), dias_reto:toFloat(b('DIAS EN RETO')),
-    partero:toStr(b('Partero')), hora_parto:excelTimeToHHMM(b('Hora de parto')),
-    c1_hora:excelTimeToHHMM(b('Hora 1er Toma')), c1_lts:toFloat(b('Litros 1ra toma')),
-    c1_calidad:toFloat(b('Calidad')), c1_calostrero:toStr(b('Calostrero')), c1_sonda:toStr(b('SONDA')),
-    c2_hora:excelTimeToHHMM(b('Hora 2da Toma ')||b('Hora 2da Toma')), c2_lts:toFloat(b('Litros 2da toma')),
-    c2_calidad:toFloat(b('Calidad 2da')), c2_calostrero:toStr(b('Calostrero 2da')), c2_sonda:toStr(b('SONDA 2da')),
-    o1_lts:toFloat(b('1a Ordeña Lts.  De Calostro')), o1_refrac:toFloat(b('Refractometria')),
-    o2_lts:toFloat(b('2a Ordeña Lts.  De Calostro')), o2_calidad:toFloat(b('Calidad de Calostros')),
+    fecha_parto:    excelDateToISO(g(0)),
+    madre_vaca:     toStr(g(1)),
+    madre_vaquilla: toStr(g(2)),
+    hembra:         es_macho ? toStr(macho_val) : toStr(g(3)),
+    sexo:           es_macho ? 'M' : 'H',
+    raza:           toStr(g(5)),
+    dia_noche:      toStr(g(6)),
+    dificultad:     toStr(g(7)),
+    peso_nacer:     toFloat(g(8)),
+    dias_gestacion: toFloat(g(9)),
+    dias_reto:      toFloat(g(10)),
+    partero:        toStr(g(11)),
+    hora_parto:     excelTimeToHHMM(g(12)),
+    c1_hora:        excelTimeToHHMM(g(13)),
+    c1_lts:         toFloat(g(14)),
+    c1_calidad:     toFloat(g(15)),
+    c1_calostrero:  toStr(g(16)),
+    c1_sonda:       toStr(g(17)),
+    c2_hora:        excelTimeToHHMM(g(18)),
+    c2_lts:         toFloat(g(19)),
+    c2_calidad:     toFloat(g(20)),
+    c2_calostrero:  toStr(g(21)),
+    c2_sonda:       toStr(g(22)),
+    o1_refrac:      toFloat(g(23)),
+    o1_lts:         toFloat(g(24)),
+    o1_calidad:     toFloat(g(25)),
+    o2_lts:         toFloat(g(26)),
+    o2_calidad:     toFloat(g(27)),
   };
 }
+
 function mapPesajeRow(row){
   const keys=Object.keys(row);const g=i=>row[keys[i]]??null;
   return{fecha:excelDateToISO(g(0)),hembra:toStr(g(1)),peso:toFloat(g(2)),notas:toStr(g(3))};
