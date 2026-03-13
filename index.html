@@ -631,10 +631,18 @@ function computePartoKPIs(data){
   const noche=data.filter(r=>r.dia_noche==='Noche').length;
   const gest=data.filter(r=>r.dias_gestacion!=null).map(r=>r.dias_gestacion);
   const reto=data.filter(r=>r.dias_reto!=null).map(r=>r.dias_reto);
+  const gestH=data.filter(r=>r.dias_gestacion!=null&&r.raza==='H').map(r=>r.dias_gestacion);
+  const gestJ=data.filter(r=>r.dias_gestacion!=null&&r.raza==='J').map(r=>r.dias_gestacion);
+  const retoH=data.filter(r=>r.dias_reto!=null&&r.raza==='H').map(r=>r.dias_reto);
+  const retoJ=data.filter(r=>r.dias_reto!=null&&r.raza==='J').map(r=>r.dias_reto);
   return {
     total,hembras,machos,dificiles,noche,
     avgGest:avg(gest), minGest:gest.length?Math.min(...gest):null, maxGest:gest.length?Math.max(...gest):null,
     avgReto:avg(reto), minReto:reto.length?Math.min(...reto):null, maxReto:reto.length?Math.max(...reto):null,
+    avgGestH:avg(gestH), minGestH:gestH.length?Math.min(...gestH):null, maxGestH:gestH.length?Math.max(...gestH):null,
+    avgGestJ:avg(gestJ), minGestJ:gestJ.length?Math.min(...gestJ):null, maxGestJ:gestJ.length?Math.max(...gestJ):null,
+    avgRetoH:avg(retoH), minRetoH:retoH.length?Math.min(...retoH):null, maxRetoH:retoH.length?Math.max(...retoH):null,
+    avgRetoJ:avg(retoJ), minRetoJ:retoJ.length?Math.min(...retoJ):null, maxRetoJ:retoJ.length?Math.max(...retoJ):null,
   };
 }
 
@@ -654,7 +662,11 @@ function renderDashPartos(fd){
     kpiCard('Difíciles', kA.dificiles, kB.dificiles, `${kA.total?Math.round(kA.dificiles/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.dificiles/kB.total*100):0}%`:'', compare)+
     kpiCard('Noche', kA.noche, kB.noche, '', '', compare)+
     kpiCard('Días Gestación', fmtN(kA.avgGest,0), fmtN(kB.avgGest,0), `min ${fmtN(kA.minGest,0)} / max ${fmtN(kA.maxGest,0)}`, compare?`min ${fmtN(kB.minGest,0)} / max ${fmtN(kB.maxGest,0)}`:'', compare)+
-    kpiCard('Días en Reto', fmtN(kA.avgReto,0), fmtN(kB.avgReto,0), `min ${fmtN(kA.minReto,0)} / max ${fmtN(kA.maxReto,0)}`, compare?`min ${fmtN(kB.minReto,0)} / max ${fmtN(kB.maxReto,0)}`:'', compare);
+    kpiCard('Gestación Holstein', fmtN(kA.avgGestH,0), fmtN(kB.avgGestH,0), `min ${fmtN(kA.minGestH,0)} / max ${fmtN(kA.maxGestH,0)}`, compare?`min ${fmtN(kB.minGestH,0)} / max ${fmtN(kB.maxGestH,0)}`:'', compare)+
+    kpiCard('Gestación Jersey', fmtN(kA.avgGestJ,0), fmtN(kB.avgGestJ,0), `min ${fmtN(kA.minGestJ,0)} / max ${fmtN(kA.maxGestJ,0)}`, compare?`min ${fmtN(kB.minGestJ,0)} / max ${fmtN(kB.maxGestJ,0)}`:'', compare)+
+    kpiCard('Días en Reto', fmtN(kA.avgReto,0), fmtN(kB.avgReto,0), `min ${fmtN(kA.minReto,0)} / max ${fmtN(kA.maxReto,0)}`, compare?`min ${fmtN(kB.minReto,0)} / max ${fmtN(kB.maxReto,0)}`:'', compare)+
+    kpiCard('Reto Holstein', fmtN(kA.avgRetoH,0), fmtN(kB.avgRetoH,0), `min ${fmtN(kA.minRetoH,0)} / max ${fmtN(kA.maxRetoH,0)}`, compare?`min ${fmtN(kB.minRetoH,0)} / max ${fmtN(kB.maxRetoH,0)}`:'', compare)+
+    kpiCard('Reto Jersey', fmtN(kA.avgRetoJ,0), fmtN(kB.avgRetoJ,0), `min ${fmtN(kA.minRetoJ,0)} / max ${fmtN(kA.maxRetoJ,0)}`, compare?`min ${fmtN(kB.minRetoJ,0)} / max ${fmtN(kB.maxRetoJ,0)}`:'', compare);
 
   // Charts
   const {keys:mA, map:mapA}=groupByMonth(dataA, r=>1);
