@@ -1413,8 +1413,15 @@ function mapPartoRowFromExcel(row){
 }
 
 function mapPesajeRow(row){
-  const keys=Object.keys(row);const g=i=>row[keys[i]]??null;
-  return{fecha:excelDateToISO(g(0)),hembra:toStr(g(1)),peso:toFloat(g(2)),notas:toStr(g(3))};
+  // Col 0=Numero Becerra (hembra), Col 1=Kg, Col 2=Fecha de Pesada
+  const p=row.__row||[];
+  const g=i=>(p[i]!==undefined&&p[i]!==null&&p[i]!=='')?p[i]:null;
+  return{
+    hembra: toStr(g(0)),
+    peso:   toFloat(g(1)),
+    fecha:  excelDateToISO(g(2)),
+    notas:  null
+  };
 }
 function showImportPreview(valid,total){
   const omitidos=total-valid;
