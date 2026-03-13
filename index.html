@@ -627,7 +627,7 @@ function computePartoKPIs(data){
   const total=data.length;
   const hembras=data.filter(r=>r.sexo==='H').length;
   const machos=data.filter(r=>r.sexo==='M').length;
-  const dificiles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase().includes('dificil')).length;
+  const dificiles=data.filter(r=>r.dificultad&&(r.dificultad.toLowerCase().includes('dificil')||r.dificultad.toLowerCase().includes('distocia'))).length;
   const noche=data.filter(r=>r.dia_noche==='Noche').length;
   const gest=data.filter(r=>r.dias_gestacion!=null).map(r=>r.dias_gestacion);
   const reto=data.filter(r=>r.dias_reto!=null).map(r=>r.dias_reto);
@@ -659,7 +659,7 @@ function renderDashPartos(fd){
     kpiCard('Total Partos', kA.total, kB.total, '', '', compare)+
     kpiCard('Hembras', kA.hembras, kB.hembras, `${kA.total?Math.round(kA.hembras/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.hembras/kB.total*100):0}%`:'', compare)+
     kpiCard('Machos', kA.machos, kB.machos, '', '', compare)+
-    kpiCard('Difíciles', kA.dificiles, kB.dificiles, `${kA.total?Math.round(kA.dificiles/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.dificiles/kB.total*100):0}%`:'', compare)+
+    kpiCard('Difíciles', `${kA.dificiles} (${kA.total?Math.round(kA.dificiles/kA.total*100):0}%)`, compare?`${kB.dificiles} (${kB.total?Math.round(kB.dificiles/kB.total*100):0}%)`:'—', 'incl. Distocia', '', compare)+
     kpiCard('Noche', kA.noche, kB.noche, '', '', compare)+
     kpiCard('Días Gestación', fmtN(kA.avgGest,0), fmtN(kB.avgGest,0), `min ${fmtN(kA.minGest,0)} / max ${fmtN(kA.maxGest,0)}`, compare?`min ${fmtN(kB.minGest,0)} / max ${fmtN(kB.maxGest,0)}`:'', compare)+
     kpiCard('Gestación Holstein', fmtN(kA.avgGestH,0), fmtN(kB.avgGestH,0), `min ${fmtN(kA.minGestH,0)} / max ${fmtN(kA.maxGestH,0)}`, compare?`min ${fmtN(kB.minGestH,0)} / max ${fmtN(kB.maxGestH,0)}`:'', compare)+
@@ -924,7 +924,7 @@ function renderStats(data){
   const hembras=data.filter(r=>r.sexo==='H').length;
   const hoy=new Date().toISOString().slice(0,7);
   const mes=data.filter(r=>r.fecha_parto&&r.fecha_parto.slice(0,7)===hoy).length;
-  const dificiles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase().includes('dificil')).length;
+  const dificiles=data.filter(r=>r.dificultad&&(r.dificultad.toLowerCase().includes('dificil')||r.dificultad.toLowerCase().includes('distocia'))).length;
   document.getElementById('statsRow').innerHTML=`
     <div class="stat-card"><div class="val">${total}</div><div class="lbl">Total Partos</div></div>
     <div class="stat-card"><div class="val">${hembras}</div><div class="lbl">Hembras</div></div>
@@ -946,7 +946,7 @@ function renderPartos(data){
       <td>${r.sexo==='M'?'<span class="badge badge-m">M</span>':'<span class="badge badge-h">H</span>'}</td>
       <td>${r.raza?'<span class="badge" style="background:#e8f5e9;color:#1b5e20">'+r.raza+'</span>':'—'}</td>
       <td>${r.dia_noche?`<span class="badge ${r.dia_noche==='Dia'?'badge-dn':'badge-nn'}">${r.dia_noche}</span>`:'—'}</td>
-      <td>${r.dificultad?`<span class="badge ${r.dificultad.toLowerCase().includes('dificil')?'badge-dif':'badge-nor'}">${r.dificultad}</span>`:'—'}</td>
+      <td>${r.dificultad?`<span class="badge ${(r.dificultad.toLowerCase().includes('dificil')||r.dificultad.toLowerCase().includes('distocia'))?'badge-dif':'badge-nor'}">${r.dificultad}</span>`:'—'}</td>
       <td class="mono">${r.peso_nacer!=null?r.peso_nacer+' kg':'—'}</td>
       <td class="mono">${r.dias_gestacion||'—'}</td>
       <td class="mono">${r.dias_reto||'—'}</td>
