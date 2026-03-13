@@ -578,17 +578,18 @@ async function readFile(file){
     let text;
     try { text = new TextDecoder('iso-8859-1').decode(buf); }
     catch(e){ text = new TextDecoder('utf-8').decode(buf); }
-    // Detect delimiter: semicolon or comma
     const firstLine = text.split('\n')[0];
     const delim = (firstLine.split(';').length > firstLine.split(',').length) ? ';' : ',';
-    // Parse using XLSX with detected delimiter
     const wb = XLSX.read(text, {type:'string', FS: delim});
     const ws = wb.Sheets[wb.SheetNames[0]];
+    // raw:false for CSV so dates come as strings
     return XLSX.utils.sheet_to_json(ws,{defval:null,raw:false});
   }
+  // For Excel: use raw:true so we get numeric serial dates/times, then convert manually
   const data=await file.arrayBuffer();
-  const wb=XLSX.read(data);
+  const wb=XLSX.read(data, {type:'array', cellDates:true});
   const ws=wb.Sheets[wb.SheetNames[0]];
+  // Use raw:false but cellDates:true so XLSX handles date conversion
   return XLSX.utils.sheet_to_json(ws,{defval:null,raw:false});
 }
 
@@ -655,13 +656,7 @@ function mapPartoRowFromExcel(row){
 
   // Date: handle MM/DD/YYYY (Excel US format from this ranch)
   const rawFecha = b('FECHA PARTO');
-  let fecha_parto = null;
-  if(rawFecha){
-    const s = String(rawFecha).trim();
-    const m = s.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-    if(m) fecha_parto = `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
-    else fecha_parto = excelDateToISO(rawFecha);
-  }
+  let fecha_parto = excelDateToISO(rawFecha);
 
   return {
     fecha_parto,
