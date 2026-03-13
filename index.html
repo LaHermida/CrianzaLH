@@ -628,7 +628,13 @@ function computePartoKPIs(data){
   const machos=data.filter(r=>r.sexo==='M').length;
   const dificiles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase().includes('dificil')).length;
   const noche=data.filter(r=>r.dia_noche==='Noche').length;
-  return {total,hembras,machos,dificiles,noche};
+  const gest=data.filter(r=>r.dias_gestacion!=null).map(r=>r.dias_gestacion);
+  const reto=data.filter(r=>r.dias_reto!=null).map(r=>r.dias_reto);
+  return {
+    total,hembras,machos,dificiles,noche,
+    avgGest:avg(gest), minGest:gest.length?Math.min(...gest):null, maxGest:gest.length?Math.max(...gest):null,
+    avgReto:avg(reto), minReto:reto.length?Math.min(...reto):null, maxReto:reto.length?Math.max(...reto):null,
+  };
 }
 
 // ==================== DASH PARTOS ====================
@@ -645,7 +651,9 @@ function renderDashPartos(fd){
     kpiCard('Hembras', kA.hembras, kB.hembras, `${kA.total?Math.round(kA.hembras/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.hembras/kB.total*100):0}%`:'', compare)+
     kpiCard('Machos', kA.machos, kB.machos, '', '', compare)+
     kpiCard('Difíciles', kA.dificiles, kB.dificiles, `${kA.total?Math.round(kA.dificiles/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.dificiles/kB.total*100):0}%`:'', compare)+
-    kpiCard('Noche', kA.noche, kB.noche, '', '', compare);
+    kpiCard('Noche', kA.noche, kB.noche, '', '', compare)+
+    kpiCard('Días Gestación', fmtN(kA.avgGest,0), fmtN(kB.avgGest,0), `min ${fmtN(kA.minGest,0)} / max ${fmtN(kA.maxGest,0)}`, compare?`min ${fmtN(kB.minGest,0)} / max ${fmtN(kB.maxGest,0)}`:'', compare)+
+    kpiCard('Días en Reto', fmtN(kA.avgReto,0), fmtN(kB.avgReto,0), `min ${fmtN(kA.minReto,0)} / max ${fmtN(kA.maxReto,0)}`, compare?`min ${fmtN(kB.minReto,0)} / max ${fmtN(kB.maxReto,0)}`:'', compare);
 
   // Charts
   const {keys:mA, map:mapA}=groupByMonth(dataA, r=>1);
@@ -754,6 +762,45 @@ function renderDashTomas(fd){
       ${refracBarA}
       <div class="kpi-sub">✅ ${sA.refracOk} ok · ❌ ${sA.refracBad} bajo · mín ${fmtN(sA.minRefrac,1)}</div>
     </div>`;
+
+  // Partero refractometría table
+  const parteroMap={};
+  dataA.forEach(r=>{
+    if(!r.partero||r.o1_refrac==null) return;
+    if(!parteroMap[r.partero]) parteroMap[r.partero]=[];
+    parteroMap[r.partero].push(r.o1_refrac);
+  });
+  const parteroRows=Object.entries(parteroMap).sort((a,b)=>b[1].length-a[1].length);
+  const parteroHtml=parteroRows.length?`
+    <div class="dash-section" style="margin-top:1rem">
+      <div class="dash-section-title">Refractometría por Partero</div>
+      <div class="table-wrap" style="max-width:600px">
+        <table>
+          <thead><tr>
+            <th>Partero</th><th>Partos</th><th>Refrac. Prom.</th><th>Mín</th><th>Máx</th><th>% ≥9</th>
+          </tr></thead>
+          <tbody>
+            ${parteroRows.map(([p,vals])=>{
+              const a=avg(vals);
+              const mn=Math.min(...vals);
+              const mx=Math.max(...vals);
+              const pct=Math.round(vals.filter(v=>v>=9).length/vals.length*100);
+              const color=pct>=80?'gdp-ok':pct>=60?'gdp-warn':'gdp-bad';
+              return `<tr>
+                <td>${p}</td>
+                <td class="mono">${vals.length}</td>
+                <td class="mono">${a!=null?a.toFixed(1):'—'}</td>
+                <td class="mono">${mn.toFixed(1)}</td>
+                <td class="mono">${mx.toFixed(1)}</td>
+                <td class="mono ${color}">${pct}%</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`:'';
+  // Insert after kpis
+  document.getElementById('pt-kpis').insertAdjacentHTML('afterend', parteroHtml);
 
   // Charts
   function monthAvgChart(cid, dataSet, field, color, labelA, dataB2, labelB){
