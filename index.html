@@ -324,13 +324,12 @@
       <div id="gdp-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
 
       <!-- Tabla por semana -->
-      <div class="kpi-group-label">📅 GDP por Semana de Nacimiento</div>
+      <div class="kpi-group-label">📅 GDP por Lote Mensual de Nacimiento</div>
       <div class="table-wrap">
         <table id="gdp-semana-table">
           <thead>
             <tr>
-              <th>Semana</th>
-              <th>Rango Fechas</th>
+              <th>Lote</th>
               <th>Becerras</th>
               <th>Aretes</th>
               <th>1ª Pesada<br><small>Días prom.</small></th>
@@ -1227,7 +1226,7 @@ function renderDashGDP(){
       parto, nac, pesoNacer,
       p1peso:p1?p1.peso:null, d1, adg1,
       p2peso:p2?p2.peso:null, d2, adg2, adgEntre,
-      semana: getISOWeek(nac), year: nac.getFullYear()
+      semana: nac.getMonth(), year: nac.getFullYear()
     };
   });
 
@@ -1245,25 +1244,23 @@ function renderDashGDP(){
     kpiCard('ADG 2ª Pesada (prom)',adg2s.length?avg(adg2s).toFixed(3)+' kg/día':'—','','','',false)+
     kpiCard('ADG Entre pesadas (prom)',adgEs.length?avg(adgEs).toFixed(3)+' kg/día':'—','','','',false);
 
-  // Group by semana
-  const semanaMap={};
+  // Group by month
+  const mesesNombre=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const loteMap={};
   Object.values(hembraStats).forEach(s=>{
-    const key=`${s.year}-W${String(s.semana).padStart(2,'0')}`;
-    if(!semanaMap[key]) semanaMap[key]={key,year:s.year,semana:s.semana,items:[]};
-    semanaMap[key].items.push(s);
+    const key=`${s.year}-${String(s.nac.getMonth()+1).padStart(2,'0')}`;
+    if(!loteMap[key]) loteMap[key]={key,year:s.year,mes:s.nac.getMonth(),items:[]};
+    loteMap[key].items.push(s);
   });
 
-  const semanas=Object.values(semanaMap).sort((a,b)=>a.key.localeCompare(b.key));
+  const lotes=Object.values(loteMap).sort((a,b)=>a.key.localeCompare(b.key));
   const tbody=document.getElementById('gdp-semana-body');
-  if(!semanas.length){tbody.innerHTML='<tr><td colspan="11" class="empty">Sin datos de pesajes.</td></tr>';return;}
+  if(!lotes.length){tbody.innerHTML='<tr><td colspan="10" class="empty">Sin datos de pesajes.</td></tr>';return;}
 
-  tbody.innerHTML=semanas.map(sem=>{
-    const items=sem.items;
-    // Get date range of births in this week
-    const fechas=items.map(s=>s.nac).sort((a,b)=>a-b);
-    const fechaMin=fechas[0].toISOString().slice(0,10);
-    const fechaMax=fechas[fechas.length-1].toISOString().slice(0,10);
-    const aretes=items.map(s=>s.parto.hembra).sort().join(', ');
+  tbody.innerHTML=lotes.map(lote=>{
+    const items=lote.items;
+    const label=`${mesesNombre[lote.mes]} ${lote.year}`;
+    const aretes=items.map(s=>s.parto.hembra).sort((a,b)=>parseInt(a)-parseInt(b)).join(', ');
     const a1=items.filter(s=>s.adg1!=null).map(s=>s.adg1);
     const a2=items.filter(s=>s.adg2!=null).map(s=>s.adg2);
     const ae=items.filter(s=>s.adgEntre!=null).map(s=>s.adgEntre);
@@ -1276,10 +1273,9 @@ function renderDashGDP(){
     const adgEProm=ae.length?avg(ae):null;
     const adgClass=v=>v==null?'':v>=0.8?'gdp-ok':v>=0.6?'gdp-warn':'gdp-bad';
     return `<tr>
-      <td class="mono" style="font-weight:600">Sem ${sem.semana}</td>
-      <td class="mono" style="font-size:.8rem">${fechaMin===fechaMax?fechaMin:fechaMin+' – '+fechaMax}</td>
+      <td class="mono" style="font-weight:600">${label}</td>
       <td class="mono" style="text-align:center">${items.length}</td>
-      <td style="font-size:.78rem;max-width:180px;word-break:break-word">${aretes}</td>
+      <td style="font-size:.78rem;max-width:200px;word-break:break-word">${aretes}</td>
       <td class="mono">${d1s.length?Math.round(avg(d1s))+' días':'—'}</td>
       <td class="mono">${p1s.length?avg(p1s).toFixed(1)+' kg':'—'}</td>
       <td class="mono ${adgClass(adg1Prom)}">${adg1Prom!=null?adg1Prom.toFixed(3):'—'}</td>
