@@ -170,6 +170,7 @@
     <div class="nav-sep"></div>
     <button onclick="showTab('reg-partos',this)">🐄 Registro Partos</button>
     <button onclick="showTab('reg-pesajes',this)">📏 Registro Pesajes</button>
+    <button onclick="showTab('inventario',this)">🐮 Inventario</button>
   </nav>
   <main>
 
@@ -344,6 +345,62 @@
           <tbody id="gdp-semana-body">
             <tr><td colspan="11" class="empty">Cargando...</td></tr>
           </tbody>
+        </table>
+      </div>
+    </div>
+
+
+    <!-- ===== INVENTARIO ===== -->
+    <div id="tab-inventario" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🐮 Inventario & Supervivencia</span>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="document.getElementById('importSalidasFile').click()">📥 Importar Salidas</button>
+          <input type="file" id="importSalidasFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importSalidas(event)"/>
+        </div>
+      </div>
+
+      <!-- KPIs generales -->
+      <div class="kpi-group-label">📊 Resumen General</div>
+      <div id="inv-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
+
+      <!-- Mortalidad por etapa -->
+      <div class="kpi-group-label">📋 Mortalidad por Etapa</div>
+      <div class="table-wrap" style="max-width:700px;margin-bottom:1.5rem">
+        <table id="inv-etapa-table">
+          <thead>
+            <tr>
+              <th>Etapa</th>
+              <th>Muertas</th>
+              <th>Diarrea</th>
+              <th>Pulmonar</th>
+              <th>Otra</th>
+            </tr>
+          </thead>
+          <tbody id="inv-etapa-body"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Tabla por lote mensual -->
+      <div class="kpi-group-label">📅 Supervivencia por Lote Mensual</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Lote</th>
+              <th>Nacidas</th>
+              <th>Activas</th>
+              <th>% Superv.</th>
+              <th>Muertas</th>
+              <th>- Diarrea</th>
+              <th>- Pulmonar</th>
+              <th>- Otra</th>
+              <th>Descarte</th>
+              <th>Vendidas</th>
+              <th>Otras Salidas</th>
+            </tr>
+          </thead>
+          <tbody id="inv-lote-body"><tr><td colspan="11" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -530,7 +587,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','reg-partos','reg-pesajes'].forEach(t=>{
+  ['dashboard','dash-gdp','reg-partos','reg-pesajes','inventario'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -1304,6 +1361,113 @@ function getISOWeek(date){
   return Math.ceil((((d-yearStart)/86400000)+1)/7);
 }
 
+
+// ==================== INVENTARIO ====================
+async function loadInventario(){
+  const [partos, salidas] = await Promise.all([
+    sbFetch('partos_crianza?order=fecha_parto.asc'),
+    sbFetch('salidas_crianza?order=fecha_salida.asc')
+  ]);
+  window._partos = partos||[];
+  window._salidas = salidas||[];
+  renderInventario(partos||[], salidas||[]);
+}
+
+function renderInventario(partos, salidas){
+  const mesesNombre=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
+  // Build salida map by hembra
+  const salidaMap={};
+  salidas.forEach(s=>{ salidaMap[s.hembra]=s; });
+
+  // Only count hembras vivas (not MTA, not aborto)
+  const hembras=partos.filter(p=>p.sexo==='H' && p.hembra && p.hembra!=='MTA' && p.hembra!=='ABORTO');
+
+  // Group by birth month
+  const loteMap={};
+  hembras.forEach(p=>{
+    const d=new Date(p.fecha_parto);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(!loteMap[key]) loteMap[key]={key,year:d.getFullYear(),mes:d.getMonth(),nacidas:[],salidas:[]};
+    loteMap[key].nacidas.push(p);
+    if(salidaMap[p.hembra]) loteMap[key].salidas.push(salidaMap[p.hembra]);
+  });
+
+  const lotes=Object.values(loteMap).sort((a,b)=>a.key.localeCompare(b.key));
+
+  // Global KPIs
+  const totalNacidas=hembras.length;
+  const totalSalidas=hembras.filter(p=>salidaMap[p.hembra]).length;
+  const totalActivas=totalNacidas-totalSalidas;
+  const totalMuertas=salidas.filter(s=>s.motivo&&s.motivo.startsWith('Muerta')).length;
+  const totalVendidas=salidas.filter(s=>s.motivo==='Vendida').length;
+  const totalDescarte=salidas.filter(s=>s.motivo==='Descarte').length;
+  const pctSuperv=totalNacidas?Math.round(totalActivas/totalNacidas*100):0;
+
+  document.getElementById('inv-kpis').innerHTML=
+    kpiCard('Total Nacidas (hembras)',totalNacidas,'','','',false)+
+    kpiCard('Activas en Hato',`${totalActivas} (${pctSuperv}%)`,'','% supervivencia','',false)+
+    kpiCard('Total Salidas',totalSalidas,'','','',false)+
+    kpiCard('Muertas',totalMuertas,'','','',false)+
+    kpiCard('Vendidas',totalVendidas,'','','',false)+
+    kpiCard('Descartes',totalDescarte,'','','',false);
+
+  // Etapa table
+  const etapas=[
+    'Etapa 1 - Leche (0-65d)',
+    'Etapa 2 - Jaulas (66-90d)',
+    'Etapa 3 - AYC (91-150d)',
+    'Etapa 4 - 5-11m (151-365d)',
+    'Etapa 5 - 12m a Gestación'
+  ];
+  const etapaBody=document.getElementById('inv-etapa-body');
+  etapaBody.innerHTML=etapas.map(e=>{
+    const es=salidas.filter(s=>s.etapa===e&&s.motivo&&s.motivo.startsWith('Muerta'));
+    const diarrea=es.filter(s=>s.motivo==='Muerta - Diarrea').length;
+    const pulmonar=es.filter(s=>s.motivo==='Muerta - Pulmonar').length;
+    const otra=es.filter(s=>s.motivo==='Muerta - Otra').length;
+    const total=es.length;
+    return `<tr>
+      <td>${e}</td>
+      <td class="mono" style="font-weight:600">${total}</td>
+      <td class="mono">${diarrea}</td>
+      <td class="mono">${pulmonar}</td>
+      <td class="mono">${otra}</td>
+    </tr>`;
+  }).join('');
+
+  // Lote table
+  const loteBody=document.getElementById('inv-lote-body');
+  if(!lotes.length){loteBody.innerHTML='<tr><td colspan="11" class="empty">Sin datos.</td></tr>';return;}
+  loteBody.innerHTML=lotes.map(lote=>{
+    const n=lote.nacidas.length;
+    const s=lote.salidas;
+    const activas=n-s.length;
+    const pct=n?Math.round(activas/n*100):0;
+    const muertas=s.filter(x=>x.motivo&&x.motivo.startsWith('Muerta')).length;
+    const diarrea=s.filter(x=>x.motivo==='Muerta - Diarrea').length;
+    const pulmonar=s.filter(x=>x.motivo==='Muerta - Pulmonar').length;
+    const otraMuerta=s.filter(x=>x.motivo==='Muerta - Otra').length;
+    const descarte=s.filter(x=>x.motivo==='Descarte').length;
+    const vendidas=s.filter(x=>x.motivo==='Vendida').length;
+    const otras=s.filter(x=>!x.motivo||(!x.motivo.startsWith('Muerta')&&x.motivo!=='Descarte'&&x.motivo!=='Vendida')).length;
+    const pctClass=pct>=80?'gdp-ok':pct>=60?'gdp-warn':'gdp-bad';
+    return `<tr>
+      <td style="font-weight:600">${mesesNombre[lote.mes]} ${lote.year}</td>
+      <td class="mono" style="text-align:center">${n}</td>
+      <td class="mono" style="text-align:center">${activas}</td>
+      <td class="mono ${pctClass}" style="text-align:center">${pct}%</td>
+      <td class="mono" style="text-align:center">${muertas}</td>
+      <td class="mono" style="text-align:center">${diarrea}</td>
+      <td class="mono" style="text-align:center">${pulmonar}</td>
+      <td class="mono" style="text-align:center">${otraMuerta}</td>
+      <td class="mono" style="text-align:center">${descarte}</td>
+      <td class="mono" style="text-align:center">${vendidas}</td>
+      <td class="mono" style="text-align:center">${otras}</td>
+    </tr>`;
+  }).join('');
+}
+
 // ==================== IMPORT ====================
 let importQueue=[],importType='';
 async function importPartos(event){
@@ -1325,6 +1489,44 @@ async function importPartos(event){
   importQueue=rows.map((row,idx)=>mapPartoRowFromExcel(row, twinSecondIdx.has(idx))).filter(r=>r.fecha_parto);
   showImportPreview(importQueue.length,rows.length);
 }
+async function importSalidas(event){
+  const file=event.target.files[0];if(!file)return;event.target.value='';
+  const rows=await readFile(file);
+  if(!rows.length){alert('Archivo vacío.');return;}
+  // Format: Hembra | Fecha Salida | Motivo (optional)
+  // Col 0=hembra, 1=fecha_salida, 2=motivo
+  const mapped=rows.map(row=>{
+    const p=row.__row||[];
+    const g=i=>(p[i]!==undefined&&p[i]!==null&&p[i]!=='')?p[i]:null;
+    const hembra=toStr(g(0));
+    const fecha_salida=excelDateToISO(g(1));
+    const razon_original=toStr(g(2))||null;
+    if(!hembra||!fecha_salida) return null;
+    const motivo=clasificarMotivo(razon_original||'');
+    return {hembra, fecha_salida, razon_original, motivo};
+  }).filter(r=>r);
+  if(!mapped.length){alert('Sin datos válidos.');return;}
+  let ok=0,err=0;
+  for(const r of mapped){
+    const res=await sbFetch('salidas_crianza','POST',r);
+    if(res&&!res.error) ok++; else err++;
+  }
+  alert(`Importadas: ${ok} salidas${err?', Errores: '+err:''}`);
+  await loadInventario();
+}
+
+function clasificarMotivo(razon){
+  const r=razon.toUpperCase().trim();
+  if(!r||r==='--') return 'Otro';
+  if(r.includes('DIARREA')||r.includes('COLICO')||r.includes('COLIC')) return 'Muerta - Diarrea';
+  if(r.includes('NEUMON')||r.includes('PULMON')||r.includes('B.R.D')||r.includes('BRD')) return 'Muerta - Pulmonar';
+  if(r.includes('MUERTO')||r.includes('MUERTA')||r.includes('ACCIDENTE')||r.includes('ENFERM')||r.includes('ENTRIPADA')||r.includes('TEMPERATURA')||r.includes('CAIDA')) return 'Muerta - Otra';
+  if(r.includes('VENDIDA')||r.includes('CARNE')) return 'Vendida';
+  if(r.includes('QUEDADA')||r.includes('FLACA')||r.includes('CHICA')||r.includes('CRECIMIENTO')||r.includes('BAJA')) return 'Descarte';
+  if(r.includes('CUATA')) return 'Cuata';
+  return 'Otro';
+}
+
 async function importPesajes(event){
   const file=event.target.files[0];if(!file)return;event.target.value='';
   const rows=await readFile(file);
