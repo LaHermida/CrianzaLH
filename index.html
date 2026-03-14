@@ -708,7 +708,7 @@ function renderDashPartos(fd){
     kpiCard('Total Partos', kA.total, kB.total, '', '', compare)+
     kpiCard('Hembras Vivas', `${kA.vivas} (${kA.partosDenom?Math.round(kA.vivas/kA.partosDenom*100):0}%)`, compare?`${kB.vivas} (${kB.partosDenom?Math.round(kB.vivas/kB.partosDenom*100):0}%)`:'—', 'del total sin abortos', '', compare)+
     kpiCard('MTA (muertas)', `${kA.mtas} (${kA.partosDenom?Math.round(kA.mtas/kA.partosDenom*100):0}%)`, compare?`${kB.mtas} (${kB.partosDenom?Math.round(kB.mtas/kB.partosDenom*100):0}%)`:'—', '', '', compare)+
-    kpiCard('Abortos', `${kA.abortos}`, compare?`${kB.abortos}`:'—', 'no cuentan en denominador', '', compare)+
+    kpiCard('Abortos', `${kA.abortos} (${kA.total?Math.round(kA.abortos/kA.total*100):0}%)`, compare?`${kB.abortos} (${kB.total?Math.round(kB.abortos/kB.total*100):0}%)`:'—', `de ${kA.total} total (partos+abortos)`, '', compare)+
     kpiCard('Mortalidad (MTA+MTO)', `${kA.mtas+kA.mtos} (${kA.total?Math.round((kA.mtas+kA.mtos)/kA.total*100):0}%)`, compare?`${kB.mtas+kB.mtos} (${kB.total?Math.round((kB.mtas+kB.mtos)/kB.total*100):0}%)`:'—', `MTA: ${kA.mtas} / MTO: ${kA.mtos}`, '', compare)+
     kpiCard('Hembras', kA.hembras, kB.hembras, `${kA.total?Math.round(kA.hembras/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.hembras/kB.total*100):0}%`:'', compare)+
     kpiCard('Machos', kA.machos, kB.machos, '', '', compare)+
