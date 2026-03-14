@@ -354,7 +354,14 @@
     <div id="tab-inventario" class="hidden">
       <div class="section-header">
         <span class="section-title">🐮 Inventario & Supervivencia</span>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+          <label style="font-size:.85rem;color:var(--text-muted)">Nacimiento:</label>
+          <input type="date" id="inv-desde" onchange="loadInventario()" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <span style="font-size:.85rem;color:var(--text-muted)">a</span>
+          <input type="date" id="inv-hasta" onchange="loadInventario()" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <button class="btn btn-secondary btn-sm" onclick="setInvQuick('2025')">2025</button>
+          <button class="btn btn-secondary btn-sm" onclick="setInvQuick('2026')">2026</button>
+          <button class="btn btn-secondary btn-sm" onclick="setInvQuick('todo')">Todo</button>
           <button class="btn btn-secondary" onclick="document.getElementById('importSalidasFile').click()">📥 Importar Salidas</button>
           <input type="file" id="importSalidasFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importSalidas(event)"/>
         </div>
@@ -371,13 +378,14 @@
           <thead>
             <tr>
               <th>Etapa</th>
-              <th>Muertas</th>
-              <th>Diarrea</th>
-              <th>Pulmonar</th>
-              <th>Otra</th>
+              <th>Iniciaron</th>
+              <th>Muertas (%)</th>
+              <th>- Diarrea</th>
+              <th>- Pulmonar</th>
+              <th>- Otra</th>
             </tr>
           </thead>
-          <tbody id="inv-etapa-body"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
+          <tbody id="inv-etapa-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
 
@@ -1372,13 +1380,27 @@ function getISOWeek(date){
 
 // ==================== INVENTARIO ====================
 async function loadInventario(){
+  const desde=document.getElementById('inv-desde')?.value;
+  const hasta=document.getElementById('inv-hasta')?.value;
+  let q='partos_crianza?order=fecha_parto.asc';
+  if(desde) q+=`&fecha_parto=gte.${desde}`;
+  if(hasta) q+=`&fecha_parto=lte.${hasta}`;
   const [partos, salidas] = await Promise.all([
-    sbFetch('partos_crianza?order=fecha_parto.asc'),
+    sbFetch(q),
     sbFetch('salidas_crianza?order=fecha_salida.asc')
   ]);
   window._partos = partos||[];
   window._salidas = salidas||[];
   renderInventario(partos||[], salidas||[]);
+}
+
+function setInvQuick(periodo){
+  const desde=document.getElementById('inv-desde');
+  const hasta=document.getElementById('inv-hasta');
+  if(periodo==='2025'){desde.value='2025-01-01';hasta.value='2025-12-31';}
+  else if(periodo==='2026'){desde.value='2026-01-01';hasta.value='2026-12-31';}
+  else{desde.value='';hasta.value='';}
+  loadInventario();
 }
 
 function renderInventario(partos, salidas){
@@ -1420,24 +1442,44 @@ function renderInventario(partos, salidas){
     kpiCard('Vendidas',totalVendidas,'','','',false)+
     kpiCard('Descartes',totalDescarte,'','','',false);
 
-  // Etapa table
-  const etapas=[
-    'Etapa 1 - Leche (0-65d)',
-    'Etapa 2 - Jaulas (66-90d)',
-    'Etapa 3 - AYC (91-150d)',
-    'Etapa 4 - 5-11m (151-365d)',
-    'Etapa 5 - 12m a Gestación'
+  // Etapa table - calculate how many reached each stage
+  const etapasDef=[
+    {nombre:'Etapa 1 - Leche (0-65d)',      min:0,   max:65},
+    {nombre:'Etapa 2 - Jaulas (66-90d)',     min:66,  max:90},
+    {nombre:'Etapa 3 - AYC (91-150d)',       min:91,  max:150},
+    {nombre:'Etapa 4 - 5-11m (151-365d)',    min:151, max:365},
+    {nombre:'Etapa 5 - 12m a Gestación',     min:366, max:99999}
   ];
+
+  // For each hembra, track at what age she left (if she left)
+  const salidaEdadMap={};
+  salidas.forEach(s=>{ if(s.hembra) salidaEdadMap[s.hembra]=s.edad_dias||0; });
+
   const etapaBody=document.getElementById('inv-etapa-body');
-  etapaBody.innerHTML=etapas.map(e=>{
-    const es=salidas.filter(s=>s.etapa===e&&s.motivo&&s.motivo.startsWith('Muerta'));
-    const diarrea=es.filter(s=>s.motivo==='Muerta - Diarrea').length;
-    const pulmonar=es.filter(s=>s.motivo==='Muerta - Pulmonar').length;
-    const otra=es.filter(s=>s.motivo==='Muerta - Otra').length;
-    const total=es.length;
+  let acumuladaSalidas=0;
+  etapaBody.innerHTML=etapasDef.map((etapa,idx)=>{
+    // Iniciaron = hembras que llegaron vivas al inicio de esta etapa
+    // = total hembras - las que murieron/salieron en etapas anteriores
+    const iniciaronN = totalNacidas - acumuladaSalidas;
+
+    // Muertas en esta etapa
+    const mEnEtapa = salidas.filter(s=>s.etapa===etapa.nombre && s.motivo && s.motivo.startsWith('Muerta'));
+    const diarrea=mEnEtapa.filter(s=>s.motivo==='Muerta - Diarrea').length;
+    const pulmonar=mEnEtapa.filter(s=>s.motivo==='Muerta - Pulmonar').length;
+    const otra=mEnEtapa.filter(s=>s.motivo==='Muerta - Otra').length;
+    const totalMuertas=mEnEtapa.length;
+
+    // All exits this stage (to accumulate for next)
+    const todasSalidasEtapa=salidas.filter(s=>s.etapa===etapa.nombre).length;
+    acumuladaSalidas+=todasSalidasEtapa;
+
+    const pctMort=iniciaronN?Math.round(totalMuertas/iniciaronN*100):0;
+    const pctClass=pctMort>=15?'gdp-bad':pctMort>=8?'gdp-warn':'gdp-ok';
+
     return `<tr>
-      <td>${e}</td>
-      <td class="mono" style="font-weight:600">${total}</td>
+      <td>${etapa.nombre}</td>
+      <td class="mono">${iniciaronN}</td>
+      <td class="mono ${pctClass}" style="font-weight:600">${totalMuertas} (${pctMort}%)</td>
       <td class="mono">${diarrea}</td>
       <td class="mono">${pulmonar}</td>
       <td class="mono">${otra}</td>
