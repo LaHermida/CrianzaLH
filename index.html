@@ -1383,7 +1383,12 @@ function excelTimeToHHMM(val){
   if(val===null||val===undefined||val==='') return null;
   let s=String(val).trim();
   if(!s) return null;
-  if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)){const p=s.split(':');return p[0].padStart(2,'0')+':'+p[1];}
+  if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)){
+    const p=s.split(':');
+    let h=parseInt(p[0]);
+    if(h>=24) h=h-24; // handle 24:xx+ times
+    return String(h).padStart(2,'0')+':'+p[1];
+  }
   if(/^\d{1,2}$/.test(s)) return s.padStart(2,'0')+':00';
   if(typeof val==='number'||(!isNaN(parseFloat(s))&&s.includes('.'))){
     const n=parseFloat(s);const t=Math.round(n*1440);
