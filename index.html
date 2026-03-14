@@ -680,7 +680,7 @@ function computePartoKPIs(data){
   const retoH=data.filter(r=>r.dias_reto!=null&&r.raza==='H').map(r=>r.dias_reto);
   const retoJ=data.filter(r=>r.dias_reto!=null&&r.raza==='J').map(r=>r.dias_reto);
   return {
-    total,hembras,machos,dificiles,noche,
+    total,hembras,machos,mtas,abortos,vivas,partosDenom,dificiles,noche,
     avgGest:avg(gest), minGest:gest.length?Math.min(...gest):null, maxGest:gest.length?Math.max(...gest):null,
     avgReto:avg(reto), minReto:reto.length?Math.min(...reto):null, maxReto:reto.length?Math.max(...reto):null,
     avgGestH:avg(gestH), minGestH:gestH.length?Math.min(...gestH):null, maxGestH:gestH.length?Math.max(...gestH):null,
@@ -701,6 +701,9 @@ function renderDashPartos(fd){
 
   document.getElementById('dp-kpis').innerHTML=
     kpiCard('Total Partos', kA.total, kB.total, '', '', compare)+
+    kpiCard('Hembras Vivas', `${kA.vivas} (${kA.partosDenom?Math.round(kA.vivas/kA.partosDenom*100):0}%)`, compare?`${kB.vivas} (${kB.partosDenom?Math.round(kB.vivas/kB.partosDenom*100):0}%)`:'—', 'del total sin abortos', '', compare)+
+    kpiCard('MTA (muertas)', `${kA.mtas} (${kA.partosDenom?Math.round(kA.mtas/kA.partosDenom*100):0}%)`, compare?`${kB.mtas} (${kB.partosDenom?Math.round(kB.mtas/kB.partosDenom*100):0}%)`:'—', '', '', compare)+
+    kpiCard('Abortos', `${kA.abortos}`, compare?`${kB.abortos}`:'—', 'no cuentan en denominador', '', compare)+
     kpiCard('Hembras', kA.hembras, kB.hembras, `${kA.total?Math.round(kA.hembras/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.hembras/kB.total*100):0}%`:'', compare)+
     kpiCard('Machos', kA.machos, kB.machos, '', '', compare)+
     kpiCard('Difíciles', `${kA.dificiles} (${kA.total?Math.round(kA.dificiles/kA.total*100):0}%)`, compare?`${kB.dificiles} (${kB.total?Math.round(kB.dificiles/kB.total*100):0}%)`:'—', 'incl. Distocia', '', compare)+
@@ -1302,7 +1305,18 @@ async function importPartos(event){
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
   importType='partos';
-  importQueue=rows.map(mapPartoRowFromExcel).filter(r=>r.fecha_parto);
+  // Detect twins: same madre + same fecha on consecutive rows
+  const twinSecondIdx=new Set();
+  for(let i=1;i<rows.length;i++){
+    const p=rows[i].__row||[], pp=rows[i-1].__row||[];
+    const madreA=(pp[1]||pp[2]||'').toString().trim();
+    const madreB=(p[1]||p[2]||'').toString().trim();
+    const fechaA=pp[0], fechaB=p[0];
+    if(madreA && madreA===madreB && String(fechaA)===String(fechaB)){
+      twinSecondIdx.add(i);
+    }
+  }
+  importQueue=rows.map((row,idx)=>mapPartoRowFromExcel(row, twinSecondIdx.has(idx))).filter(r=>r.fecha_parto);
   showImportPreview(importQueue.length,rows.length);
 }
 async function importPesajes(event){
@@ -1375,7 +1389,7 @@ function excelTimeToHHMM(val){
 }
 function toFloat(val){if(val===null||val===''||val===undefined)return null;return parseFloat(String(val).replace(',','.'))||null;}
 function toStr(val){return val?String(val).trim()||null:null;}
-function mapPartoRowFromExcel(row){
+function mapPartoRowFromExcel(row, isTwinSecond=false){
   // Lee por posicion usando __row para evitar problemas con nombres duplicados/espacios
   // 0=fecha,1=vaca,2=vaquilla,3=hembra,4=macho,5=raza,6=dia_noche
   // 7=dificultad,8=peso,9=gest,10=reto,11=partero,12=hora_parto
@@ -1384,19 +1398,41 @@ function mapPartoRowFromExcel(row){
   // 23=o1_refrac,24=o1_lts,25=o1_calidad,26=o2_lts,27=o2_calidad
   const p = row.__row || [];
   const g = i => (p[i]!==undefined && p[i]!==null && p[i]!=='') ? p[i] : null;
-  const macho_val = g(4);
-  const es_macho = macho_val && String(macho_val).trim() !== '';
+
+  const hembra_raw = toStr(g(3))||'';
+  const macho_raw  = toStr(g(4))||'';
+  const gest       = toFloat(g(9));
+
+  // Detect special cases
+  const es_mta    = hembra_raw.toUpperCase().includes('MTA');
+  const es_mto    = macho_raw.toUpperCase().includes('MTO') || hembra_raw.toUpperCase().includes('MTO');
+  const es_aborto = hembra_raw.toUpperCase().includes('ABORTO') || macho_raw.toUpperCase().includes('ABORTO') ||
+                    (gest && gest < 255 && !hembra_raw && macho_raw.toUpperCase() !== 'MACHO');
+  const es_macho  = macho_raw.toUpperCase() === 'MACHO';
+
+  let sexo, hembra;
+  if(es_mta)       { sexo='H'; hembra='MTA'; }
+  else if(es_mto)  { sexo='M'; hembra='MTO'; }
+  else if(es_aborto){ sexo='A'; hembra='ABORTO'; }
+  else if(es_macho){ sexo='M'; hembra=null; }
+  else             { sexo='H'; hembra=hembra_raw||null; }
+
+  // Twins: second row gets no ordeña data (counted only once per mother)
+  const o1_lts    = isTwinSecond ? null : toFloat(g(24));
+  const o1_calidad= isTwinSecond ? null : toFloat(g(25));
+  const o2_lts    = isTwinSecond ? null : toFloat(g(26));
+  const o2_calidad= isTwinSecond ? null : toFloat(g(27));
+
   return {
     fecha_parto:    excelDateToISO(g(0)),
     madre_vaca:     toStr(g(1)),
     madre_vaquilla: toStr(g(2)),
-    hembra:         es_macho ? toStr(macho_val) : toStr(g(3)),
-    sexo:           es_macho ? 'M' : 'H',
+    hembra, sexo,
     raza:           toStr(g(5)),
     dia_noche:      toStr(g(6)),
     dificultad:     toStr(g(7)),
     peso_nacer:     toFloat(g(8)),
-    dias_gestacion: toFloat(g(9)),
+    dias_gestacion: gest,
     dias_reto:      toFloat(g(10)),
     partero:        toStr(g(11)),
     hora_parto:     excelTimeToHHMM(g(12)),
@@ -1411,10 +1447,7 @@ function mapPartoRowFromExcel(row){
     c2_calostrero:  toStr(g(21)),
     c2_sonda:       toStr(g(22)),
     o1_refrac:      toFloat(g(23)),
-    o1_lts:         toFloat(g(24)),
-    o1_calidad:     toFloat(g(25)),
-    o2_lts:         toFloat(g(26)),
-    o2_calidad:     toFloat(g(27)),
+    o1_lts, o1_calidad, o2_lts, o2_calidad,
   };
 }
 
