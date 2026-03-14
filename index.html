@@ -671,6 +671,10 @@ function computePartoKPIs(data){
   const total=data.length;
   const hembras=data.filter(r=>r.sexo==='H').length;
   const machos=data.filter(r=>r.sexo==='M').length;
+  const mtas=data.filter(r=>r.hembra==='MTA').length;
+  const abortos=data.filter(r=>r.sexo==='A').length;
+  const vivas=data.filter(r=>r.sexo==='H'&&r.hembra!=='MTA').length;
+  const partosDenom=data.filter(r=>r.sexo!=='A').length;
   const dificiles=data.filter(r=>r.dificultad&&(r.dificultad.toLowerCase().includes('dificil')||r.dificultad.toLowerCase().includes('distocia'))).length;
   const noche=data.filter(r=>r.dia_noche==='Noche').length;
   const gest=data.filter(r=>r.dias_gestacion!=null).map(r=>r.dias_gestacion);
