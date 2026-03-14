@@ -672,6 +672,7 @@ function computePartoKPIs(data){
   const hembras=data.filter(r=>r.sexo==='H').length;
   const machos=data.filter(r=>r.sexo==='M').length;
   const mtas=data.filter(r=>r.hembra==='MTA').length;
+  const mtos=data.filter(r=>r.hembra==='MTO').length;
   const abortos=data.filter(r=>r.sexo==='A').length;
   const vivas=data.filter(r=>r.sexo==='H'&&r.hembra!=='MTA').length;
   const partosDenom=data.filter(r=>r.sexo!=='A').length;
@@ -684,7 +685,7 @@ function computePartoKPIs(data){
   const retoH=data.filter(r=>r.dias_reto!=null&&r.raza==='H').map(r=>r.dias_reto);
   const retoJ=data.filter(r=>r.dias_reto!=null&&r.raza==='J').map(r=>r.dias_reto);
   return {
-    total,hembras,machos,mtas,abortos,vivas,partosDenom,dificiles,noche,
+    total,hembras,machos,mtas,mtos,abortos,vivas,partosDenom,dificiles,noche,
     avgGest:avg(gest), minGest:gest.length?Math.min(...gest):null, maxGest:gest.length?Math.max(...gest):null,
     avgReto:avg(reto), minReto:reto.length?Math.min(...reto):null, maxReto:reto.length?Math.max(...reto):null,
     avgGestH:avg(gestH), minGestH:gestH.length?Math.min(...gestH):null, maxGestH:gestH.length?Math.max(...gestH):null,
@@ -708,6 +709,7 @@ function renderDashPartos(fd){
     kpiCard('Hembras Vivas', `${kA.vivas} (${kA.partosDenom?Math.round(kA.vivas/kA.partosDenom*100):0}%)`, compare?`${kB.vivas} (${kB.partosDenom?Math.round(kB.vivas/kB.partosDenom*100):0}%)`:'—', 'del total sin abortos', '', compare)+
     kpiCard('MTA (muertas)', `${kA.mtas} (${kA.partosDenom?Math.round(kA.mtas/kA.partosDenom*100):0}%)`, compare?`${kB.mtas} (${kB.partosDenom?Math.round(kB.mtas/kB.partosDenom*100):0}%)`:'—', '', '', compare)+
     kpiCard('Abortos', `${kA.abortos}`, compare?`${kB.abortos}`:'—', 'no cuentan en denominador', '', compare)+
+    kpiCard('Mortalidad (MTA+MTO)', `${kA.mtas+kA.mtos} (${kA.total?Math.round((kA.mtas+kA.mtos)/kA.total*100):0}%)`, compare?`${kB.mtas+kB.mtos} (${kB.total?Math.round((kB.mtas+kB.mtos)/kB.total*100):0}%)`:'—', `MTA: ${kA.mtas} / MTO: ${kA.mtos}`, '', compare)+
     kpiCard('Hembras', kA.hembras, kB.hembras, `${kA.total?Math.round(kA.hembras/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.hembras/kB.total*100):0}%`:'', compare)+
     kpiCard('Machos', kA.machos, kB.machos, '', '', compare)+
     kpiCard('Difíciles', `${kA.dificiles} (${kA.total?Math.round(kA.dificiles/kA.total*100):0}%)`, compare?`${kB.dificiles} (${kB.total?Math.round(kB.dificiles/kB.total*100):0}%)`:'—', 'incl. Distocia', '', compare)+
