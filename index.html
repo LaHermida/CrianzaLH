@@ -675,7 +675,7 @@ function computePartoKPIs(data){
   const abortos=data.filter(r=>r.sexo==='A').length;
   const vivas=data.filter(r=>r.sexo==='H'&&r.hembra!=='MTA').length;
   const partosDenom=data.filter(r=>r.sexo!=='A').length;
-  const dificiles=data.filter(r=>r.dificultad&&(r.dificultad.toLowerCase().includes('dificil')||r.dificultad.toLowerCase().includes('distocia'))).length;
+  const dificiles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase()!=='normal').length;
   const noche=data.filter(r=>r.dia_noche==='Noche').length;
   const gest=data.filter(r=>r.dias_gestacion!=null).map(r=>r.dias_gestacion);
   const reto=data.filter(r=>r.dias_reto!=null).map(r=>r.dias_reto);
@@ -980,7 +980,7 @@ function renderStats(data){
   const hembras=data.filter(r=>r.sexo==='H').length;
   const hoy=new Date().toISOString().slice(0,7);
   const mes=data.filter(r=>r.fecha_parto&&r.fecha_parto.slice(0,7)===hoy).length;
-  const dificiles=data.filter(r=>r.dificultad&&(r.dificultad.toLowerCase().includes('dificil')||r.dificultad.toLowerCase().includes('distocia'))).length;
+  const dificiles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase()!=='normal').length;
   document.getElementById('statsRow').innerHTML=`
     <div class="stat-card"><div class="val">${total}</div><div class="lbl">Total Partos</div></div>
     <div class="stat-card"><div class="val">${hembras}</div><div class="lbl">Hembras</div></div>
@@ -1002,7 +1002,7 @@ function renderPartos(data){
       <td>${r.sexo==='M'?'<span class="badge badge-m">M</span>':'<span class="badge badge-h">H</span>'}</td>
       <td>${r.raza?'<span class="badge" style="background:#e8f5e9;color:#1b5e20">'+r.raza+'</span>':'—'}</td>
       <td>${r.dia_noche?`<span class="badge ${r.dia_noche==='Dia'?'badge-dn':'badge-nn'}">${r.dia_noche}</span>`:'—'}</td>
-      <td>${r.dificultad?`<span class="badge ${(r.dificultad.toLowerCase().includes('dificil')||r.dificultad.toLowerCase().includes('distocia'))?'badge-dif':'badge-nor'}">${r.dificultad}</span>`:'—'}</td>
+      <td>${r.dificultad?`<span class="badge ${r.dificultad.toLowerCase()!=='normal'?'badge-dif':'badge-nor'}">${r.dificultad}</span>`:'—'}</td>
       <td class="mono">${r.peso_nacer!=null?r.peso_nacer+' kg':'—'}</td>
       <td class="mono">${r.dias_gestacion||'—'}</td>
       <td class="mono">${r.dias_reto||'—'}</td>
