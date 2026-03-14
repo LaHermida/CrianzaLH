@@ -594,6 +594,14 @@ function showTab(tab,btn){
   const el=document.getElementById('tab-'+tab);
   if(el) el.classList.remove('hidden');
   if(tab==='dashboard') renderDashboard();
+  if(tab==='inventario') loadInventario();
+  if(tab==='dash-gdp'){
+    if(!window._pesajes||!window._pesajes.length){
+      loadPesajes().then(()=>renderDashGDP());
+    } else {
+      renderDashGDP();
+    }
+  }
 }
 
 // ==================== DATA LOAD ====================
