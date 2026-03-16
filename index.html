@@ -1779,13 +1779,12 @@ function exportActivasExcel(){
   const tbody=document.getElementById('inv-activas-body');
   if(!tbody) return;
   const rows=tbody.querySelectorAll('tr');
-  let csv='Arete,Fecha Nacimiento,Edad (días),Raza,Etapa Actual\n';
+  let csv='Arete,Fecha Nacimiento,Edad (dias),Raza,Etapa Actual'+String.fromCharCode(10);
   rows.forEach(row=>{
     const cells=row.querySelectorAll('td');
     if(cells.length<5) return;
     const vals=[...cells].slice(0,5).map(c=>c.textContent.trim());
-    csv+=vals.join(',')+'
-';
+    csv+=vals.join(',')+String.fromCharCode(10);
   });
   const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
   const url=URL.createObjectURL(blob);
