@@ -380,9 +380,9 @@
               <th>Etapa</th>
               <th>Iniciaron</th>
               <th>Muertas (%)</th>
-              <th>- Diarrea</th>
-              <th>- Pulmonar</th>
-              <th>- Otra</th>
+              <th>Diarrea (%)</th>
+              <th>Pulmonar (%)</th>
+              <th>Otra (%)</th>
             </tr>
           </thead>
           <tbody id="inv-etapa-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
@@ -1385,13 +1385,16 @@ async function loadInventario(){
   let q='partos_crianza?order=fecha_parto.asc';
   if(desde) q+=`&fecha_parto=gte.${desde}`;
   if(hasta) q+=`&fecha_parto=lte.${hasta}`;
-  const [partos, salidas] = await Promise.all([
+  const [partos, todasSalidas] = await Promise.all([
     sbFetch(q),
     sbFetch('salidas_crianza?order=fecha_salida.asc')
   ]);
+  // Filter salidas to only hembras born in the date range
+  const hembraSet=new Set((partos||[]).map(p=>p.hembra).filter(Boolean));
+  const salidas=(todasSalidas||[]).filter(s=>hembraSet.has(s.hembra));
   window._partos = partos||[];
-  window._salidas = salidas||[];
-  renderInventario(partos||[], salidas||[]);
+  window._salidas = salidas;
+  renderInventario(partos||[], salidas);
 }
 
 function setInvQuick(periodo){
@@ -1476,13 +1479,16 @@ function renderInventario(partos, salidas){
     const pctMort=iniciaronN?Math.round(totalMuertas/iniciaronN*100):0;
     const pctClass=pctMort>=15?'gdp-bad':pctMort>=8?'gdp-warn':'gdp-ok';
 
+    const pctD=iniciaronN?Math.round(diarrea/iniciaronN*100):0;
+    const pctP=iniciaronN?Math.round(pulmonar/iniciaronN*100):0;
+    const pctO=iniciaronN?Math.round(otra/iniciaronN*100):0;
     return `<tr>
       <td>${etapa.nombre}</td>
       <td class="mono">${iniciaronN}</td>
       <td class="mono ${pctClass}" style="font-weight:600">${totalMuertas} (${pctMort}%)</td>
-      <td class="mono">${diarrea}</td>
-      <td class="mono">${pulmonar}</td>
-      <td class="mono">${otra}</td>
+      <td class="mono">${diarrea} (${pctD}%)</td>
+      <td class="mono">${pulmonar} (${pctP}%)</td>
+      <td class="mono">${otra} (${pctO}%)</td>
     </tr>`;
   }).join('');
 
