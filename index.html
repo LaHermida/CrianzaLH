@@ -1124,6 +1124,13 @@ function renderStats(data){
 
 // ==================== PARTOS TABLE ====================
 function renderPartos(data){
+  // Ultimo arete registrado
+  const hembrasP=(data||[]).filter(p=>p.sexo==='H'&&p.hembra&&/^\d+$/.test(String(p.hembra).trim()));
+  if(hembrasP.length){
+    const ult=hembrasP.sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
+    const el=document.getElementById('ultimo-parto');
+    if(el) el.textContent=`Último arete: ${ult.hembra} (${ult.fecha_parto})`;
+  }
   const tbody=document.getElementById('partosBody');
   if(!data||!data.length){tbody.innerHTML='<tr><td colspan="28" class="empty">Sin registros.</td></tr>';return;}
   tbody.innerHTML=data.map(r=>`
