@@ -637,8 +637,7 @@ async function sbFetch(path,method='GET',body=null){
   const opts={method,headers:{
     'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,
     'Content-Type':'application/json',
-    'Prefer':method==='POST'?'return=representation':'return=minimal',
-    'Range':'0-9999'
+    'Prefer':method==='POST'?'return=representation':'count=exact'
   }};
   if(body) opts.body=JSON.stringify(body);
   const res=await fetch(url,opts);
@@ -671,7 +670,7 @@ function showTab(tab,btn){
 
 // ==================== DATA LOAD ====================
 async function loadPartos(){
-  const data=await sbFetch('partos_crianza?order=fecha_parto.desc&limit=5000');
+  const data=await sbFetch('partos_crianza?order=fecha_parto.desc&limit=10000');
   allPartos=data;
   renderPartos(data);
   renderStats(data);
@@ -1284,7 +1283,7 @@ async function deleteParto(id){
 
 // ==================== PESAJES ====================
 async function loadPesajes(){
-  const partos=await sbFetch('partos_crianza?order=fecha_parto.asc&limit=5000');
+  const partos=await sbFetch('partos_crianza?order=fecha_parto.asc&limit=10000');
   const pesajes=await sbFetch('pesajes_crianza?order=fecha.asc&limit=5000');
   window._partos=partos||[];
   window._pesajes=pesajes||[];
