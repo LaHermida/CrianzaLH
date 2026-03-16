@@ -379,10 +379,10 @@
             <tr>
               <th>Etapa</th>
               <th>Iniciaron</th>
-              <th>Muertas (%)</th>
-              <th>Diarrea (%)</th>
-              <th>Pulmonar (%)</th>
-              <th>Otra (%)</th>
+              <th>Muertas</th>
+              <th>Diarrea</th>
+              <th>Pulmonar</th>
+              <th>Otra</th>
             </tr>
           </thead>
           <tbody id="inv-etapa-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
@@ -1479,16 +1479,13 @@ function renderInventario(partos, salidas){
     const pctMort=iniciaronN?Math.round(totalMuertas/iniciaronN*100):0;
     const pctClass=pctMort>=15?'gdp-bad':pctMort>=8?'gdp-warn':'gdp-ok';
 
-    const pctD=iniciaronN?Math.round(diarrea/iniciaronN*100):0;
-    const pctP=iniciaronN?Math.round(pulmonar/iniciaronN*100):0;
-    const pctO=iniciaronN?Math.round(otra/iniciaronN*100):0;
     return `<tr>
       <td>${etapa.nombre}</td>
       <td class="mono">${iniciaronN}</td>
       <td class="mono ${pctClass}" style="font-weight:600">${totalMuertas} (${pctMort}%)</td>
-      <td class="mono">${diarrea} (${pctD}%)</td>
-      <td class="mono">${pulmonar} (${pctP}%)</td>
-      <td class="mono">${otra} (${pctO}%)</td>
+      <td class="mono">${diarrea}</td>
+      <td class="mono">${pulmonar}</td>
+      <td class="mono">${otra}</td>
     </tr>`;
   }).join('');
 
@@ -1513,13 +1510,13 @@ function renderInventario(partos, salidas){
       <td class="mono" style="text-align:center">${n}</td>
       <td class="mono" style="text-align:center">${activas}</td>
       <td class="mono ${pctClass}" style="text-align:center">${pct}%</td>
-      <td class="mono" style="text-align:center">${muertas}</td>
-      <td class="mono" style="text-align:center">${diarrea}</td>
-      <td class="mono" style="text-align:center">${pulmonar}</td>
-      <td class="mono" style="text-align:center">${otraMuerta}</td>
-      <td class="mono" style="text-align:center">${descarte}</td>
-      <td class="mono" style="text-align:center">${vendidas}</td>
-      <td class="mono" style="text-align:center">${otras}</td>
+      <td class="mono" style="text-align:center">${muertas} (${n?Math.round(muertas/n*100):0}%)</td>
+      <td class="mono" style="text-align:center">${n?Math.round(diarrea/n*100):0}%</td>
+      <td class="mono" style="text-align:center">${n?Math.round(pulmonar/n*100):0}%</td>
+      <td class="mono" style="text-align:center">${n?Math.round(otraMuerta/n*100):0}%</td>
+      <td class="mono" style="text-align:center">${n?Math.round(descarte/n*100):0}%</td>
+      <td class="mono" style="text-align:center">${n?Math.round(vendidas/n*100):0}%</td>
+      <td class="mono" style="text-align:center">${n?Math.round(otras/n*100):0}%</td>
     </tr>`;
   }).join('');
 }
@@ -1572,15 +1569,15 @@ async function importSalidas(event){
 }
 
 function clasificarMotivo(razon){
-  const r=razon.toUpperCase().trim();
-  if(!r||r==='--') return 'Otro';
+  const r=(razon||'').toUpperCase().trim();
+  if(!r||r==='--') return 'Muerta - Otra';
   if(r.includes('DIARREA')||r.includes('COLICO')||r.includes('COLIC')) return 'Muerta - Diarrea';
   if(r.includes('NEUMON')||r.includes('PULMON')||r.includes('B.R.D')||r.includes('BRD')) return 'Muerta - Pulmonar';
-  if(r.includes('MUERTO')||r.includes('MUERTA')||r.includes('ACCIDENTE')||r.includes('ENFERM')||r.includes('ENTRIPADA')||r.includes('TEMPERATURA')||r.includes('CAIDA')) return 'Muerta - Otra';
-  if(r.includes('VENDIDA')||r.includes('CARNE')) return 'Vendida';
   if(r.includes('QUEDADA')||r.includes('FLACA')||r.includes('CHICA')||r.includes('CRECIMIENTO')||r.includes('BAJA')) return 'Descarte';
   if(r.includes('CUATA')) return 'Cuata';
-  return 'Otro';
+  if(r.includes('VENDIDA')||r.includes('CARNE')) return 'Vendida';
+  // Everything else is Muerta - Otra
+  return 'Muerta - Otra';
 }
 
 async function importPesajes(event){
