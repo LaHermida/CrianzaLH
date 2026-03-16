@@ -373,6 +373,8 @@
           <button class="btn btn-secondary btn-sm" onclick="setInvQuick('2025')">2025</button>
           <button class="btn btn-secondary btn-sm" onclick="setInvQuick('2026')">2026</button>
           <button class="btn btn-secondary btn-sm" onclick="setInvQuick('todo')">Todo</button>
+          <button class="btn btn-secondary" onclick="window.print()">🖨️ PDF</button>
+          <button class="btn btn-secondary" onclick="exportActivasExcel()">📊 Excel Activas</button>
           <button class="btn btn-secondary" onclick="document.getElementById('importSalidasFile').click()">📥 Importar Salidas</button>
           <input type="file" id="importSalidasFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importSalidas(event)"/>
         </div>
@@ -1182,6 +1184,7 @@ async function editParto(id){
   openModal(id);
 }
 async function saveParto(){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
   const fecha=document.getElementById('f_fecha').value;
   if(!fecha){alert('La fecha es obligatoria');return;}
   const btn=document.getElementById('saveBtn');
@@ -1225,6 +1228,7 @@ async function saveParto(){
   btn.innerHTML='Guardar';btn.disabled=false;
 }
 async function deleteParto(id){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
   if(!confirm('¿Eliminar este registro?')) return;
   await sbFetch(`partos_crianza?id=eq.${id}`,'DELETE');
   await loadPartos();
@@ -1305,6 +1309,7 @@ function renderPesajes(pesajes,partos){
 function openPesajeModal(){document.getElementById('pesajeModal').classList.add('open');}
 function closePesajeModal(){document.getElementById('pesajeModal').classList.remove('open');}
 async function savePesaje(){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
   const fecha=document.getElementById('p_fecha').value;
   const hembra=document.getElementById('p_hembra').value;
   const peso=parseFloat(document.getElementById('p_peso').value);
@@ -1315,6 +1320,7 @@ async function savePesaje(){
   await loadPesajes();
 }
 async function deletePesaje(id){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
   if(!confirm('¿Eliminar este pesaje?')) return;
   await sbFetch(`pesajes_crianza?id=eq.${id}`,'DELETE');
   await loadPesajes();
@@ -1683,7 +1689,13 @@ function renderInventario(partos, salidas){
 
 // ==================== IMPORT ====================
 let importQueue=[],importType='';
+async function checkPass(){
+  const pass=prompt('Contraseña:');
+  return pass==='017451';
+}
+
 async function importPartos(event){
+  if(!await checkPass()){alert('Contraseña incorrecta');event.target.value='';return;}
   const file=event.target.files[0];if(!file)return;event.target.value='';
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
@@ -1703,6 +1715,7 @@ async function importPartos(event){
   showImportPreview(importQueue.length,rows.length);
 }
 async function importSalidas(event){
+  if(!await checkPass()){alert('Contraseña incorrecta');event.target.value='';return;}
   const file=event.target.files[0];if(!file)return;event.target.value='';
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
@@ -1728,6 +1741,25 @@ async function importSalidas(event){
   await loadInventario();
 }
 
+function exportActivasExcel(){
+  const tbody=document.getElementById('inv-activas-body');
+  if(!tbody) return;
+  const rows=tbody.querySelectorAll('tr');
+  let csv='Arete,Fecha Nacimiento,Edad (días),Raza,Etapa Actual\n';
+  rows.forEach(row=>{
+    const cells=row.querySelectorAll('td');
+    if(cells.length<5) return;
+    const vals=[...cells].slice(0,5).map(c=>c.textContent.trim());
+    csv+=vals.join(',')+'
+';
+  });
+  const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download='becerras_activas.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
 function toggleActivas(){
   const wrap=document.getElementById('activas-wrap');
   const btn=document.getElementById('btn-activas');
@@ -1749,6 +1781,7 @@ function clasificarMotivo(razon){
 }
 
 async function importPesajes(event){
+  if(!await checkPass()){alert('Contraseña incorrecta');event.target.value='';return;}
   const file=event.target.files[0];if(!file)return;event.target.value='';
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
