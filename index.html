@@ -338,13 +338,9 @@
               <th>Lote</th>
               <th>Becerras</th>
               <th>Aretes</th>
-              <th>1ª Pesada<br><small>Días prom.</small></th>
-              <th>1ª Pesada<br><small>Peso prom.</small></th>
-              <th>ADG 1ª<br><small>kg/día</small></th>
-              <th>2ª Pesada<br><small>Días prom.</small></th>
-              <th>2ª Pesada<br><small>Peso prom.</small></th>
-              <th>ADG 2ª<br><small>kg/día</small></th>
-              <th>ADG Entre<br><small>pesadas</small></th>
+              <th>ADG E1<br><small>0-65d</small></th>
+              <th>ADG E2<br><small>66-90d</small></th>
+              <th>ADG E3<br><small>91-150d</small></th>
             </tr>
           </thead>
           <tbody id="gdp-semana-body">
@@ -396,9 +392,12 @@
       </div>
 
       <!-- Listado becerras activas -->
-      <div class="kpi-group-label">🐮 Becerras Activas en Hato</div>
-      <div class="table-wrap" style="margin-bottom:1.5rem">
-        <table>
+      <div class="kpi-group-label" style="display:flex;align-items:center;justify-content:space-between">
+        <span>🐮 Becerras Activas en Hato</span>
+        <button class="btn btn-secondary btn-sm" onclick="toggleActivas()" id="btn-activas">▼ Ver listado</button>
+      </div>
+      <div id="activas-wrap" style="display:none;margin-bottom:1.5rem">
+        <div class="table-wrap"><table>
           <thead>
             <tr>
               <th>Arete</th>
@@ -409,7 +408,7 @@
             </tr>
           </thead>
           <tbody id="inv-activas-body"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
-        </table>
+        </table></div>
       </div>
 
       <!-- Tabla por lote mensual -->
@@ -1300,9 +1299,16 @@ function renderDashGDP(){
   const allPartos=window._partos||[];
   const allPesajes=window._pesajes||[];
 
-  // Build partoMap
+  if(!allPartos.length||!allPesajes.length){
+    document.getElementById('gdp-kpis').innerHTML='<div style="color:var(--text-muted);padding:1rem">Cargando datos...</div>';
+    document.getElementById('gdp-semana-body').innerHTML='<tr><td colspan="10" class="empty">Sin datos.</td></tr>';
+    loadPesajes().then(()=>renderDashGDP());
+    return;
+  }
+
+  // Build partoMap (hembras only)
   const partoMap={};
-  allPartos.forEach(p=>{if(p.hembra&&p.sexo==='H') partoMap[p.hembra]=p;});
+  allPartos.forEach(p=>{if(p.hembra&&p.sexo==='H'&&p.hembra!=='MTA'&&p.hembra!=='ABORTO') partoMap[p.hembra]=p;});
 
   // Filter by raza
   const pesajes=allPesajes.filter(r=>{
@@ -1310,113 +1316,144 @@ function renderDashGDP(){
     return p && (!razaFilter||p.raza===razaFilter);
   });
 
-  // Group pesajes by hembra, sorted by date
+  // Group pesajes by hembra sorted by date
   const hembraMap={};
   [...pesajes].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).forEach(r=>{
     if(!hembraMap[r.hembra]) hembraMap[r.hembra]=[];
     hembraMap[r.hembra].push(r);
   });
 
-  // Build per-hembra stats
+  const mesesNombre=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const etapasDef=[
+    {nombre:'E1 Leche',     min:0,   max:65},
+    {nombre:'E2 Jaulas',    min:66,  max:90},
+    {nombre:'E3 AYC',       min:91,  max:150},
+    {nombre:'E4 5-11m',     min:151, max:365},
+    {nombre:'E5 12m+',      min:366, max:99999}
+  ];
+
+  // Build per-hembra stats with ADG by stage
   const hembraStats={};
   Object.entries(hembraMap).forEach(([hembra,pesos])=>{
     const parto=partoMap[hembra];
     if(!parto||!parto.fecha_parto) return;
-    const nac=new Date(parto.fecha_parto);
+    const nac=new Date(parto.fecha_parto+'T12:00:00');
     const pesoNacer=parto.peso_nacer||0;
-    const p1=pesos[0], p2=pesos[1]||null;
-    const d1=p1?Math.floor((new Date(p1.fecha)-nac)/86400000):null;
-    const d2=p2?Math.floor((new Date(p2.fecha)-nac)/86400000):null;
-    const adg1=(p1&&d1>0)?((p1.peso-pesoNacer)/d1):null;
-    const adg2=(p2&&d2>0)?((p2.peso-pesoNacer)/d2):null;
-    const adgEntre=(p1&&p2&&d2>d1)?((p2.peso-p1.peso)/(d2-d1)):null;
+    const refrac=parto.o1_refrac||null;
+
+    // All pesadas sorted
+    const ps=pesos.map(p=>({
+      peso:p.peso,
+      dias:Math.floor((new Date(p.fecha)-nac)/86400000)
+    })).filter(p=>p.dias>0).sort((a,b)=>a.dias-b.dias);
+
+    // ADG per stage: relative to previous pesada (or nacer if first)
+    const etapaADG={};
+    ps.forEach((p,i)=>{
+      const prevPeso = i===0 ? pesoNacer : ps[i-1].peso;
+      const prevDias = i===0 ? 0 : ps[i-1].dias;
+      const adg = (p.dias-prevDias)>0 ? (p.peso-prevPeso)/(p.dias-prevDias) : null;
+      // Assign to etapa based on current pesada dias
+      const etapa=etapasDef.find(e=>p.dias>=e.min&&p.dias<=e.max);
+      if(etapa&&adg!==null) etapaADG[etapa.nombre]=adg;
+    });
+
+    const p1=ps[0]||null, p2=ps[1]||null;
     hembraStats[hembra]={
-      parto, nac, pesoNacer,
-      p1peso:p1?p1.peso:null, d1, adg1,
-      p2peso:p2?p2.peso:null, d2, adg2, adgEntre,
-      semana: nac.getMonth(), year: nac.getFullYear()
+      parto, nac, pesoNacer, refrac,
+      p1peso:p1?p1.peso:null, d1:p1?p1.dias:null,
+      p2peso:p2?p2.peso:null, d2:p2?p2.dias:null,
+      adgE1:etapaADG['E1 Leche']||null,
+      adgE2:etapaADG['E2 Jaulas']||null,
+      adgE3:etapaADG['E3 AYC']||null,
+      adgE4:etapaADG['E4 5-11m']||null,
+      adgE5:etapaADG['E5 12m+']||null,
     };
   });
 
-  // KPIs generales
   const stats=Object.values(hembraStats);
-  const adg1s=stats.filter(s=>s.adg1!=null).map(s=>s.adg1);
-  const adg2s=stats.filter(s=>s.adg2!=null).map(s=>s.adg2);
-  const adgEs=stats.filter(s=>s.adgEntre!=null).map(s=>s.adgEntre);
-  const con2=stats.filter(s=>s.p2peso!=null).length;
+  const adgClass=v=>v==null?'':v>=0.8?'gdp-ok':v>=0.6?'gdp-warn':'gdp-bad';
+  const fmtADG=v=>v!=null?v.toFixed(3):'—';
+  const avgEtapa=key=>{ const vs=stats.filter(s=>s[key]!=null).map(s=>s[key]); return vs.length?avg(vs):null; };
 
+  // KPIs generales
+  const con2=stats.filter(s=>s.p2peso!=null).length;
   document.getElementById('gdp-kpis').innerHTML=
     kpiCard('Becerras con pesaje',stats.length,'','','',false)+
     kpiCard('Con 2ª pesada',`${con2} (${stats.length?Math.round(con2/stats.length*100):0}%)`,'','','',false)+
-    kpiCard('ADG 1ª Pesada (prom)',adg1s.length?avg(adg1s).toFixed(3)+' kg/día':'—','','','',false)+
-    kpiCard('ADG 2ª Pesada (prom)',adg2s.length?avg(adg2s).toFixed(3)+' kg/día':'—','','','',false)+
-    kpiCard('ADG Entre pesadas (prom)',adgEs.length?avg(adgEs).toFixed(3)+' kg/día':'—','','','',false);
+    kpiCard('ADG E1 Leche (prom)',avgEtapa('adgE1')!=null?avgEtapa('adgE1').toFixed(3)+' kg/día':'—','','0-65d vs nacer','',false)+
+    kpiCard('ADG E2 Jaulas (prom)',avgEtapa('adgE2')!=null?avgEtapa('adgE2').toFixed(3)+' kg/día':'—','','66-90d vs E1','',false)+
+    kpiCard('ADG E3 AYC (prom)',avgEtapa('adgE3')!=null?avgEtapa('adgE3').toFixed(3)+' kg/día':'—','','91-150d vs E2','',false);
+
+  // Refractometria bands
+  const refBands=[
+    {label:'>10',    filter:s=>s.refrac!=null&&s.refrac>10},
+    {label:'8-10',   filter:s=>s.refrac!=null&&s.refrac>=8&&s.refrac<=10},
+    {label:'<8',     filter:s=>s.refrac!=null&&s.refrac<8},
+    {label:'Sin dato',filter:s=>s.refrac==null},
+  ];
+  const refHtml=`
+    <div class="kpi-group-label" style="margin-top:1.5rem">🧪 ADG por Refractometría (1ª Pesada)</div>
+    <div class="table-wrap" style="max-width:500px;margin-bottom:1.5rem">
+      <table>
+        <thead><tr><th>Refractometría</th><th>Becerras</th><th>ADG E1 prom</th><th>ADG E2 prom</th></tr></thead>
+        <tbody>${refBands.map(b=>{
+          const gr=stats.filter(b.filter);
+          const a1=gr.filter(s=>s.adgE1!=null).map(s=>s.adgE1);
+          const a2=gr.filter(s=>s.adgE2!=null).map(s=>s.adgE2);
+          const avgA1=a1.length?avg(a1):null;
+          const avgA2=a2.length?avg(a2):null;
+          return `<tr>
+            <td style="font-weight:600">${b.label}</td>
+            <td class="mono">${gr.length}</td>
+            <td class="mono ${adgClass(avgA1)}">${fmtADG(avgA1)}</td>
+            <td class="mono ${adgClass(avgA2)}">${fmtADG(avgA2)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+
+  // Insert refractometria table after kpis
+  const gdpKpisEl=document.getElementById('gdp-kpis');
+  let refEl=document.getElementById('gdp-refrac-section');
+  if(!refEl){
+    refEl=document.createElement('div');
+    refEl.id='gdp-refrac-section';
+    gdpKpisEl.parentNode.insertBefore(refEl,gdpKpisEl.nextSibling);
+  }
+  refEl.innerHTML=refHtml;
 
   // Group by month
-  const mesesNombre=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const loteMap={};
   Object.values(hembraStats).forEach(s=>{
-    const key=`${s.year}-${String(s.nac.getMonth()+1).padStart(2,'0')}`;
-    if(!loteMap[key]) loteMap[key]={key,year:s.year,mes:s.nac.getMonth(),items:[]};
-    loteMap[key].items.push(s);
+    const key=`${s.year||s.nac.getFullYear()}-${String((s.year?s.nac:s.nac).getMonth()+1).padStart(2,'0')}`;
+    const yr=s.nac.getFullYear(), mes=s.nac.getMonth();
+    const k=`${yr}-${String(mes+1).padStart(2,'0')}`;
+    if(!loteMap[k]) loteMap[k]={k,yr,mes,items:[]};
+    loteMap[k].items.push(s);
   });
 
-  const lotes=Object.values(loteMap).sort((a,b)=>a.key.localeCompare(b.key));
-
-  // Render listado activas
-  const hoy=new Date();
-  const activas=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>new Date(a.fecha_parto)-new Date(b.fecha_parto));
-  const activasBody=document.getElementById('inv-activas-body');
-  if(!activas.length){
-    activasBody.innerHTML='<tr><td colspan="5" class="empty">Sin becerras activas.</td></tr>';
-  } else {
-    activasBody.innerHTML=activas.map(p=>{
-      const nac=new Date(p.fecha_parto+'T12:00:00');
-      const dias=Math.floor((hoy-nac)/86400000);
-      let etapaActual='';
-      if(dias<=65) etapaActual='Etapa 1 - Leche';
-      else if(dias<=90) etapaActual='Etapa 2 - Jaulas';
-      else if(dias<=150) etapaActual='Etapa 3 - AYC';
-      else if(dias<=365) etapaActual='Etapa 4 - 5-11m';
-      else etapaActual='Etapa 5 - 12m a Gest.';
-      return `<tr>
-        <td class="mono" style="font-weight:600">${p.hembra}</td>
-        <td class="mono">${p.fecha_parto}</td>
-        <td class="mono">${dias}</td>
-        <td class="mono">${p.raza||'—'}</td>
-        <td>${etapaActual}</td>
-      </tr>`;
-    }).join('');
-  }
+  const lotes=Object.values(loteMap).sort((a,b)=>a.k.localeCompare(b.k));
   const tbody=document.getElementById('gdp-semana-body');
-  if(!lotes.length){tbody.innerHTML='<tr><td colspan="10" class="empty">Sin datos de pesajes.</td></tr>';return;}
+  if(!lotes.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Sin datos de pesajes.</td></tr>';return;}
 
   tbody.innerHTML=lotes.map(lote=>{
     const items=lote.items;
-    const label=`${mesesNombre[lote.mes]} ${lote.year}`;
+    const label=`${mesesNombre[lote.mes]} ${lote.yr}`;
     const aretes=items.map(s=>s.parto.hembra).sort((a,b)=>parseInt(a)-parseInt(b)).join(', ');
-    const a1=items.filter(s=>s.adg1!=null).map(s=>s.adg1);
-    const a2=items.filter(s=>s.adg2!=null).map(s=>s.adg2);
-    const ae=items.filter(s=>s.adgEntre!=null).map(s=>s.adgEntre);
-    const d1s=items.filter(s=>s.d1!=null).map(s=>s.d1);
-    const d2s=items.filter(s=>s.d2!=null).map(s=>s.d2);
-    const p1s=items.filter(s=>s.p1peso!=null).map(s=>s.p1peso);
-    const p2s=items.filter(s=>s.p2peso!=null).map(s=>s.p2peso);
-    const adg1Prom=a1.length?avg(a1):null;
-    const adg2Prom=a2.length?avg(a2):null;
-    const adgEProm=ae.length?avg(ae):null;
-    const adgClass=v=>v==null?'':v>=0.8?'gdp-ok':v>=0.6?'gdp-warn':'gdp-bad';
+    const ae1=items.filter(s=>s.adgE1!=null).map(s=>s.adgE1);
+    const ae2=items.filter(s=>s.adgE2!=null).map(s=>s.adgE2);
+    const ae3=items.filter(s=>s.adgE3!=null).map(s=>s.adgE3);
+    const pA1=ae1.length?avg(ae1):null;
+    const pA2=ae2.length?avg(ae2):null;
+    const pA3=ae3.length?avg(ae3):null;
     return `<tr>
-      <td class="mono" style="font-weight:600">${label}</td>
+      <td style="font-weight:600">${label}</td>
       <td class="mono" style="text-align:center">${items.length}</td>
-      <td style="font-size:.78rem;max-width:200px;word-break:break-word">${aretes}</td>
-      <td class="mono">${d1s.length?Math.round(avg(d1s))+' días':'—'}</td>
-      <td class="mono">${p1s.length?avg(p1s).toFixed(1)+' kg':'—'}</td>
-      <td class="mono ${adgClass(adg1Prom)}">${adg1Prom!=null?adg1Prom.toFixed(3):'—'}</td>
-      <td class="mono">${d2s.length?Math.round(avg(d2s))+' días':'—'}</td>
-      <td class="mono">${p2s.length?avg(p2s).toFixed(1)+' kg':'—'}</td>
-      <td class="mono ${adgClass(adg2Prom)}">${adg2Prom!=null?adg2Prom.toFixed(3):'—'}</td>
-      <td class="mono ${adgClass(adgEProm)}">${adgEProm!=null?adgEProm.toFixed(3):'—'}</td>
+      <td style="font-size:.75rem;max-width:160px;word-break:break-word">${aretes}</td>
+      <td class="mono ${adgClass(pA1)}">${fmtADG(pA1)}</td>
+      <td class="mono ${adgClass(pA2)}">${fmtADG(pA2)}</td>
+      <td class="mono ${adgClass(pA3)}">${fmtADG(pA3)}</td>
     </tr>`;
   }).join('');
 }
@@ -1644,6 +1681,14 @@ async function importSalidas(event){
   }
   alert(`Importadas: ${ok} salidas${err?', Errores: '+err:''}`);
   await loadInventario();
+}
+
+function toggleActivas(){
+  const wrap=document.getElementById('activas-wrap');
+  const btn=document.getElementById('btn-activas');
+  const visible=wrap.style.display!=='none';
+  wrap.style.display=visible?'none':'block';
+  btn.textContent=visible?'▼ Ver listado':'▲ Ocultar listado';
 }
 
 function clasificarMotivo(razon){
