@@ -277,7 +277,8 @@
       <div class="stats-row" id="statsRow"></div>
       <div class="section-header">
         <span class="section-title">Registro de Partos</span>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+          <span id="ultimo-parto" style="font-size:.82rem;color:var(--text-muted)"></span>
           <button class="btn btn-secondary" onclick="document.getElementById('importPartosFile').click()">📥 Importar Excel/CSV</button>
           <input type="file" id="importPartosFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importPartos(event)"/>
           <button class="btn btn-primary" onclick="openModal()">+ Nuevo Parto</button>
@@ -316,7 +317,15 @@
       <div class="section-header">
         <span class="section-title">📈 Dashboard GDP / Desarrollo</span>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-          <label style="font-size:.85rem;color:var(--text-muted)">Raza:</label>
+          <label style="font-size:.85rem;color:var(--text-muted)">Nacimiento:</label>
+          <input type="date" id="gdp-desde" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <span style="font-size:.85rem;color:var(--text-muted)">a</span>
+          <input type="date" id="gdp-hasta" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <button class="btn btn-primary btn-sm" onclick="renderDashGDP()">🔍 Buscar</button>
+          <button class="btn btn-secondary btn-sm" onclick="setGdpQuick('2025')">2025</button>
+          <button class="btn btn-secondary btn-sm" onclick="setGdpQuick('2026')">2026</button>
+          <button class="btn btn-secondary btn-sm" onclick="setGdpQuick('todo')">Todo</button>
+          <label style="font-size:.85rem;color:var(--text-muted);margin-left:.5rem">Raza:</label>
           <select id="gdp-raza" onchange="renderDashGDP()" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem">
             <option value="">Todas</option>
             <option value="H">Holstein</option>
@@ -439,7 +448,8 @@
     <div id="tab-reg-pesajes" class="hidden">
       <div class="section-header">
         <span class="section-title">Desarrollo / Pesajes</span>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+          <span id="ultimo-pesaje" style="font-size:.82rem;color:var(--text-muted)"></span>
           <button class="btn btn-secondary" onclick="document.getElementById('importPesajesFile').click()">📥 Importar Excel/CSV</button>
           <input type="file" id="importPesajesFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importPesajes(event)"/>
           <button class="btn btn-primary" onclick="openPesajeModal()">+ Nuevo Pesaje</button>
@@ -1230,6 +1240,24 @@ async function loadPesajes(){
   return {partos,pesajes};
 }
 function renderPesajes(pesajes,partos){
+  // Show ultimo pesaje por numero de pesada
+  const el=document.getElementById('ultimo-pesaje');
+  if(el&&pesajes&&pesajes.length){
+    const sorted=[...pesajes].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
+    const hemPesadaIdx={};
+    const pesadaMap={1:null,2:null,3:null};
+    sorted.forEach(r=>{
+      if(!hemPesadaIdx[r.hembra]) hemPesadaIdx[r.hembra]=0;
+      hemPesadaIdx[r.hembra]++;
+      const n=hemPesadaIdx[r.hembra];
+      if(n<=3) pesadaMap[n]=r;
+    });
+    const parts=[];
+    for(let i=1;i<=3;i++){
+      if(pesadaMap[i]) parts.push(`${i}ª: ${pesadaMap[i].hembra} (${pesadaMap[i].fecha})`);
+    }
+    el.textContent=`Últimos aretes — ${parts.join(' | ')}`;
+  }
   const tbody=document.getElementById('pesajesBody');
   if(!pesajes||!pesajes.length){tbody.innerHTML='<tr><td colspan="11" class="empty">Sin pesajes.</td></tr>';return;}
   const partoMap={};
@@ -1294,9 +1322,25 @@ async function deletePesaje(id){
 
 
 // ==================== DASH GDP ====================
+function setGdpQuick(periodo){
+  const desde=document.getElementById('gdp-desde');
+  const hasta=document.getElementById('gdp-hasta');
+  if(periodo==='2025'){desde.value='2025-01-01';hasta.value='2025-12-31';}
+  else if(periodo==='2026'){desde.value='2026-01-01';hasta.value='2026-12-31';}
+  else{desde.value='';hasta.value='';}
+  renderDashGDP();
+}
+
 function renderDashGDP(){
   const razaFilter=document.getElementById('gdp-raza').value;
-  const allPartos=window._partos||[];
+  const desde=document.getElementById('gdp-desde')?.value;
+  const hasta=document.getElementById('gdp-hasta')?.value;
+  const allPartos=(window._partos||[]).filter(p=>{
+    if(!p.fecha_parto) return false;
+    if(desde && p.fecha_parto < desde) return false;
+    if(hasta && p.fecha_parto > hasta) return false;
+    return true;
+  });
   const allPesajes=window._pesajes||[];
 
   if(!allPartos.length||!allPesajes.length){
