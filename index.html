@@ -363,7 +363,7 @@
     <!-- ===== INVENTARIO ===== -->
     <div id="tab-inventario" class="hidden">
       <div class="section-header">
-        <span class="section-title">🐮 Inventario & Supervivencia</span>
+        <span class="section-title">🐮 Inventario & Supervivencia <span id="ultimo-inv" style="font-size:.8rem;font-weight:400;color:var(--text-muted)"></span></span>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
           <label style="font-size:.85rem;color:var(--text-muted)">Nacimiento:</label>
           <input type="date" id="inv-desde" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
@@ -468,6 +468,26 @@
     </div>
 
   </main>
+</div>
+
+<!-- MODAL CONTRASEÑA -->
+<div class="modal-overlay" id="passModal">
+  <div class="modal" style="max-width:320px">
+    <div class="modal-header">
+      <h2>🔒 Contraseña requerida</h2>
+      <button class="modal-close" onclick="cancelPass()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Contraseña</label>
+        <input type="password" id="passInput" onkeydown="if(event.key==='Enter')submitPass()" style="width:100%"/>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:1rem">
+      <button class="btn btn-secondary" onclick="cancelPass()">Cancelar</button>
+      <button class="btn btn-primary" onclick="submitPass()">Confirmar</button>
+    </div>
+  </div>
 </div>
 
 <!-- MODAL PARTO -->
@@ -1184,7 +1204,6 @@ async function editParto(id){
   openModal(id);
 }
 async function saveParto(){
-  if(!await checkPass()){alert('Contraseña incorrecta');return;}
   const fecha=document.getElementById('f_fecha').value;
   if(!fecha){alert('La fecha es obligatoria');return;}
   const btn=document.getElementById('saveBtn');
@@ -1228,7 +1247,6 @@ async function saveParto(){
   btn.innerHTML='Guardar';btn.disabled=false;
 }
 async function deleteParto(id){
-  if(!await checkPass()){alert('Contraseña incorrecta');return;}
   if(!confirm('¿Eliminar este registro?')) return;
   await sbFetch(`partos_crianza?id=eq.${id}`,'DELETE');
   await loadPartos();
@@ -1309,7 +1327,6 @@ function renderPesajes(pesajes,partos){
 function openPesajeModal(){document.getElementById('pesajeModal').classList.add('open');}
 function closePesajeModal(){document.getElementById('pesajeModal').classList.remove('open');}
 async function savePesaje(){
-  if(!await checkPass()){alert('Contraseña incorrecta');return;}
   const fecha=document.getElementById('p_fecha').value;
   const hembra=document.getElementById('p_hembra').value;
   const peso=parseFloat(document.getElementById('p_peso').value);
@@ -1320,7 +1337,6 @@ async function savePesaje(){
   await loadPesajes();
 }
 async function deletePesaje(id){
-  if(!await checkPass()){alert('Contraseña incorrecta');return;}
   if(!confirm('¿Eliminar este pesaje?')) return;
   await sbFetch(`pesajes_crianza?id=eq.${id}`,'DELETE');
   await loadPesajes();
@@ -1603,6 +1619,11 @@ function renderInventario(partos, salidas){
   const totalDescarte=salidas.filter(s=>s.motivo==='Descarte').length;
   const pctSuperv=totalNacidas?Math.round(totalActivas/totalNacidas*100):0;
 
+  // Show ultimo arete activo
+  const ultActiva=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
+  const ultInvEl=document.getElementById('ultimo-inv');
+  if(ultInvEl&&ultActiva) ultInvEl.textContent=`— Último activo: ${ultActiva.hembra}`;
+
   document.getElementById('inv-kpis').innerHTML=
     kpiCard('Total Nacidas (hembras)',totalNacidas,'','','',false)+
     kpiCard('Activas en Hato',`${totalActivas} (${pctSuperv}%)`,'','% supervivencia','',false)+
@@ -1689,9 +1710,22 @@ function renderInventario(partos, salidas){
 
 // ==================== IMPORT ====================
 let importQueue=[],importType='';
-async function checkPass(){
-  const pass=prompt('Contraseña:');
-  return pass==='017451';
+function checkPass(){
+  return new Promise(resolve=>{
+    document.getElementById('passModal').classList.add('open');
+    document.getElementById('passInput').value='';
+    document.getElementById('passInput').focus();
+    window._passResolve=resolve;
+  });
+}
+function submitPass(){
+  const val=document.getElementById('passInput').value;
+  document.getElementById('passModal').classList.remove('open');
+  if(window._passResolve){ window._passResolve(val==='017451'); window._passResolve=null; }
+}
+function cancelPass(){
+  document.getElementById('passModal').classList.remove('open');
+  if(window._passResolve){ window._passResolve(false); window._passResolve=null; }
 }
 
 async function importPartos(event){
