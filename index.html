@@ -356,9 +356,10 @@
         <span class="section-title">🐮 Inventario & Supervivencia</span>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
           <label style="font-size:.85rem;color:var(--text-muted)">Nacimiento:</label>
-          <input type="date" id="inv-desde" onchange="loadInventario()" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <input type="date" id="inv-desde" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
           <span style="font-size:.85rem;color:var(--text-muted)">a</span>
-          <input type="date" id="inv-hasta" onchange="loadInventario()" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <input type="date" id="inv-hasta" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <button class="btn btn-primary btn-sm" onclick="loadInventario()">🔍 Buscar</button>
           <button class="btn btn-secondary btn-sm" onclick="setInvQuick('2025')">2025</button>
           <button class="btn btn-secondary btn-sm" onclick="setInvQuick('2026')">2026</button>
           <button class="btn btn-secondary btn-sm" onclick="setInvQuick('todo')">Todo</button>
@@ -386,6 +387,23 @@
             </tr>
           </thead>
           <tbody id="inv-etapa-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <!-- Listado becerras activas -->
+      <div class="kpi-group-label">🐮 Becerras Activas en Hato</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem">
+        <table>
+          <thead>
+            <tr>
+              <th>Arete</th>
+              <th>Fecha Nac.</th>
+              <th>Edad (días)</th>
+              <th>Raza</th>
+              <th>Etapa Actual</th>
+            </tr>
+          </thead>
+          <tbody id="inv-activas-body"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
 
@@ -1336,6 +1354,32 @@ function renderDashGDP(){
   });
 
   const lotes=Object.values(loteMap).sort((a,b)=>a.key.localeCompare(b.key));
+
+  // Render listado activas
+  const hoy=new Date();
+  const activas=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>new Date(a.fecha_parto)-new Date(b.fecha_parto));
+  const activasBody=document.getElementById('inv-activas-body');
+  if(!activas.length){
+    activasBody.innerHTML='<tr><td colspan="5" class="empty">Sin becerras activas.</td></tr>';
+  } else {
+    activasBody.innerHTML=activas.map(p=>{
+      const nac=new Date(p.fecha_parto+'T12:00:00');
+      const dias=Math.floor((hoy-nac)/86400000);
+      let etapaActual='';
+      if(dias<=65) etapaActual='Etapa 1 - Leche';
+      else if(dias<=90) etapaActual='Etapa 2 - Jaulas';
+      else if(dias<=150) etapaActual='Etapa 3 - AYC';
+      else if(dias<=365) etapaActual='Etapa 4 - 5-11m';
+      else etapaActual='Etapa 5 - 12m a Gest.';
+      return `<tr>
+        <td class="mono" style="font-weight:600">${p.hembra}</td>
+        <td class="mono">${p.fecha_parto}</td>
+        <td class="mono">${dias}</td>
+        <td class="mono">${p.raza||'—'}</td>
+        <td>${etapaActual}</td>
+      </tr>`;
+    }).join('');
+  }
   const tbody=document.getElementById('gdp-semana-body');
   if(!lotes.length){tbody.innerHTML='<tr><td colspan="10" class="empty">Sin datos de pesajes.</td></tr>';return;}
 
@@ -1419,7 +1463,7 @@ function renderInventario(partos, salidas){
   // Group by birth month
   const loteMap={};
   hembras.forEach(p=>{
-    const d=new Date(p.fecha_parto);
+    const d=new Date(p.fecha_parto+'T12:00:00');
     const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
     if(!loteMap[key]) loteMap[key]={key,year:d.getFullYear(),mes:d.getMonth(),nacidas:[],salidas:[]};
     loteMap[key].nacidas.push(p);
@@ -1427,6 +1471,32 @@ function renderInventario(partos, salidas){
   });
 
   const lotes=Object.values(loteMap).sort((a,b)=>a.key.localeCompare(b.key));
+
+  // Render listado activas
+  const hoy=new Date();
+  const activas=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>new Date(a.fecha_parto)-new Date(b.fecha_parto));
+  const activasBody=document.getElementById('inv-activas-body');
+  if(!activas.length){
+    activasBody.innerHTML='<tr><td colspan="5" class="empty">Sin becerras activas.</td></tr>';
+  } else {
+    activasBody.innerHTML=activas.map(p=>{
+      const nac=new Date(p.fecha_parto+'T12:00:00');
+      const dias=Math.floor((hoy-nac)/86400000);
+      let etapaActual='';
+      if(dias<=65) etapaActual='Etapa 1 - Leche';
+      else if(dias<=90) etapaActual='Etapa 2 - Jaulas';
+      else if(dias<=150) etapaActual='Etapa 3 - AYC';
+      else if(dias<=365) etapaActual='Etapa 4 - 5-11m';
+      else etapaActual='Etapa 5 - 12m a Gest.';
+      return `<tr>
+        <td class="mono" style="font-weight:600">${p.hembra}</td>
+        <td class="mono">${p.fecha_parto}</td>
+        <td class="mono">${dias}</td>
+        <td class="mono">${p.raza||'—'}</td>
+        <td>${etapaActual}</td>
+      </tr>`;
+    }).join('');
+  }
 
   // Global KPIs
   const totalNacidas=hembras.length;
