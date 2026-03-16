@@ -1900,10 +1900,16 @@ function excelTimeToHHMM(val){
   if(val===null||val===undefined||val==='') return null;
   let s=String(val).trim();
   if(!s) return null;
+  // Handle "1 day, 0:07:00" style (timedelta from Excel)
+  const dayMatch=s.match(/(\d+)\s*day[s]?,\s*(\d{1,2}):(\d{2})/);
+  if(dayMatch){
+    const h=parseInt(dayMatch[2])%24;
+    return String(h).padStart(2,'0')+':'+dayMatch[3];
+  }
   if(/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)){
     const p=s.split(':');
     let h=parseInt(p[0]);
-    if(h>=24) h=h-24; // handle 24:xx+ times
+    if(h>=24) h=h-24;
     return String(h).padStart(2,'0')+':'+p[1];
   }
   if(/^\d{1,2}$/.test(s)) return s.padStart(2,'0')+':00';
