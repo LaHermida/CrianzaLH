@@ -1440,7 +1440,8 @@ function renderDashGDP(){
   tbody.innerHTML=lotes.map(lote=>{
     const items=lote.items;
     const label=`${mesesNombre[lote.mes]} ${lote.yr}`;
-    const aretes=items.map(s=>s.parto.hembra).sort((a,b)=>parseInt(a)-parseInt(b)).join(', ');
+    const aretesSort=items.map(s=>parseInt(s.parto.hembra)).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+    const aretes=aretesSort.length?`${aretesSort[0]} – ${aretesSort[aretesSort.length-1]}`:'—';
     const ae1=items.filter(s=>s.adgE1!=null).map(s=>s.adgE1);
     const ae2=items.filter(s=>s.adgE2!=null).map(s=>s.adgE2);
     const ae3=items.filter(s=>s.adgE3!=null).map(s=>s.adgE3);
