@@ -1133,7 +1133,8 @@ function renderPartos(data){
   }
   const tbody=document.getElementById('partosBody');
   if(!data||!data.length){tbody.innerHTML='<tr><td colspan="28" class="empty">Sin registros.</td></tr>';return;}
-  tbody.innerHTML=data.map(r=>`
+  const sortedData=[...data].sort((a,b)=>parseInt(b.hembra||0)-parseInt(a.hembra||0));
+  tbody.innerHTML=sortedData.map(r=>`
     <tr>
       <td class="mono">${r.fecha_parto||'—'}</td>
       <td>${r.madre_vaca?'<span class="badge badge-dn">Vaca</span>':r.madre_vaquilla?'<span class="badge badge-nn">Vaquilla</span>':'—'}</td>
@@ -1632,10 +1633,16 @@ function renderInventario(partos, salidas){
   const totalDescarte=salidas.filter(s=>s.motivo==='Descarte').length;
   const pctSuperv=totalNacidas?Math.round(totalActivas/totalNacidas*100):0;
 
-  // Show ultimo arete activo
+  // Show ultimo arete activo y ultima muerta
   const ultActiva=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
+  const ultMuerta=salidas.filter(s=>s.motivo&&s.motivo.startsWith('Muerta')&&/^\d+$/.test(String(s.hembra||'').trim())).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
   const ultInvEl=document.getElementById('ultimo-inv');
-  if(ultInvEl&&ultActiva) ultInvEl.textContent=`— Último activo: ${ultActiva.hembra}`;
+  if(ultInvEl){
+    const partes=[];
+    if(ultActiva) partes.push(`Último activo: ${ultActiva.hembra}`);
+    if(ultMuerta) partes.push(`Última muerta: ${ultMuerta.hembra} (${ultMuerta.fecha_salida})`);
+    ultInvEl.textContent=partes.length?'— '+partes.join(' | '):'';
+  }
 
   document.getElementById('inv-kpis').innerHTML=
     kpiCard('Total Nacidas (hembras)',totalNacidas,'','','',false)+
