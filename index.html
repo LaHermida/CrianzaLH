@@ -185,11 +185,11 @@
       <div class="dash-controls" id="dash-global-controls">
         <div class="form-group">
           <label>Desde</label>
-          <input type="date" id="dash-desde"/>
+          <input type="text" id="dash-desde" placeholder="DD/MM/AAAA"/>
         </div>
         <div class="form-group">
           <label>Hasta</label>
-          <input type="date" id="dash-hasta"/>
+          <input type="text" id="dash-hasta" placeholder="DD/MM/AAAA"/>
         </div>
         <div class="form-group" style="flex:0">
           <label>&nbsp;</label>
@@ -214,10 +214,10 @@
       </div>
       <!-- Panel comparación -->
       <div id="dash-cmp-panel" style="display:none" class="dash-controls">
-        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-a)"></span>Periodo A — Desde</label><input type="date" id="dash-a-desde"/></div>
-        <div class="form-group"><label>Hasta</label><input type="date" id="dash-a-hasta"/></div>
-        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-b)"></span>Periodo B — Desde</label><input type="date" id="dash-b-desde"/></div>
-        <div class="form-group"><label>Hasta</label><input type="date" id="dash-b-hasta"/></div>
+        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-a)"></span>Periodo A — Desde</label><input type="text" id="dash-a-desde" placeholder="DD/MM/AAAA"/></div>
+        <div class="form-group"><label>Hasta</label><input type="text" id="dash-a-hasta" placeholder="DD/MM/AAAA"/></div>
+        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-b)"></span>Periodo B — Desde</label><input type="text" id="dash-b-desde" placeholder="DD/MM/AAAA"/></div>
+        <div class="form-group"><label>Hasta</label><input type="text" id="dash-b-hasta" placeholder="DD/MM/AAAA"/></div>
         <div class="form-group" style="align-self:flex-end"><button class="btn btn-primary btn-sm" onclick="renderDashboard()">🔍 Buscar</button></div>
       </div>
 
@@ -318,9 +318,9 @@
         <span class="section-title">📈 Dashboard GDP / Desarrollo</span>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
           <label style="font-size:.85rem;color:var(--text-muted)">Nacimiento:</label>
-          <input type="date" id="gdp-desde" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <input type="text" id="gdp-desde" placeholder="DD/MM/AAAA" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
           <span style="font-size:.85rem;color:var(--text-muted)">a</span>
-          <input type="date" id="gdp-hasta" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <input type="text" id="gdp-hasta" placeholder="DD/MM/AAAA" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
           <button class="btn btn-primary btn-sm" onclick="renderDashGDP()">🔍 Buscar</button>
           <button class="btn btn-secondary btn-sm" onclick="setGdpQuick('2025')">2025</button>
           <button class="btn btn-secondary btn-sm" onclick="setGdpQuick('2026')">2026</button>
@@ -366,9 +366,9 @@
         <span class="section-title">🐮 Inventario & Supervivencia <span id="ultimo-inv" style="font-size:.8rem;font-weight:400;color:var(--text-muted)"></span></span>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
           <label style="font-size:.85rem;color:var(--text-muted)">Nacimiento:</label>
-          <input type="date" id="inv-desde" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <input type="text" id="inv-desde" placeholder="DD/MM/AAAA" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
           <span style="font-size:.85rem;color:var(--text-muted)">a</span>
-          <input type="date" id="inv-hasta" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+          <input type="text" id="inv-hasta" placeholder="DD/MM/AAAA" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
           <button class="btn btn-primary btn-sm" onclick="loadInventario()">🔍 Buscar</button>
           <button class="btn btn-secondary btn-sm" onclick="setInvQuick('2025')">2025</button>
           <button class="btn btn-secondary btn-sm" onclick="setInvQuick('2026')">2026</button>
@@ -739,6 +739,19 @@ function filterByRange(data, desde, hasta){
     if(hasta && f > hasta) return false;
     return true;
   });
+}
+
+function ddmmToISO(s){
+  if(!s||!s.trim()) return '';
+  const p=s.trim().split('/');
+  if(p.length===3) return `${p[2]}-${p[1].padStart(2,'0')}-${p[0].padStart(2,'0')}`;
+  return s;
+}
+function isoToDDMM(s){
+  if(!s) return '';
+  const p=s.split('-');
+  if(p.length===3) return `${p[2]}/${p[1]}/${p[0]}`;
+  return s;
 }
 
 function avg(arr){ return arr.length?arr.reduce((a,b)=>a+b,0)/arr.length:null; }
@@ -1363,16 +1376,16 @@ async function deletePesaje(id){
 function setGdpQuick(periodo){
   const desde=document.getElementById('gdp-desde');
   const hasta=document.getElementById('gdp-hasta');
-  if(periodo==='2025'){desde.value='2025-01-01';hasta.value='2025-12-31';}
-  else if(periodo==='2026'){desde.value='2026-01-01';hasta.value='2026-12-31';}
+  if(periodo==='2025'){desde.value='01/01/2025';hasta.value='31/12/2025';}
+  else if(periodo==='2026'){desde.value='01/01/2026';hasta.value='31/12/2026';}
   else{desde.value='';hasta.value='';}
   renderDashGDP();
 }
 
 function renderDashGDP(){
   const razaFilter=document.getElementById('gdp-raza').value;
-  const desde=document.getElementById('gdp-desde')?.value;
-  const hasta=document.getElementById('gdp-hasta')?.value;
+  const desde=ddmmToISO(document.getElementById('gdp-desde')?.value||'');
+  const hasta=ddmmToISO(document.getElementById('gdp-hasta')?.value||'');
   const allPartos=(window._partos||[]).filter(p=>{
     if(!p.fecha_parto) return false;
     if(desde && p.fecha_parto < desde) return false;
@@ -1552,8 +1565,8 @@ function getISOWeek(date){
 
 // ==================== INVENTARIO ====================
 async function loadInventario(){
-  const desde=document.getElementById('inv-desde')?.value;
-  const hasta=document.getElementById('inv-hasta')?.value;
+  const desde=ddmmToISO(document.getElementById('inv-desde')?.value||'');
+  const hasta=ddmmToISO(document.getElementById('inv-hasta')?.value||'');
   let q='partos_crianza?order=fecha_parto.asc';
   if(desde) q+=`&fecha_parto=gte.${desde}`;
   if(hasta) q+=`&fecha_parto=lte.${hasta}`;
@@ -1572,8 +1585,8 @@ async function loadInventario(){
 function setInvQuick(periodo){
   const desde=document.getElementById('inv-desde');
   const hasta=document.getElementById('inv-hasta');
-  if(periodo==='2025'){desde.value='2025-01-01';hasta.value='2025-12-31';}
-  else if(periodo==='2026'){desde.value='2026-01-01';hasta.value='2026-12-31';}
+  if(periodo==='2025'){desde.value='01/01/2025';hasta.value='31/12/2025';}
+  else if(periodo==='2026'){desde.value='01/01/2026';hasta.value='31/12/2026';}
   else{desde.value='';hasta.value='';}
   loadInventario();
 }
