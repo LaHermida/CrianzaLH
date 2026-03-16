@@ -627,7 +627,9 @@ function showTab(tab,btn){
   if(tab==='dashboard') renderDashboard();
   if(tab==='inventario') loadInventario();
   if(tab==='dash-gdp'){
-    if(!window._pesajes||!window._pesajes.length){
+    const needPesajes=!window._pesajes||!window._pesajes.length;
+    const needPartos=!window._partos||!window._partos.length;
+    if(needPesajes||needPartos){
       loadPesajes().then(()=>renderDashGDP());
     } else {
       renderDashGDP();
@@ -1226,6 +1228,7 @@ async function loadPesajes(){
   window._partos=partos||[];
   window._pesajes=pesajes||[];
   renderPesajes(pesajes,partos);
+  return {partos,pesajes};
 }
 function renderPesajes(pesajes,partos){
   const tbody=document.getElementById('pesajesBody');
