@@ -801,6 +801,7 @@ function computePartoKPIs(data){
   const hembras=data.filter(r=>r.sexo==='H').length;
   const machos=data.filter(r=>r.sexo==='M').length;
   const mtas=data.filter(r=>r.hembra==='MTA').length;
+  const vendidasNacer=data.filter(r=>r.sexo==='H'&&r.hembra&&!/^\d+$/.test(String(r.hembra).trim())&&r.hembra!=='MTA'&&r.hembra!=='ABORTO').length;
   const mtos=data.filter(r=>r.hembra==='MTO').length;
   const abortos=data.filter(r=>r.sexo==='A').length;
   const vivas=data.filter(r=>r.sexo==='H'&&r.hembra!=='MTA').length;
@@ -814,7 +815,7 @@ function computePartoKPIs(data){
   const retoH=data.filter(r=>r.dias_reto!=null&&r.raza==='H').map(r=>r.dias_reto);
   const retoJ=data.filter(r=>r.dias_reto!=null&&r.raza==='J').map(r=>r.dias_reto);
   return {
-    total,hembras,machos,mtas,mtos,abortos,vivas,partosDenom,dificiles,noche,
+    total,hembras,machos,mtas,mtos,abortos,vivas,vendidasNacer,partosDenom,dificiles,noche,
     avgGest:avg(gest), minGest:gest.length?Math.min(...gest):null, maxGest:gest.length?Math.max(...gest):null,
     avgReto:avg(reto), minReto:reto.length?Math.min(...reto):null, maxReto:reto.length?Math.max(...reto):null,
     avgGestH:avg(gestH), minGestH:gestH.length?Math.min(...gestH):null, maxGestH:gestH.length?Math.max(...gestH):null,
@@ -838,6 +839,7 @@ function renderDashPartos(fd){
     kpiCard('Hembras Vivas', `${kA.vivas} (${kA.partosDenom?Math.round(kA.vivas/kA.partosDenom*100):0}%)`, compare?`${kB.vivas} (${kB.partosDenom?Math.round(kB.vivas/kB.partosDenom*100):0}%)`:'—', 'del total sin abortos', '', compare)+
     kpiCard('MTA (muertas)', `${kA.mtas} (${kA.partosDenom?Math.round(kA.mtas/kA.partosDenom*100):0}%)`, compare?`${kB.mtas} (${kB.partosDenom?Math.round(kB.mtas/kB.partosDenom*100):0}%)`:'—', '', '', compare)+
     kpiCard('Abortos', `${kA.abortos} (${kA.total?Math.round(kA.abortos/kA.total*100):0}%)`, compare?`${kB.abortos} (${kB.total?Math.round(kB.abortos/kB.total*100):0}%)`:'—', `de ${kA.total} total (partos+abortos)`, '', compare)+
+    kpiCard('Vendidas al Nacer', `${kA.vendidasNacer}`, compare?`${kB.vendidasNacer}`:'—', 'Cuatas, Vendida', '', compare)+
     kpiCard('Mortalidad (MTA+MTO)', `${kA.mtas+kA.mtos} (${kA.total?Math.round((kA.mtas+kA.mtos)/kA.total*100):0}%)`, compare?`${kB.mtas+kB.mtos} (${kB.total?Math.round((kB.mtas+kB.mtos)/kB.total*100):0}%)`:'—', `MTA: ${kA.mtas} / MTO: ${kA.mtos}`, '', compare)+
     kpiCard('Hembras', kA.hembras, kB.hembras, `${kA.total?Math.round(kA.hembras/kA.total*100):0}%`, compare?`${kB.total?Math.round(kB.hembras/kB.total*100):0}%`:'', compare)+
     kpiCard('Machos', kA.machos, kB.machos, '', '', compare)+
@@ -1570,7 +1572,11 @@ function renderInventario(partos, salidas){
   salidas.forEach(s=>{ salidaMap[s.hembra]=s; });
 
   // Only count hembras vivas (not MTA, not aborto)
-  const hembras=partos.filter(p=>p.sexo==='H' && p.hembra && p.hembra!=='MTA' && p.hembra!=='ABORTO');
+  const hembras=partos.filter(p=>
+    p.sexo==='H' && p.hembra &&
+    p.hembra!=='MTA' && p.hembra!=='ABORTO' &&
+    /^\d+$/.test(String(p.hembra).trim()) // solo aretes numéricos
+  );
 
   // Group by birth month
   const loteMap={};
@@ -1586,7 +1592,7 @@ function renderInventario(partos, salidas){
 
   // Render listado activas
   const hoy=new Date();
-  const activas=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>new Date(a.fecha_parto)-new Date(b.fecha_parto));
+  const activas=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
   const activasBody=document.getElementById('inv-activas-body');
   if(!activas.length){
     activasBody.innerHTML='<tr><td colspan="5" class="empty">Sin becerras activas.</td></tr>';
