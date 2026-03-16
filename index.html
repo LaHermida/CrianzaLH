@@ -1272,23 +1272,29 @@ async function loadPesajes(){
   return {partos,pesajes};
 }
 function renderPesajes(pesajes,partos){
-  // Show ultimo pesaje por numero de pesada
+  // Show ultimo arete (mayor numero) por numero de pesada
   const el=document.getElementById('ultimo-pesaje');
   if(el&&pesajes&&pesajes.length){
-    const sorted=[...pesajes].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha));
-    const hemPesadaIdx={};
-    const pesadaMap={1:null,2:null,3:null};
-    sorted.forEach(r=>{
-      if(!hemPesadaIdx[r.hembra]) hemPesadaIdx[r.hembra]=0;
-      hemPesadaIdx[r.hembra]++;
-      const n=hemPesadaIdx[r.hembra];
-      if(n<=3) pesadaMap[n]=r;
+    // Count pesadas per hembra sorted by date
+    const hembraIdx={};
+    [...pesajes].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).forEach(r=>{
+      if(!hembraIdx[r.hembra]) hembraIdx[r.hembra]=0;
+      hembraIdx[r.hembra]++;
+    });
+    // For each pesada number, find the highest arete
+    const maxAretePorPesada={};
+    Object.entries(hembraIdx).forEach(([hembra,count])=>{
+      const n=parseInt(hembra);
+      if(isNaN(n)) return;
+      for(let i=1;i<=count;i++){
+        if(!maxAretePorPesada[i]||n>maxAretePorPesada[i]) maxAretePorPesada[i]=n;
+      }
     });
     const parts=[];
     for(let i=1;i<=3;i++){
-      if(pesadaMap[i]) parts.push(`${i}ª: ${pesadaMap[i].hembra} (${pesadaMap[i].fecha})`);
+      if(maxAretePorPesada[i]) parts.push(`${i}ª: ${maxAretePorPesada[i]}`);
     }
-    el.textContent=`Últimos aretes — ${parts.join(' | ')}`;
+    el.textContent=parts.length?`Últimos aretes — ${parts.join(' | ')}`:'';
   }
   const tbody=document.getElementById('pesajesBody');
   if(!pesajes||!pesajes.length){tbody.innerHTML='<tr><td colspan="11" class="empty">Sin pesajes.</td></tr>';return;}
@@ -1301,7 +1307,7 @@ function renderPesajes(pesajes,partos){
     pesadaCount[r.hembra]++;
   });
   const hemPesadaIdx={};
-  tbody.innerHTML=[...pesajes].sort((a,b)=>new Date(a.fecha)-new Date(b.fecha)).map(r=>{
+  tbody.innerHTML=[...pesajes].sort((a,b)=>parseInt(a.hembra||0)-parseInt(b.hembra||0)).map(r=>{
     if(!hemPesadaIdx[r.hembra]) hemPesadaIdx[r.hembra]=0;
     hemPesadaIdx[r.hembra]++;
     const numPesada=hemPesadaIdx[r.hembra];
