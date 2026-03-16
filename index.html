@@ -670,7 +670,7 @@ function showTab(tab,btn){
 
 // ==================== DATA LOAD ====================
 async function loadPartos(){
-  const data=await sbFetch('partos_crianza?order=fecha_parto.desc');
+  const data=await sbFetch('partos_crianza?order=fecha_parto.desc&limit=5000');
   allPartos=data;
   renderPartos(data);
   renderStats(data);
@@ -1283,8 +1283,8 @@ async function deleteParto(id){
 
 // ==================== PESAJES ====================
 async function loadPesajes(){
-  const partos=await sbFetch('partos_crianza?order=fecha_parto.asc');
-  const pesajes=await sbFetch('pesajes_crianza?order=fecha.asc');
+  const partos=await sbFetch('partos_crianza?order=fecha_parto.asc&limit=5000');
+  const pesajes=await sbFetch('pesajes_crianza?order=fecha.asc&limit=5000');
   window._partos=partos||[];
   window._pesajes=pesajes||[];
   renderPesajes(pesajes,partos);
@@ -1578,7 +1578,7 @@ async function loadInventario(){
   if(hasta) q+=`&fecha_parto=lte.${hasta}`;
   const [partos, todasSalidas] = await Promise.all([
     sbFetch(q),
-    sbFetch('salidas_crianza?order=fecha_salida.asc')
+    sbFetch('salidas_crianza?order=fecha_salida.asc&limit=5000')
   ]);
   // Filter salidas to only hembras born in the date range
   const hembraSet=new Set((partos||[]).map(p=>p.hembra).filter(Boolean));
