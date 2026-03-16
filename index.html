@@ -185,11 +185,15 @@
       <div class="dash-controls" id="dash-global-controls">
         <div class="form-group">
           <label>Desde</label>
-          <input type="date" id="dash-desde" oninput="renderDashboard()"/>
+          <input type="date" id="dash-desde"/>
         </div>
         <div class="form-group">
           <label>Hasta</label>
-          <input type="date" id="dash-hasta" oninput="renderDashboard()"/>
+          <input type="date" id="dash-hasta"/>
+        </div>
+        <div class="form-group" style="flex:0">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary btn-sm" onclick="renderDashboard()" style="margin-bottom:.3rem">🔍 Buscar</button>
         </div>
         <div class="form-group" style="flex:0">
           <label>&nbsp;</label>
@@ -210,10 +214,11 @@
       </div>
       <!-- Panel comparación -->
       <div id="dash-cmp-panel" style="display:none" class="dash-controls">
-        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-a)"></span>Periodo A — Desde</label><input type="date" id="dash-a-desde" oninput="renderDashboard()"/></div>
-        <div class="form-group"><label>Hasta</label><input type="date" id="dash-a-hasta" oninput="renderDashboard()"/></div>
-        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-b)"></span>Periodo B — Desde</label><input type="date" id="dash-b-desde" oninput="renderDashboard()"/></div>
-        <div class="form-group"><label>Hasta</label><input type="date" id="dash-b-hasta" oninput="renderDashboard()"/></div>
+        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-a)"></span>Periodo A — Desde</label><input type="date" id="dash-a-desde"/></div>
+        <div class="form-group"><label>Hasta</label><input type="date" id="dash-a-hasta"/></div>
+        <div class="form-group"><label><span class="legend-dot" style="background:var(--cmp-b)"></span>Periodo B — Desde</label><input type="date" id="dash-b-desde"/></div>
+        <div class="form-group"><label>Hasta</label><input type="date" id="dash-b-hasta"/></div>
+        <div class="form-group" style="align-self:flex-end"><button class="btn btn-primary btn-sm" onclick="renderDashboard()">🔍 Buscar</button></div>
       </div>
 
       <!-- TODOS LOS KPIs JUNTOS -->
