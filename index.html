@@ -637,7 +637,8 @@ async function sbFetch(path,method='GET',body=null){
   const opts={method,headers:{
     'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,
     'Content-Type':'application/json',
-    'Prefer':method==='POST'?'return=representation':'return=minimal'
+    'Prefer':method==='POST'?'return=representation':'return=minimal',
+    'Range':'0-9999'
   }};
   if(body) opts.body=JSON.stringify(body);
   const res=await fetch(url,opts);
