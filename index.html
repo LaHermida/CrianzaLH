@@ -1800,17 +1800,46 @@ async function importSalidas(event){
   const file=event.target.files[0];if(!file)return;event.target.value='';
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
-  // Format: Hembra | Fecha Salida | Motivo (optional)
-  // Col 0=hembra, 1=fecha_salida, 2=motivo
+  // Auto-detect format:
+  // Format A (simple): Col 0=hembra, 1=fecha_salida, 2=motivo
+  // Format B (full):   Col 1=hembra(Vaca), 5=edad, 7=fecha_salida, 8=fecha_nac, 9=ultimo_peso, 10=motivo
+  const firstRow=rows[0]?.__row||[];
+  const isFormatB = firstRow.length >= 10 && (firstRow[6]||'').toString().includes('ginecol') ||
+                    rows.some(r=>{const p=r.__row||[]; return p[6]&&p[6].toString().includes('Nacimiento');});
+  
   const mapped=rows.map(row=>{
     const p=row.__row||[];
-    const g=i=>(p[i]!==undefined&&p[i]!==null&&p[i]!=='')?p[i]:null;
-    const hembra=toStr(g(0));
-    const fecha_salida=excelDateToISO(g(1));
-    const razon_original=toStr(g(2))||null;
-    if(!hembra||!fecha_salida) return null;
+    const g=i=>(p[i]!==undefined&&p[i]!==null&&String(p[i]).trim()!=='')?p[i]:null;
+    let hembra, fecha_salida, razon_original, fecha_nacimiento, edad_dias, ultimo_peso;
+    
+    if(isFormatB){
+      hembra=toStr(g(1));
+      fecha_salida=excelDateToISO(g(7));
+      fecha_nacimiento=excelDateToISO(g(8));
+      edad_dias=g(5)?parseInt(g(5)):null;
+      ultimo_peso=g(9)?parseFloat(g(9)):null;
+      razon_original=toStr(g(10))||null;
+    } else {
+      hembra=toStr(g(0));
+      fecha_salida=excelDateToISO(g(1));
+      razon_original=toStr(g(2))||null;
+    }
+    
+    if(!hembra||!fecha_salida||!/^\d+$/.test(hembra.trim())) return null;
     const motivo=clasificarMotivo(razon_original||'');
-    return {hembra, fecha_salida, razon_original, motivo};
+    
+    // Calculate etapa from edad_dias
+    let etapa=null;
+    if(edad_dias!=null){
+      const d=parseInt(edad_dias);
+      if(d<=65) etapa='Etapa 1 - Leche (0-65d)';
+      else if(d<=90) etapa='Etapa 2 - Jaulas (66-90d)';
+      else if(d<=150) etapa='Etapa 3 - AYC (91-150d)';
+      else if(d<=365) etapa='Etapa 4 - 5-11m (151-365d)';
+      else etapa='Etapa 5 - 12m a Gestación';
+    }
+    
+    return {hembra, fecha_salida, fecha_nacimiento, edad_dias, ultimo_peso, razon_original, motivo, etapa};
   }).filter(r=>r);
   if(!mapped.length){alert('Sin datos válidos.');return;}
   let ok=0,err=0;
