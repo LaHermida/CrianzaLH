@@ -1937,17 +1937,18 @@ async function readFile(file){
     const buf=await file.arrayBuffer();
     let text;
     try{text=new TextDecoder('iso-8859-1').decode(buf);}catch(e){text=new TextDecoder('utf-8').decode(buf);}
-    const firstLine=text.split('\n')[0];
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());
+    if(!lines.length) return [];
+    const firstLine=lines[0];
     const delim=(firstLine.split(';').length>firstLine.split(',').length)?';':',';
-    const wb=XLSX.read(text,{type:'string',FS:delim});
-    const ws=wb.Sheets[wb.SheetNames[0]];
-    const arrays=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
-    if(!arrays.length) return [];
-    const headers=arrays[0];
-    return arrays.slice(1).map(row=>({
-      __row: row,
-      ...Object.fromEntries(headers.map((h,i)=>[h,row[i]]))
-    }));
+    const headers=firstLine.split(delim).map(h=>h.trim().replace(/^"|"$/g,''));
+    return lines.slice(1).map(line=>{
+      const cols=line.split(delim).map(c=>c.trim().replace(/^"|"$/g,''));
+      const row=cols;
+      const obj={__row:row};
+      headers.forEach((h,i)=>obj[h]=cols[i]||null);
+      return obj;
+    }).filter(r=>r.__row.some(v=>v));
   }
   const data=await file.arrayBuffer();
   const wb=XLSX.read(data,{type:'array',cellDates:true});
