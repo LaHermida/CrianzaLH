@@ -347,9 +347,12 @@
               <th>Lote</th>
               <th>Becerras</th>
               <th>Aretes</th>
-              <th>ADG E1<br><small>0-65d</small></th>
-              <th>ADG E2<br><small>66-90d</small></th>
-              <th>ADG E3<br><small>91-150d</small></th>
+              <th>1ª Pesada<br><small>Días prom.</small></th>
+              <th>1ª Pesada<br><small>Peso prom.</small></th>
+              <th>ADG 1ª<br><small>vs nacer</small></th>
+              <th>2ª Pesada<br><small>Días prom.</small></th>
+              <th>2ª Pesada<br><small>Peso prom.</small></th>
+              <th>ADG 2ª<br><small>vs 1ª</small></th>
             </tr>
           </thead>
           <tbody id="gdp-semana-body">
@@ -1450,27 +1453,16 @@ function renderDashGDP(){
       dias:Math.floor((new Date(p.fecha)-nac)/86400000)
     })).filter(p=>p.dias>0).sort((a,b)=>a.dias-b.dias);
 
-    // ADG per stage: relative to previous pesada (or nacer if first)
-    const etapaADG={};
-    ps.forEach((p,i)=>{
-      const prevPeso = i===0 ? pesoNacer : ps[i-1].peso;
-      const prevDias = i===0 ? 0 : ps[i-1].dias;
-      const adg = (p.dias-prevDias)>0 ? (p.peso-prevPeso)/(p.dias-prevDias) : null;
-      // Assign to etapa based on current pesada dias
-      const etapa=etapasDef.find(e=>p.dias>=e.min&&p.dias<=e.max);
-      if(etapa&&adg!==null) etapaADG[etapa.nombre]=adg;
-    });
-
     const p1=ps[0]||null, p2=ps[1]||null;
+    // ADG 1a pesada: vs peso nacer
+    const adg1=(p1&&p1.dias>0&&pesoNacer)?((p1.peso-pesoNacer)/p1.dias):null;
+    // ADG 2a pesada: vs 1a pesada
+    const adg2=(p1&&p2&&(p2.dias-p1.dias)>0)?((p2.peso-p1.peso)/(p2.dias-p1.dias)):null;
+
     hembraStats[hembra]={
       parto, nac, pesoNacer, refrac,
-      p1peso:p1?p1.peso:null, d1:p1?p1.dias:null,
-      p2peso:p2?p2.peso:null, d2:p2?p2.dias:null,
-      adgE1:etapaADG['E1 Leche']||null,
-      adgE2:etapaADG['E2 Jaulas']||null,
-      adgE3:etapaADG['E3 AYC']||null,
-      adgE4:etapaADG['E4 5-11m']||null,
-      adgE5:etapaADG['E5 12m+']||null,
+      p1peso:p1?p1.peso:null, d1:p1?p1.dias:null, adg1,
+      p2peso:p2?p2.peso:null, d2:p2?p2.dias:null, adg2,
     };
   });
 
@@ -1481,12 +1473,13 @@ function renderDashGDP(){
 
   // KPIs generales
   const con2=stats.filter(s=>s.p2peso!=null).length;
+  const adg1s=stats.filter(s=>s.adg1!=null).map(s=>s.adg1);
+  const adg2s=stats.filter(s=>s.adg2!=null).map(s=>s.adg2);
   document.getElementById('gdp-kpis').innerHTML=
     kpiCard('Becerras con pesaje',stats.length,'','','',false)+
     kpiCard('Con 2ª pesada',`${con2} (${stats.length?Math.round(con2/stats.length*100):0}%)`,'','','',false)+
-    kpiCard('ADG E1 Leche (prom)',avgEtapa('adgE1')!=null?avgEtapa('adgE1').toFixed(3)+' kg/día':'—','','0-65d vs nacer','',false)+
-    kpiCard('ADG E2 Jaulas (prom)',avgEtapa('adgE2')!=null?avgEtapa('adgE2').toFixed(3)+' kg/día':'—','','66-90d vs E1','',false)+
-    kpiCard('ADG E3 AYC (prom)',avgEtapa('adgE3')!=null?avgEtapa('adgE3').toFixed(3)+' kg/día':'—','','91-150d vs E2','',false);
+    kpiCard('ADG 1ª Pesada (prom)',adg1s.length?avg(adg1s).toFixed(3)+' kg/día':'—','','vs peso nacer','',false)+
+    kpiCard('ADG 2ª Pesada (prom)',adg2s.length?avg(adg2s).toFixed(3)+' kg/día':'—','','vs 1ª pesada','',false);
 
   // Refractometria bands
   const refBands=[
@@ -1502,8 +1495,8 @@ function renderDashGDP(){
         <thead><tr><th>Refractometría</th><th>Becerras</th><th>ADG E1 prom</th><th>ADG E2 prom</th></tr></thead>
         <tbody>${refBands.map(b=>{
           const gr=stats.filter(b.filter);
-          const a1=gr.filter(s=>s.adgE1!=null).map(s=>s.adgE1);
-          const a2=gr.filter(s=>s.adgE2!=null).map(s=>s.adgE2);
+          const a1=gr.filter(s=>s.adg1!=null).map(s=>s.adg1);
+          const a2=gr.filter(s=>s.adg2!=null).map(s=>s.adg2);
           const avgA1=a1.length?avg(a1):null;
           const avgA2=a2.length?avg(a2):null;
           return `<tr>
@@ -1545,19 +1538,24 @@ function renderDashGDP(){
     const label=`${mesesNombre[lote.mes]} ${lote.yr}`;
     const aretesSort=items.map(s=>parseInt(s.parto.hembra)).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
     const aretes=aretesSort.length?`${aretesSort[0]} – ${aretesSort[aretesSort.length-1]}`:'—';
-    const ae1=items.filter(s=>s.adgE1!=null).map(s=>s.adgE1);
-    const ae2=items.filter(s=>s.adgE2!=null).map(s=>s.adgE2);
-    const ae3=items.filter(s=>s.adgE3!=null).map(s=>s.adgE3);
-    const pA1=ae1.length?avg(ae1):null;
-    const pA2=ae2.length?avg(ae2):null;
-    const pA3=ae3.length?avg(ae3):null;
+    const a1s=items.filter(s=>s.adg1!=null).map(s=>s.adg1);
+    const a2s=items.filter(s=>s.adg2!=null).map(s=>s.adg2);
+    const d1s=items.filter(s=>s.d1!=null).map(s=>s.d1);
+    const d2s=items.filter(s=>s.d2!=null).map(s=>s.d2);
+    const p1s=items.filter(s=>s.p1peso!=null).map(s=>s.p1peso);
+    const p2s=items.filter(s=>s.p2peso!=null).map(s=>s.p2peso);
+    const pA1=a1s.length?avg(a1s):null;
+    const pA2=a2s.length?avg(a2s):null;
     return `<tr>
       <td style="font-weight:600">${label}</td>
       <td class="mono" style="text-align:center">${items.length}</td>
       <td style="font-size:.75rem;max-width:160px;word-break:break-word">${aretes}</td>
+      <td class="mono">${d1s.length?Math.round(avg(d1s))+'d':'—'}</td>
+      <td class="mono">${p1s.length?avg(p1s).toFixed(1)+' kg':'—'}</td>
       <td class="mono ${adgClass(pA1)}">${fmtADG(pA1)}</td>
+      <td class="mono">${d2s.length?Math.round(avg(d2s))+'d':'—'}</td>
+      <td class="mono">${p2s.length?avg(p2s).toFixed(1)+' kg':'—'}</td>
       <td class="mono ${adgClass(pA2)}">${fmtADG(pA2)}</td>
-      <td class="mono ${adgClass(pA3)}">${fmtADG(pA3)}</td>
     </tr>`;
   }).join('');
 }
@@ -2034,13 +2032,19 @@ function mapPartoRowFromExcel(row, isTwinSecond=false){
 }
 
 function mapPesajeRow(row){
-  // Col 0=Numero Becerra (hembra), Col 1=Kg, Col 2=Fecha de Pesada
+  // Format A: Col 0=hembra, Col 1=Kg, Col 2=Fecha  (old format)
+  // Format B: Col 0=hembra, Col 1=Fecha, Col 2=Kg  (new 2026 format)
   const p=row.__row||[];
   const g=i=>(p[i]!==undefined&&p[i]!==null&&p[i]!=='')?p[i]:null;
+  const col1=g(1), col2=g(2);
+  // Detect format: if col1 looks like a date string or Date object -> Format B
+  const isFormatB = col1 && (col1 instanceof Date || 
+    (typeof col1==='string' && /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(col1)) ||
+    (typeof col1==='string' && /^\d{4}-\d{2}-\d{2}/.test(col1)));
   return{
     hembra: toStr(g(0)),
-    peso:   toFloat(g(1)),
-    fecha:  excelDateToISO(g(2)),
+    peso:   isFormatB ? toFloat(col2) : toFloat(col1),
+    fecha:  isFormatB ? excelDateToISO(col1) : excelDateToISO(col2),
     notas:  null
   };
 }
