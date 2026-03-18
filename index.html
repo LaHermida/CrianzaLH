@@ -1528,7 +1528,7 @@ function renderDashGDP(){
         '</tr>';
     }).join('');
     return '<div style="flex:1;min-width:300px">'+
-      '<button id="btn-p3-'+raza+'" onclick="toggleP3(''+raza+'')" '+
+      '<button id="btn-p3-'+raza+'" onclick="toggleP3(\'' +raza+ '\')" '+
       'style="background:'+color+';color:white;border:none;border-radius:6px;padding:.4rem .8rem;cursor:pointer;font-size:.85rem;width:100%;text-align:left">'+
       '🐄 '+label+' ('+items.length+' becerras | '+areteMin+'–'+areteMax+') ▼</button>'+
       '<div id="tbl-p3-'+raza+'" style="display:none;margin-top:.5rem">'+
