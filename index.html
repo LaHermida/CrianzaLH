@@ -435,6 +435,7 @@
           <thead>
             <tr>
               <th>Lote</th>
+              <th>Aretes</th>
               <th>Nacidas</th>
               <th>Activas</th>
               <th>% Superv.</th>
@@ -442,9 +443,7 @@
               <th>- Diarrea</th>
               <th>- Pulmonar</th>
               <th>- Otra</th>
-              <th>Descarte</th>
-              <th>Vendidas</th>
-              <th>Otras Salidas</th>
+              <th>Salidas</th>
             </tr>
           </thead>
           <tbody id="inv-lote-body"><tr><td colspan="11" class="empty">Cargando...</td></tr></tbody>
@@ -1807,22 +1806,25 @@ function renderInventario(partos, salidas){
 
   // Lote table
   const loteBody=document.getElementById('inv-lote-body');
-  if(!lotes.length){loteBody.innerHTML='<tr><td colspan="11" class="empty">Sin datos.</td></tr>';return;}
+  if(!lotes.length){loteBody.innerHTML='<tr><td colspan="10" class="empty">Sin datos.</td></tr>';return;}
   loteBody.innerHTML=lotes.map(lote=>{
     const n=lote.nacidas.length;
     const s=lote.salidas;
     const activas=n-s.length;
     const pct=n?Math.round(activas/n*100):0;
-    const muertas=s.filter(x=>x.motivo&&x.motivo.startsWith('Muerta')).length;
+    // All non-vendida exits count as muertas
+    const muertas=s.filter(x=>x.motivo&&(x.motivo.startsWith('Muerta')||x.motivo==='Descarte'||x.motivo==='Cuata')).length;
     const diarrea=s.filter(x=>x.motivo==='Muerta - Diarrea').length;
     const pulmonar=s.filter(x=>x.motivo==='Muerta - Pulmonar').length;
-    const otraMuerta=s.filter(x=>x.motivo==='Muerta - Otra').length;
-    const descarte=s.filter(x=>x.motivo==='Descarte').length;
-    const vendidas=s.filter(x=>x.motivo==='Vendida').length;
-    const otras=s.filter(x=>!x.motivo||(!x.motivo.startsWith('Muerta')&&x.motivo!=='Descarte'&&x.motivo!=='Vendida')).length;
+    const otraMuerta=s.filter(x=>x.motivo&&(x.motivo==='Muerta - Otra'||x.motivo==='Descarte'||x.motivo==='Cuata')).length;
+    const salidas=s.filter(x=>x.motivo==='Vendida').length;
+    // Arete range
+    const aretesN=lote.nacidas.map(p=>parseInt(p.hembra)).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
+    const areteRng=aretesN.length?aretesN[0]+' – '+aretesN[aretesN.length-1]:'—';
     const pctClass=pct>=80?'gdp-ok':pct>=60?'gdp-warn':'gdp-bad';
     return `<tr>
       <td style="font-weight:600">${mesesNombre[lote.mes]} ${lote.year}</td>
+      <td class="mono" style="font-size:.78rem">${areteRng}</td>
       <td class="mono" style="text-align:center">${n}</td>
       <td class="mono" style="text-align:center">${activas}</td>
       <td class="mono ${pctClass}" style="text-align:center">${pct}%</td>
@@ -1830,9 +1832,7 @@ function renderInventario(partos, salidas){
       <td class="mono" style="text-align:center">${n?Math.round(diarrea/n*100):0}%</td>
       <td class="mono" style="text-align:center">${n?Math.round(pulmonar/n*100):0}%</td>
       <td class="mono" style="text-align:center">${n?Math.round(otraMuerta/n*100):0}%</td>
-      <td class="mono" style="text-align:center">${n?Math.round(descarte/n*100):0}%</td>
-      <td class="mono" style="text-align:center">${n?Math.round(vendidas/n*100):0}%</td>
-      <td class="mono" style="text-align:center">${n?Math.round(otras/n*100):0}%</td>
+      <td class="mono" style="text-align:center">${salidas} (${n?Math.round(salidas/n*100):0}%)</td>
     </tr>`;
   }).join('');
 }
