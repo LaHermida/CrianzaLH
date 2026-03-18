@@ -353,6 +353,9 @@
               <th>2ª Pesada<br><small>Días prom.</small></th>
               <th>2ª Pesada<br><small>Peso prom.</small></th>
               <th>ADG 2ª<br><small>vs 1ª</small></th>
+              <th>3ª Pesada<br><small>Días prom.</small></th>
+              <th>3ª Pesada<br><small>Peso prom.</small></th>
+              <th>ADG 3ª<br><small>vs 2ª</small></th>
             </tr>
           </thead>
           <tbody id="gdp-semana-body">
@@ -1453,16 +1456,20 @@ function renderDashGDP(){
       dias:Math.floor((new Date(p.fecha)-nac)/86400000)
     })).filter(p=>p.dias>0).sort((a,b)=>a.dias-b.dias);
 
-    const p1=ps[0]||null, p2=ps[1]||null;
+    const p1=ps[0]||null, p2=ps[1]||null, p3=ps[2]||null;
     // ADG 1a pesada: vs peso nacer
     const adg1=(p1&&p1.dias>0&&pesoNacer)?((p1.peso-pesoNacer)/p1.dias):null;
     // ADG 2a pesada: vs 1a pesada
     const adg2=(p1&&p2&&(p2.dias-p1.dias)>0)?((p2.peso-p1.peso)/(p2.dias-p1.dias)):null;
+    // ADG 3a pesada: vs 2a pesada
+    const adg3=(p2&&p3&&(p3.dias-p2.dias)>0)?((p3.peso-p2.peso)/(p3.dias-p2.dias)):null;
 
     hembraStats[hembra]={
       parto, nac, pesoNacer, refrac,
       p1peso:p1?p1.peso:null, d1:p1?p1.dias:null, adg1,
       p2peso:p2?p2.peso:null, d2:p2?p2.dias:null, adg2,
+      p3peso:p3?p3.peso:null, d3:p3?p3.dias:null, adg3,
+      raza:parto.raza||null,
     };
   });
 
@@ -1475,11 +1482,19 @@ function renderDashGDP(){
   const con2=stats.filter(s=>s.p2peso!=null).length;
   const adg1s=stats.filter(s=>s.adg1!=null).map(s=>s.adg1);
   const adg2s=stats.filter(s=>s.adg2!=null).map(s=>s.adg2);
+  const adg3s=stats.filter(s=>s.adg3!=null).map(s=>s.adg3);
+  const adg3sH=stats.filter(s=>s.adg3!=null&&s.raza==='H').map(s=>s.adg3);
+  const adg3sJ=stats.filter(s=>s.adg3!=null&&s.raza==='J').map(s=>s.adg3);
+  const p3sAll=stats.filter(s=>s.p3peso!=null).map(s=>s.p3peso);
+  const p3sH=stats.filter(s=>s.p3peso!=null&&s.raza==='H').map(s=>s.p3peso);
+  const p3sJ=stats.filter(s=>s.p3peso!=null&&s.raza==='J').map(s=>s.p3peso);
   document.getElementById('gdp-kpis').innerHTML=
     kpiCard('Becerras con pesaje',stats.length,'','','',false)+
     kpiCard('Con 2ª pesada',`${con2} (${stats.length?Math.round(con2/stats.length*100):0}%)`,'','','',false)+
     kpiCard('ADG 1ª Pesada (prom)',adg1s.length?avg(adg1s).toFixed(3)+' kg/día':'—','','vs peso nacer','',false)+
-    kpiCard('ADG 2ª Pesada (prom)',adg2s.length?avg(adg2s).toFixed(3)+' kg/día':'—','','vs 1ª pesada','',false);
+    kpiCard('ADG 2ª Pesada (prom)',adg2s.length?avg(adg2s).toFixed(3)+' kg/día':'—','','vs 1ª pesada','',false)+
+    kpiCard('Peso ~12 meses (prom)',p3sAll.length?avg(p3sAll).toFixed(1)+' kg':'—','','Holstein: '+( p3sH.length?avg(p3sH).toFixed(1)+' kg':'—')+' | Jersey: '+(p3sJ.length?avg(p3sJ).toFixed(1)+' kg':'—'),'',false)+
+    kpiCard('ADG 3ª Pesada (prom)',adg3s.length?avg(adg3s).toFixed(3)+' kg/día':'—','','vs 2ª pesada | Holstein: '+(adg3sH.length?avg(adg3sH).toFixed(3):'—')+' | Jersey: '+(adg3sJ.length?avg(adg3sJ).toFixed(3):'—'),'',false);
 
   // Refractometria bands
   const refBands=[
@@ -1540,12 +1555,16 @@ function renderDashGDP(){
     const aretes=aretesSort.length?`${aretesSort[0]} – ${aretesSort[aretesSort.length-1]}`:'—';
     const a1s=items.filter(s=>s.adg1!=null).map(s=>s.adg1);
     const a2s=items.filter(s=>s.adg2!=null).map(s=>s.adg2);
+    const a3s=items.filter(s=>s.adg3!=null).map(s=>s.adg3);
     const d1s=items.filter(s=>s.d1!=null).map(s=>s.d1);
     const d2s=items.filter(s=>s.d2!=null).map(s=>s.d2);
+    const d3s=items.filter(s=>s.d3!=null).map(s=>s.d3);
     const p1s=items.filter(s=>s.p1peso!=null).map(s=>s.p1peso);
     const p2s=items.filter(s=>s.p2peso!=null).map(s=>s.p2peso);
+    const p3s=items.filter(s=>s.p3peso!=null).map(s=>s.p3peso);
     const pA1=a1s.length?avg(a1s):null;
     const pA2=a2s.length?avg(a2s):null;
+    const pA3=a3s.length?avg(a3s):null;
     return `<tr>
       <td style="font-weight:600">${label}</td>
       <td class="mono" style="text-align:center">${items.length}</td>
@@ -1556,6 +1575,9 @@ function renderDashGDP(){
       <td class="mono">${d2s.length?Math.round(avg(d2s))+'d':'—'}</td>
       <td class="mono">${p2s.length?avg(p2s).toFixed(1)+' kg':'—'}</td>
       <td class="mono ${adgClass(pA2)}">${fmtADG(pA2)}</td>
+      <td class="mono">${d3s.length?Math.round(avg(d3s))+'d':'—'}</td>
+      <td class="mono">${p3s.length?avg(p3s).toFixed(1)+' kg':'—'}</td>
+      <td class="mono ${adgClass(pA3)}">${fmtADG(pA3)}</td>
     </tr>`;
   }).join('');
 }
