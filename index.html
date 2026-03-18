@@ -1520,10 +1520,12 @@ function renderDashGDP(){
     const areteMax=parseInt(items[items.length-1].parto.hembra);
     const rows=items.map(s=>{
       const adgColor=s.adg3>=0.8?'#2d6a4f':s.adg3>=0.6?'#c77800':'#c62828';
+      const pesoMin=raza==='H'?360:250;
+      const pesoColor=s.p3peso!=null?(s.p3peso>=pesoMin?'#2d6a4f':'#c62828'):'';
       return '<tr style="border-bottom:1px solid var(--border)">'+
         '<td style="padding:.3rem .4rem;font-weight:600">'+s.parto.hembra+'</td>'+
         '<td style="padding:.3rem .4rem">'+(s.d3||'—')+'</td>'+
-        '<td style="padding:.3rem .4rem">'+(s.p3peso!=null?s.p3peso+' kg':'—')+'</td>'+
+        '<td style="padding:.3rem .4rem;font-weight:600;color:'+pesoColor+'">'+(s.p3peso!=null?s.p3peso+' kg':'—')+'</td>'+
         '<td style="padding:.3rem .4rem;color:'+adgColor+'">'+(s.adg3!=null?s.adg3.toFixed(3):'—')+'</td>'+
         '</tr>';
     }).join('');
