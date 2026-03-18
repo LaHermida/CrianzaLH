@@ -1941,7 +1941,7 @@ async function readFile(file){
     const delim=(firstLine.split(';').length>firstLine.split(',').length)?';':',';
     const wb=XLSX.read(text,{type:'string',FS:delim});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    const arrays=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+    const arrays=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
     if(!arrays.length) return [];
     const headers=arrays[0];
     return arrays.slice(1).map(row=>({
