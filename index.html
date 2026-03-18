@@ -1509,6 +1509,54 @@ function renderDashGDP(){
     kpiCard('ADG 3ª Pesada Holstein',adg3sH.length?avg(adg3sH).toFixed(3)+' kg/día':'—','','vs 2ª pesada','',false)+
     kpiCard('ADG 3ª Pesada Jersey',adg3sJ.length?avg(adg3sJ).toFixed(3)+' kg/día':'—','','vs 2ª pesada','',false);
 
+  // 3a pesada detail tables by raza
+  const p3DetailHtml=`
+    <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1.5rem">
+      ${['H','J'].map(raza=>{
+        const label=raza==='H'?'Holstein':'Jersey';
+        const color=raza==='H'?'#1b6ca8':'#2d6a4f';
+        const items=stats.filter(s=>s.p3peso!=null&&s.raza===raza)
+          .sort((a,b)=>parseInt(a.parto.hembra)-parseInt(b.parto.hembra));
+        if(!items.length) return '';
+        const btnId='btn-p3-'+raza;
+        const tblId='tbl-p3-'+raza;
+        const areteMin=parseInt(items[0].parto.hembra);
+        const areteMax=parseInt(items[items.length-1].parto.hembra);
+        return \`<div style="flex:1;min-width:300px">
+          <button id="\${btnId}" onclick="toggleP3('\${raza}')" 
+            style="background:${color};color:white;border:none;border-radius:6px;padding:.4rem .8rem;cursor:pointer;font-size:.85rem;width:100%;text-align:left">
+            🐄 \${label} (\${items.length} becerras | \${areteMin}–\${areteMax}) ▼
+          </button>
+          <div id="\${tblId}" style="display:none;margin-top:.5rem">
+            <table style="width:100%;font-size:.82rem">
+              <thead><tr style="background:var(--header-bg);color:white">
+                <th style="padding:.4rem">Arete</th>
+                <th style="padding:.4rem">Días</th>
+                <th style="padding:.4rem">Peso (kg)</th>
+                <th style="padding:.4rem">ADG 3ª</th>
+              </tr></thead>
+              <tbody>
+                \${items.map(s=>\`<tr style="border-bottom:1px solid var(--border)">
+                  <td style="padding:.3rem .4rem;font-weight:600">\${s.parto.hembra}</td>
+                  <td style="padding:.3rem .4rem">\${s.d3||'—'}</td>
+                  <td style="padding:.3rem .4rem">\${s.p3peso!=null?s.p3peso+' kg':'—'}</td>
+                  <td style="padding:.3rem .4rem;color:\${s.adg3>=0.8?'#2d6a4f':s.adg3>=0.6?'#c77800':'#c62828'}">\${s.adg3!=null?s.adg3.toFixed(3):'—'}</td>
+                </tr>\`).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>\`;
+      }).join('')}
+    </div>`;
+
+  let p3DetailEl=document.getElementById('gdp-p3-detail');
+  if(!p3DetailEl){
+    p3DetailEl=document.createElement('div');
+    p3DetailEl.id='gdp-p3-detail';
+    document.getElementById('gdp-kpis').parentNode.insertBefore(p3DetailEl, document.getElementById('gdp-refrac-section'));
+  }
+  p3DetailEl.innerHTML=p3DetailHtml;
+
   // Refractometria bands
   const refBands=[
     {label:'>10',    filter:s=>s.refrac!=null&&s.refrac>10},
@@ -1593,6 +1641,15 @@ function renderDashGDP(){
       <td class="mono ${adgClass(pA3)}">${fmtADG(pA3)}</td>
     </tr>`;
   }).join('');
+}
+
+function toggleP3(raza){
+  const btn=document.getElementById('btn-p3-'+raza);
+  const tbl=document.getElementById('tbl-p3-'+raza);
+  if(!tbl) return;
+  const open=tbl.style.display!=='none';
+  tbl.style.display=open?'none':'block';
+  btn.textContent=btn.textContent.replace(open?'▲':'▼',open?'▼':'▲');
 }
 
 function getISOWeek(date){
