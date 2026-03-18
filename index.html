@@ -1322,6 +1322,9 @@ function renderPesajes(pesajes,partos){
       if(maxAretePorPesada[i]) parts.push(`${i}ª: ${maxAretePorPesada[i]}`);
     }
     el.textContent=parts.length?`Últimos aretes — ${parts.join(' | ')}`:'';
+    // Show 3rd pesada indicator
+    const el3=document.getElementById('ultimo-pesaje-3');
+    if(el3) el3.textContent=maxAretePorPesada[3]?`3ª: ${maxAretePorPesada[3]}`:'3ª: —';
   }
   const tbody=document.getElementById('pesajesBody');
   if(!pesajes||!pesajes.length){tbody.innerHTML='<tr><td colspan="11" class="empty">Sin pesajes.</td></tr>';return;}
@@ -1493,8 +1496,18 @@ function renderDashGDP(){
     kpiCard('Con 2ª pesada',`${con2} (${stats.length?Math.round(con2/stats.length*100):0}%)`,'','','',false)+
     kpiCard('ADG 1ª Pesada (prom)',adg1s.length?avg(adg1s).toFixed(3)+' kg/día':'—','','vs peso nacer','',false)+
     kpiCard('ADG 2ª Pesada (prom)',adg2s.length?avg(adg2s).toFixed(3)+' kg/día':'—','','vs 1ª pesada','',false)+
-    kpiCard('Peso ~12 meses (prom)',p3sAll.length?avg(p3sAll).toFixed(1)+' kg':'—','','Holstein: '+( p3sH.length?avg(p3sH).toFixed(1)+' kg':'—')+' | Jersey: '+(p3sJ.length?avg(p3sJ).toFixed(1)+' kg':'—'),'',false)+
-    kpiCard('ADG 3ª Pesada (prom)',adg3s.length?avg(adg3s).toFixed(3)+' kg/día':'—','','vs 2ª pesada | Holstein: '+(adg3sH.length?avg(adg3sH).toFixed(3):'—')+' | Jersey: '+(adg3sJ.length?avg(adg3sJ).toFixed(3):'—'),'',false);
+    kpiCard('Peso ~12 meses (General)',
+      p3sAll.length?avg(p3sAll).toFixed(1)+' kg':'—','',
+      p3sAll.length?`min ${Math.min(...p3sAll).toFixed(1)} / max ${Math.max(...p3sAll).toFixed(1)} kg | prom edad: ${Math.round(avg(stats.filter(s=>s.d3!=null).map(s=>s.d3)))}d`:'','',false)+
+    kpiCard('Peso ~12 meses Holstein',
+      p3sH.length?avg(p3sH).toFixed(1)+' kg':'—','',
+      p3sH.length?`min ${Math.min(...p3sH).toFixed(1)} / max ${Math.max(...p3sH).toFixed(1)} kg | prom edad: ${Math.round(avg(stats.filter(s=>s.d3!=null&&s.raza==='H').map(s=>s.d3)))}d`:'','',false)+
+    kpiCard('Peso ~12 meses Jersey',
+      p3sJ.length?avg(p3sJ).toFixed(1)+' kg':'—','',
+      p3sJ.length?`min ${Math.min(...p3sJ).toFixed(1)} / max ${Math.max(...p3sJ).toFixed(1)} kg | prom edad: ${Math.round(avg(stats.filter(s=>s.d3!=null&&s.raza==='J').map(s=>s.d3)))}d`:'','',false)+
+    kpiCard('ADG 3ª Pesada (General)',adg3s.length?avg(adg3s).toFixed(3)+' kg/día':'—','','vs 2ª pesada','',false)+
+    kpiCard('ADG 3ª Pesada Holstein',adg3sH.length?avg(adg3sH).toFixed(3)+' kg/día':'—','','vs 2ª pesada','',false)+
+    kpiCard('ADG 3ª Pesada Jersey',adg3sJ.length?avg(adg3sJ).toFixed(3)+' kg/día':'—','','vs 2ª pesada','',false);
 
   // Refractometria bands
   const refBands=[
