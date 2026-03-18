@@ -1948,20 +1948,11 @@ function excelDateToISO(val){
   const s=String(val).trim();
   if(!s) return null;
   if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  // Always treat as DD/MM/YYYY
   let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if(m){
-    const a=parseInt(m[1]),b=parseInt(m[2]);
-    // If first part > 12, it must be the day (DD/MM/YYYY)
-    if(a>12) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-    // Otherwise assume MM/DD/YYYY
-    return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
-  }
+  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
   m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-  if(m){
-    const a=parseInt(m[1]),b=parseInt(m[2]);
-    if(a>12) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-    return `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`;
-  }
+  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
   const d=new Date(s);
   if(!isNaN(d)) return d.toISOString().slice(0,10);
   return null;
