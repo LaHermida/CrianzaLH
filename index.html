@@ -1928,7 +1928,13 @@ async function readFile(file){
     const delim=(firstLine.split(';').length>firstLine.split(',').length)?';':',';
     const wb=XLSX.read(text,{type:'string',FS:delim});
     const ws=wb.Sheets[wb.SheetNames[0]];
-    return XLSX.utils.sheet_to_json(ws,{defval:null,raw:false});
+    const arrays=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+    if(!arrays.length) return [];
+    const headers=arrays[0];
+    return arrays.slice(1).map(row=>({
+      __row: row,
+      ...Object.fromEntries(headers.map((h,i)=>[h,row[i]]))
+    }));
   }
   const data=await file.arrayBuffer();
   const wb=XLSX.read(data,{type:'array',cellDates:true});
