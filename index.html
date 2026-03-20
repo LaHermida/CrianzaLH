@@ -1159,7 +1159,14 @@ function renderPartos(data){
   }
   const tbody=document.getElementById('partosBody');
   if(!data||!data.length){tbody.innerHTML='<tr><td colspan="28" class="empty">Sin registros.</td></tr>';return;}
-  const sortedData=[...data].sort((a,b)=>parseInt(b.hembra||0)-parseInt(a.hembra||0));
+  const sortedData=[...data].sort((a,b)=>{
+    // First by date descending
+    const fd=new Date(b.fecha_parto+'T12:00:00')-new Date(a.fecha_parto+'T12:00:00');
+    if(fd!==0) return fd;
+    // Then by hembra ascending within same date
+    const ha=parseInt(a.hembra)||0, hb=parseInt(b.hembra)||0;
+    return ha-hb;
+  });
   tbody.innerHTML=sortedData.map(r=>`
     <tr>
       <td class="mono">${fmtFecha(r.fecha_parto)||'—'}</td>
