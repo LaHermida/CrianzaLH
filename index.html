@@ -171,6 +171,10 @@
     <div class="nav-sep"></div>
     <button onclick="showTab('reg-partos',this)">🐄 Registro Partos</button>
     <button onclick="showTab('reg-pesajes',this)">📏 Registro Pesajes</button>
+    <div class="nav-sep"></div>
+    <button onclick="showTab('clin-activas',this)">🏥 Clínica</button>
+    <button onclick="showTab('clin-vacunas',this)">💉 Vacunación</button>
+    <button onclick="showTab('clin-admin',this)">⚙️ Admin Clínico</button>
   </nav>
   <main>
 
@@ -472,6 +476,94 @@
       </div>
     </div>
 
+
+    <!-- ===== CLINICA ACTIVAS ===== -->
+    <div id="tab-clin-activas" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🏥 Becerras en Tratamiento</span>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="openClinEventoModal()">+ Nueva Enfermedad</button>
+        </div>
+      </div>
+      <div class="kpi-group-label">📊 En Tratamiento Activo</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem">
+        <table>
+          <thead><tr>
+            <th>Hembra</th><th>Raza</th><th>Edad</th><th>Protocolo</th>
+            <th>Inicio</th><th>Día</th><th>Medicamentos Hoy</th><th>Comentario</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="clin-activas-body"><tr><td colspan="9" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="kpi-group-label">✅ Altas Recientes</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Hembra</th><th>Protocolo</th><th>Inicio</th><th>Alta</th><th>Días</th><th>Comentario</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="clin-altas-body"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== VACUNACION ===== -->
+    <div id="tab-clin-vacunas" class="hidden">
+      <div class="section-header">
+        <span class="section-title">💉 Vacunación</span>
+        <button class="btn btn-primary" onclick="openVacunaModal()">+ Registrar Vacuna</button>
+      </div>
+      <div class="kpi-group-label">⚠️ Pendientes por Aplicar</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem">
+        <table>
+          <thead><tr>
+            <th>Hembra</th><th>Raza</th><th>Días de Vida</th><th>Vacuna Pendiente</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="vac-pendientes-body"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="kpi-group-label">📋 Historial de Vacunación</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Fecha</th><th>Hembra</th><th>Vacuna</th><th>Lote</th><th>Notas</th><th>Acciones</th>
+          </tr></thead>
+          <tbody id="vac-historial-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ===== ADMIN CLINICO ===== -->
+    <div id="tab-clin-admin" class="hidden">
+      <div class="section-header">
+        <span class="section-title">⚙️ Administración Clínica</span>
+      </div>
+      <!-- Protocolos -->
+      <div class="kpi-group-label">📋 Protocolos de Tratamiento
+        <button class="btn btn-primary btn-sm" onclick="openProtocoloModal()" style="margin-left:1rem">+ Nuevo Protocolo</button>
+      </div>
+      <div id="admin-protocolos-list" style="margin-bottom:1.5rem"></div>
+      <!-- Medicamentos -->
+      <div class="kpi-group-label">💊 Medicamentos
+        <button class="btn btn-primary btn-sm" onclick="openMedModal()" style="margin-left:1rem">+ Nuevo</button>
+      </div>
+      <div class="table-wrap" style="max-width:600px;margin-bottom:1.5rem">
+        <table>
+          <thead><tr><th>Nombre</th><th>Presentación</th><th>Categoría</th><th>Acciones</th></tr></thead>
+          <tbody id="admin-meds-body"><tr><td colspan="4" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+      <!-- Calendario vacunacion -->
+      <div class="kpi-group-label">📅 Calendario de Vacunación
+        <button class="btn btn-primary btn-sm" onclick="openCalVacModal()" style="margin-left:1rem">+ Nueva Vacuna</button>
+      </div>
+      <div class="table-wrap" style="max-width:600px">
+        <table>
+          <thead><tr><th>Días Min</th><th>Días Max</th><th>Vacuna</th><th>Notas</th><th>Acciones</th></tr></thead>
+          <tbody id="admin-calvac-body"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -604,6 +696,8 @@
 <script>
 const SUPABASE_URL = 'https://qlgctjnrndzhvqondjvz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZ2N0am5ybmR6aHZxb25kanZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNjQzNjgsImV4cCI6MjA4Nzc0MDM2OH0._4KqKFG0N_zrS2ovwxpvi5SzQpQcPMK71wGZ3N3Cilo';
+const SUPABASE_CLIN_URL = 'https://glxbmcwpxlgqxudovsdj.supabase.co';
+const SUPABASE_CLIN_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsemJtY3dweGxncXh1ZG92c2RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNjQxNDUsImV4cCI6MjA4Nzc0MDE0NX0.f0NEc-u8ThopFiXauHBq20MGUDiEavuY08x3D1s4LNE';
 const USERS = { 'Admin':{ pass:'lh2024', role:'admin' }, 'Ale@LaHermida':{ pass:'5678', role:'admin' }, 'Captura':{ pass:'crianza1', role:'user' } };
 let currentUser = null;
 let editingId = null;
@@ -637,6 +731,21 @@ window.addEventListener('DOMContentLoaded',()=>{
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginView').style.display!=='none')doLogin();});
 
 // ==================== SUPABASE ====================
+async function sbClin(path,method='GET',body=null){
+  const url=`${SUPABASE_CLIN_URL}/rest/v1/${path}`;
+  const headers={
+    'apikey':SUPABASE_CLIN_KEY,'Authorization':`Bearer ${SUPABASE_CLIN_KEY}`,
+    'Content-Type':'application/json',
+    'Prefer':method==='POST'?'return=representation':'return=minimal'
+  };
+  if(method==='GET') headers['Range']='0-9999';
+  const opts={method,headers};
+  if(body) opts.body=JSON.stringify(body);
+  const res=await fetch(url,opts);
+  if(method==='GET') return res.json();
+  return res;
+}
+
 async function sbFetch(path,method='GET',body=null){
   const url=`${SUPABASE_URL}/rest/v1/${path}`;
   const headers={
@@ -656,7 +765,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','reg-partos','reg-pesajes','inventario'].forEach(t=>{
+  ['dashboard','dash-gdp','reg-partos','reg-pesajes','inventario','clin-activas','clin-vacunas','clin-admin'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -664,6 +773,9 @@ function showTab(tab,btn){
   if(el) el.classList.remove('hidden');
   if(tab==='dashboard') renderDashboard();
   if(tab==='inventario') loadInventario();
+  if(tab==='clin-activas') loadClinActivas();
+  if(tab==='clin-vacunas') loadClinVacunas();
+  if(tab==='clin-admin') loadClinAdmin();
   if(tab==='dash-gdp'){
     const needPesajes=!window._pesajes||!window._pesajes.length;
     const needPartos=!window._partos||!window._partos.length;
@@ -2171,5 +2283,506 @@ async function confirmImport(){
   else await loadPesajes();
 }
 </script>
+
+<!-- MODAL NUEVO EVENTO CLINICO -->
+<div class="modal-overlay" id="clinEventoModal">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <h2>🏥 Nueva Enfermedad</h2>
+      <button class="modal-close" onclick="closeClinEventoModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Hembra (arete) *</label><input type="text" id="clin-evento-hembra"/></div>
+        <div class="form-group"><label>Fecha inicio *</label><input type="date" id="clin-evento-fecha"/></div>
+        <div class="form-group wide"><label>Protocolo *</label>
+          <select id="clin-evento-proto"><option value="">-- Seleccionar --</option><span id="clin-evento-proto-opts"></span></select>
+        </div>
+        <div class="form-group wide"><label>Comentario</label><input type="text" id="clin-evento-comment"/></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:1rem">
+      <button class="btn btn-secondary" onclick="closeClinEventoModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveClinEvento()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO PROTOCOLO -->
+<div class="modal-overlay" id="protocoloModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h2>📋 Nuevo Protocolo</h2>
+      <button class="modal-close" onclick="closeProtocoloModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Nombre *</label><input type="text" id="proto-nombre" placeholder="Ej: Diarrea"/></div>
+      <div class="form-group"><label>Descripción</label><input type="text" id="proto-desc"/></div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:1rem">
+      <button class="btn btn-secondary" onclick="closeProtocoloModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveProtocolo()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NUEVO MEDICAMENTO -->
+<div class="modal-overlay" id="medModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h2>💊 Nuevo Medicamento</h2>
+      <button class="modal-close" onclick="closeMedModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Nombre *</label><input type="text" id="med-nombre"/></div>
+      <div class="form-group"><label>Presentación</label><input type="text" id="med-pres" placeholder="Ej: Frasco 100ml"/></div>
+      <div class="form-group"><label>Categoría</label><input type="text" id="med-cat" placeholder="Ej: Antibiótico"/></div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:1rem">
+      <button class="btn btn-secondary" onclick="closeMedModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveMed()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CALENDARIO VACUNACION -->
+<div class="modal-overlay" id="calVacModal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h2>📅 Nueva Vacuna en Calendario</h2>
+      <button class="modal-close" onclick="closeCalVacModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Vacuna *</label><input type="text" id="calvac-vacuna"/></div>
+        <div class="form-group"><label>Días min *</label><input type="number" id="calvac-min"/></div>
+        <div class="form-group"><label>Días max *</label><input type="number" id="calvac-max"/></div>
+        <div class="form-group wide"><label>Notas</label><input type="text" id="calvac-notas"/></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:1rem">
+      <button class="btn btn-secondary" onclick="closeCalVacModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCalVac()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL REGISTRAR VACUNA -->
+<div class="modal-overlay" id="vacunaModal">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-header">
+      <h2>💉 Registrar Vacuna</h2>
+      <button class="modal-close" onclick="closeVacunaModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="form-group"><label>Hembra *</label><input type="text" id="vac-hembra"/></div>
+        <div class="form-group"><label>Fecha *</label><input type="date" id="vac-fecha"/></div>
+        <div class="form-group wide"><label>Vacuna *</label><input type="text" id="vac-vacuna"/></div>
+        <div class="form-group"><label>Lote</label><input type="text" id="vac-lote"/></div>
+        <div class="form-group wide"><label>Notas</label><input type="text" id="vac-notas"/></div>
+      </div>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:1rem">
+      <button class="btn btn-secondary" onclick="closeVacunaModal()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveVacuna()">Guardar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
+<script>
+// ==================== CLINICAL MODULE ====================
+
+// ---- DATA LOAD ----
+async function loadClinActivas(){
+  const [eventos, protocolos, partos] = await Promise.all([
+    sbClin('clin_eventos?order=fecha_inicio.desc&limit=500'),
+    sbClin('clin_protocolos?order=nombre.asc'),
+    sbFetch('partos_crianza?order=fecha_parto.asc&limit=10000')
+  ]);
+  window._clinEventos = eventos||[];
+  window._clinProtocolos = protocolos||[];
+  window._clinPartos = partos||[];
+  renderClinActivas();
+}
+
+async function loadClinVacunas(){
+  const [calendario, aplicadas, partos] = await Promise.all([
+    sbClin('clin_vacunas_calendario?order=dias_min.asc'),
+    sbClin('clin_vacunas_aplicadas?order=fecha.desc&limit=500'),
+    sbFetch('partos_crianza?sexo=eq.H&order=fecha_parto.asc&limit=10000')
+  ]);
+  window._clinCalendario = calendario||[];
+  window._clinVacAplicadas = aplicadas||[];
+  window._clinPartosH = partos||[];
+  renderVacPendientes();
+  renderVacHistorial();
+}
+
+async function loadClinAdmin(){
+  const [protocolos, dias, meds, calendario] = await Promise.all([
+    sbClin('clin_protocolos?order=nombre.asc'),
+    sbClin('clin_protocolo_dias?order=protocolo_id.asc,dia.asc'),
+    sbClin('clin_medicamentos?order=nombre.asc'),
+    sbClin('clin_vacunas_calendario?order=dias_min.asc')
+  ]);
+  window._clinProtocolos = protocolos||[];
+  window._clinProtocoloDias = dias||[];
+  window._clinMeds = meds||[];
+  window._clinCalendario = calendario||[];
+  renderAdminProtocolos();
+  renderAdminMeds();
+  renderAdminCalVac();
+}
+
+// ---- RENDER ACTIVAS ----
+function renderClinActivas(){
+  const hoy = new Date();
+  const partoMap = {};
+  (window._clinPartos||[]).forEach(p=>{ if(p.hembra) partoMap[p.hembra]=p; });
+  const protoMap = {};
+  (window._clinProtocolos||[]).forEach(p=>{ protoMap[p.id]=p; });
+
+  const activas = (window._clinEventos||[]).filter(e=>!e.fecha_alta);
+  const altas = (window._clinEventos||[]).filter(e=>e.fecha_alta).slice(0,20);
+
+  // Activas
+  const activasBody = document.getElementById('clin-activas-body');
+  if(!activas.length){
+    activasBody.innerHTML='<tr><td colspan="9" class="empty">Sin becerras en tratamiento.</td></tr>';
+  } else {
+    activasBody.innerHTML = activas.map(e=>{
+      const parto = partoMap[e.hembra];
+      const proto = protoMap[e.protocolo_id];
+      const nac = parto ? new Date(parto.fecha_parto+'T12:00:00') : null;
+      const edad = nac ? Math.floor((hoy-nac)/86400000) : '—';
+      const inicio = new Date(e.fecha_inicio+'T12:00:00');
+      const diaNum = Math.floor((hoy-inicio)/86400000)+1;
+      const meds = (window._clinProtocoloDias||[])
+        .filter(d=>d.protocolo_id===e.protocolo_id && d.dia===diaNum)
+        .map(d=>d.medicamento+(d.dosis?' '+d.dosis:''))
+        .join(', ') || (diaNum > (proto?.duracion_dias||4) ? '✅ Protocolo terminado' : '—');
+      return `<tr>
+        <td class="mono" style="font-weight:600">${e.hembra}</td>
+        <td class="mono">${parto?.raza||'—'}</td>
+        <td class="mono">${edad}d</td>
+        <td>${proto?.nombre||'—'}</td>
+        <td class="mono">${fmtFecha(e.fecha_inicio)}</td>
+        <td class="mono" style="text-align:center;font-weight:600">Día ${diaNum}</td>
+        <td style="font-size:.82rem">${meds}</td>
+        <td style="font-size:.82rem">${e.comentario||'—'}</td>
+        <td>
+          <button class="btn btn-secondary btn-sm" onclick="darAlta(${e.id})">Alta</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteClinEvento(${e.id})">🗑</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Altas
+  const altasBody = document.getElementById('clin-altas-body');
+  if(!altas.length){
+    altasBody.innerHTML='<tr><td colspan="7" class="empty">Sin altas recientes.</td></tr>';
+  } else {
+    altasBody.innerHTML = altas.map(e=>{
+      const proto = protoMap[e.protocolo_id];
+      const inicio = new Date(e.fecha_inicio+'T12:00:00');
+      const alta = new Date(e.fecha_alta+'T12:00:00');
+      const dias = Math.floor((alta-inicio)/86400000)+1;
+      return `<tr>
+        <td class="mono" style="font-weight:600">${e.hembra}</td>
+        <td>${proto?.nombre||'—'}</td>
+        <td class="mono">${fmtFecha(e.fecha_inicio)}</td>
+        <td class="mono">${fmtFecha(e.fecha_alta)}</td>
+        <td class="mono" style="text-align:center">${dias}d</td>
+        <td style="font-size:.82rem">${e.comentario||'—'}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteClinEvento(${e.id})">🗑</button></td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ---- RENDER VACUNAS ----
+function renderVacPendientes(){
+  const hoy = new Date();
+  const aplicadasMap = {};
+  (window._clinVacAplicadas||[]).forEach(v=>{
+    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]=[];
+    aplicadasMap[v.hembra].push(v.vacuna);
+  });
+  const calendario = window._clinCalendario||[];
+  const pendientes = [];
+  (window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)).forEach(p=>{
+    const nac = new Date(p.fecha_parto+'T12:00:00');
+    const dias = Math.floor((hoy-nac)/86400000);
+    const aplicadas = aplicadasMap[p.hembra]||[];
+    calendario.forEach(cal=>{
+      if(dias>=cal.dias_min && dias<=cal.dias_max && !aplicadas.includes(cal.vacuna)){
+        pendientes.push({hembra:p.hembra, raza:p.raza, dias, vacuna:cal.vacuna});
+      }
+    });
+  });
+  const tbody = document.getElementById('vac-pendientes-body');
+  if(!pendientes.length){
+    tbody.innerHTML='<tr><td colspan="5" class="empty">Sin vacunas pendientes.</td></tr>';
+  } else {
+    tbody.innerHTML = pendientes.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>`<tr>
+      <td class="mono" style="font-weight:600">${p.hembra}</td>
+      <td class="mono">${p.raza||'—'}</td>
+      <td class="mono">${p.dias}d</td>
+      <td style="font-weight:600;color:#c77800">${p.vacuna}</td>
+      <td><button class="btn btn-primary btn-sm" onclick="aplicarVacunaRapida('${p.hembra}','${p.vacuna}')">Aplicar</button></td>
+    </tr>`).join('');
+  }
+}
+
+function renderVacHistorial(){
+  const tbody = document.getElementById('vac-historial-body');
+  const aplicadas = window._clinVacAplicadas||[];
+  if(!aplicadas.length){
+    tbody.innerHTML='<tr><td colspan="6" class="empty">Sin vacunas registradas.</td></tr>';
+  } else {
+    tbody.innerHTML = aplicadas.map(v=>`<tr>
+      <td class="mono">${fmtFecha(v.fecha)}</td>
+      <td class="mono" style="font-weight:600">${v.hembra}</td>
+      <td>${v.vacuna}</td>
+      <td class="mono">${v.lote||'—'}</td>
+      <td style="font-size:.82rem">${v.notas||'—'}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="deleteVacuna(${v.id})">🗑</button></td>
+    </tr>`).join('');
+  }
+}
+
+// ---- RENDER ADMIN ----
+function renderAdminProtocolos(){
+  const container = document.getElementById('admin-protocolos-list');
+  const protocolos = window._clinProtocolos||[];
+  const dias = window._clinProtocoloDias||[];
+  if(!protocolos.length){
+    container.innerHTML='<p style="color:var(--text-muted)">Sin protocolos. Agrega uno.</p>';
+    return;
+  }
+  container.innerHTML = protocolos.map(p=>{
+    const pDias = dias.filter(d=>d.protocolo_id===p.id).sort((a,b)=>a.dia-b.dia);
+    const maxDia = pDias.length ? Math.max(...pDias.map(d=>d.dia)) : 0;
+    let diasHtml = '';
+    for(let i=1;i<=maxDia;i++){
+      const meds = pDias.filter(d=>d.dia===i).map(d=>`${d.medicamento} ${d.dosis||''}`).join(', ');
+      diasHtml += `<tr><td style="padding:.3rem .5rem;font-weight:600">Día ${i}</td><td style="padding:.3rem .5rem">${meds||'—'}</td>
+        <td style="padding:.3rem .5rem"><button class="btn btn-secondary btn-sm" onclick="editProtoDia(${p.id},${i})">Editar</button></td></tr>`;
+    }
+    return `<div style="border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;max-width:700px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <strong style="font-size:1rem">${p.nombre}</strong>
+        <div style="display:flex;gap:.5rem">
+          <button class="btn btn-primary btn-sm" onclick="addProtoDia(${p.id})">+ Día</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProtocolo(${p.id})">🗑</button>
+        </div>
+      </div>
+      ${p.descripcion?`<p style="font-size:.85rem;color:var(--text-muted);margin-bottom:.5rem">${p.descripcion}</p>`:''}
+      <table style="width:100%;font-size:.85rem"><tbody>${diasHtml}</tbody></table>
+    </div>`;
+  }).join('');
+}
+
+function renderAdminMeds(){
+  const tbody = document.getElementById('admin-meds-body');
+  const meds = window._clinMeds||[];
+  if(!meds.length){tbody.innerHTML='<tr><td colspan="4" class="empty">Sin medicamentos.</td></tr>';return;}
+  tbody.innerHTML = meds.map(m=>`<tr>
+    <td style="font-weight:600">${m.nombre}</td>
+    <td>${m.presentacion||'—'}</td>
+    <td>${m.categoria||'—'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteMed(${m.id})">🗑</button></td>
+  </tr>`).join('');
+}
+
+function renderAdminCalVac(){
+  const tbody = document.getElementById('admin-calvac-body');
+  const cal = window._clinCalendario||[];
+  if(!cal.length){tbody.innerHTML='<tr><td colspan="5" class="empty">Sin calendario.</td></tr>';return;}
+  tbody.innerHTML = cal.map(c=>`<tr>
+    <td class="mono">${c.dias_min}</td>
+    <td class="mono">${c.dias_max}</td>
+    <td style="font-weight:600">${c.vacuna}</td>
+    <td style="font-size:.82rem">${c.notas||'—'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteCalVac(${c.id})">🗑</button></td>
+  </tr>`).join('');
+}
+
+// ---- ACTIONS ----
+async function darAlta(id){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  const fecha = prompt('Fecha de alta (DD/MM/YYYY):');
+  if(!fecha) return;
+  const iso = ddmmToISO(fecha);
+  if(!iso){alert('Fecha inválida');return;}
+  await sbClin(`clin_eventos?id=eq.${id}`,'PATCH',{fecha_alta:iso});
+  await loadClinActivas();
+}
+
+async function deleteClinEvento(id){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  if(!confirm('¿Eliminar este registro?')) return;
+  await sbClin(`clin_eventos?id=eq.${id}`,'DELETE');
+  await loadClinActivas();
+}
+
+async function deleteVacuna(id){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  if(!confirm('¿Eliminar?')) return;
+  await sbClin(`clin_vacunas_aplicadas?id=eq.${id}`,'DELETE');
+  await loadClinVacunas();
+}
+
+async function aplicarVacunaRapida(hembra, vacuna){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  const hoy = new Date().toISOString().slice(0,10);
+  await sbClin('clin_vacunas_aplicadas','POST',{hembra, vacuna, fecha:hoy});
+  await loadClinVacunas();
+}
+
+async function deleteProtocolo(id){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  if(!confirm('¿Eliminar protocolo y todos sus días?')) return;
+  await sbClin(`clin_protocolo_dias?protocolo_id=eq.${id}`,'DELETE');
+  await sbClin(`clin_protocolos?id=eq.${id}`,'DELETE');
+  await loadClinAdmin();
+}
+
+async function deleteMed(id){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  await sbClin(`clin_medicamentos?id=eq.${id}`,'DELETE');
+  await loadClinAdmin();
+}
+
+async function deleteCalVac(id){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  await sbClin(`clin_vacunas_calendario?id=eq.${id}`,'DELETE');
+  await loadClinAdmin();
+}
+
+// ---- MODALS ----
+function openClinEventoModal(){
+  const protos = window._clinProtocolos||[];
+  const opts = protos.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
+  document.getElementById('clin-evento-proto-opts').innerHTML = opts;
+  document.getElementById('clin-evento-fecha').value = '';
+  document.getElementById('clin-evento-hembra').value = '';
+  document.getElementById('clin-evento-comment').value = '';
+  document.getElementById('clinEventoModal').classList.add('open');
+}
+function closeClinEventoModal(){ document.getElementById('clinEventoModal').classList.remove('open'); }
+
+async function saveClinEvento(){
+  const hembra = document.getElementById('clin-evento-hembra').value.trim();
+  const fecha_raw = document.getElementById('clin-evento-fecha').value;
+  const proto_id = parseInt(document.getElementById('clin-evento-proto').value);
+  const comentario = document.getElementById('clin-evento-comment').value;
+  if(!hembra||!fecha_raw||!proto_id){alert('Hembra, fecha y protocolo son obligatorios');return;}
+  const fecha_inicio = ddmmToISO(fecha_raw)||fecha_raw;
+  await sbClin('clin_eventos','POST',{hembra, protocolo_id:proto_id, fecha_inicio, comentario:comentario||null});
+  closeClinEventoModal();
+  await loadClinActivas();
+}
+
+function openProtocoloModal(){
+  document.getElementById('proto-nombre').value='';
+  document.getElementById('proto-desc').value='';
+  document.getElementById('protocoloModal').classList.add('open');
+}
+function closeProtocoloModal(){ document.getElementById('protocoloModal').classList.remove('open'); }
+
+async function saveProtocolo(){
+  const nombre = document.getElementById('proto-nombre').value.trim();
+  if(!nombre){alert('Nombre requerido');return;}
+  const desc = document.getElementById('proto-desc').value;
+  await sbClin('clin_protocolos','POST',{nombre, descripcion:desc||null});
+  closeProtocoloModal();
+  await loadClinAdmin();
+}
+
+function openMedModal(){
+  document.getElementById('med-nombre').value='';
+  document.getElementById('med-pres').value='';
+  document.getElementById('med-cat').value='';
+  document.getElementById('medModal').classList.add('open');
+}
+function closeMedModal(){ document.getElementById('medModal').classList.remove('open'); }
+
+async function saveMed(){
+  const nombre = document.getElementById('med-nombre').value.trim();
+  if(!nombre){alert('Nombre requerido');return;}
+  await sbClin('clin_medicamentos','POST',{nombre, presentacion:document.getElementById('med-pres').value||null, categoria:document.getElementById('med-cat').value||null});
+  closeMedModal();
+  await loadClinAdmin();
+}
+
+function openCalVacModal(){
+  document.getElementById('calvac-vacuna').value='';
+  document.getElementById('calvac-min').value='';
+  document.getElementById('calvac-max').value='';
+  document.getElementById('calvac-notas').value='';
+  document.getElementById('calVacModal').classList.add('open');
+}
+function closeCalVacModal(){ document.getElementById('calVacModal').classList.remove('open'); }
+
+async function saveCalVac(){
+  const vacuna = document.getElementById('calvac-vacuna').value.trim();
+  const dias_min = parseInt(document.getElementById('calvac-min').value);
+  const dias_max = parseInt(document.getElementById('calvac-max').value);
+  if(!vacuna||!dias_min||!dias_max){alert('Todos los campos son requeridos');return;}
+  await sbClin('clin_vacunas_calendario','POST',{vacuna, dias_min, dias_max, notas:document.getElementById('calvac-notas').value||null});
+  closeCalVacModal();
+  await loadClinAdmin();
+}
+
+function openVacunaModal(){
+  document.getElementById('vac-hembra').value='';
+  document.getElementById('vac-vacuna').value='';
+  document.getElementById('vac-fecha').value='';
+  document.getElementById('vac-lote').value='';
+  document.getElementById('vac-notas').value='';
+  document.getElementById('vacunaModal').classList.add('open');
+}
+function closeVacunaModal(){ document.getElementById('vacunaModal').classList.remove('open'); }
+
+async function saveVacuna(){
+  const hembra = document.getElementById('vac-hembra').value.trim();
+  const vacuna = document.getElementById('vac-vacuna').value.trim();
+  const fecha_raw = document.getElementById('vac-fecha').value;
+  if(!hembra||!vacuna||!fecha_raw){alert('Hembra, vacuna y fecha son obligatorios');return;}
+  const fecha = ddmmToISO(fecha_raw)||fecha_raw;
+  await sbClin('clin_vacunas_aplicadas','POST',{hembra, vacuna, fecha, lote:document.getElementById('vac-lote').value||null, notas:document.getElementById('vac-notas').value||null});
+  closeVacunaModal();
+  await loadClinVacunas();
+}
+
+async function addProtoDia(protocolo_id){
+  const dia = prompt('¿Qué día del protocolo?');
+  if(!dia) return;
+  const med = prompt('Medicamento:');
+  if(!med) return;
+  const dosis = prompt('Dosis:');
+  const via = prompt('Vía (opcional):');
+  await sbClin('clin_protocolo_dias','POST',{protocolo_id, dia:parseInt(dia), medicamento:med, dosis:dosis||null, via:via||null});
+  await loadClinAdmin();
+}
+
+async function editProtoDia(protocolo_id, dia){
+  const existing = (window._clinProtocoloDias||[]).filter(d=>d.protocolo_id===protocolo_id&&d.dia===dia);
+  // Delete existing and re-add
+  for(const d of existing){
+    await sbClin(`clin_protocolo_dias?id=eq.${d.id}`,'DELETE');
+  }
+  const cuantos = parseInt(prompt(`¿Cuántos medicamentos para el día ${dia}?`,'1'));
+  for(let i=0;i<cuantos;i++){
+    const med = prompt(`Medicamento ${i+1}:`);
+    if(!med) continue;
+    const dosis = prompt(`Dosis ${i+1}:`);
+    await sbClin('clin_protocolo_dias','POST',{protocolo_id, dia, medicamento:med, dosis:dosis||null});
+  }
+  await loadClinAdmin();
+}
+</script>
