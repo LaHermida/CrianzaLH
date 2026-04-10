@@ -482,6 +482,8 @@
       <div class="section-header">
         <span class="section-title">🏥 Becerras en Tratamiento</span>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="document.getElementById('importClinicaFile').click()">📥 Importar Clínica</button>
+          <input type="file" id="importClinicaFile" accept=".xlsx,.xls" class="hidden" onchange="importClinica(event)"/>
           <button class="btn btn-primary" onclick="openClinEventoModal()">+ Nueva Enfermedad</button>
         </div>
       </div>
@@ -510,7 +512,11 @@
     <div id="tab-clin-vacunas" class="hidden">
       <div class="section-header">
         <span class="section-title">💉 Vacunación</span>
-        <button class="btn btn-primary" onclick="openVacunaModal()">+ Registrar Vacuna</button>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="document.getElementById('importVacunasFile').click()">📥 Importar Vacunas</button>
+          <input type="file" id="importVacunasFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importVacunas(event)"/>
+          <button class="btn btn-primary" onclick="openVacunaModal()">+ Registrar Vacuna</button>
+        </div>
       </div>
       <div class="kpi-group-label">⚠️ Pendientes por Aplicar</div>
       <div class="table-wrap" style="margin-bottom:1.5rem">
@@ -2394,7 +2400,103 @@ async function confirmImport(){
 </body>
 </html>
 <script>
-// ==================== CLINICAL MODULE ====================
+// ==================== CLINICAL MODULE ==
+
+// ---- IMPORT CLINICA (Enfermas + Altas) ----
+async function importClinica(event){
+  if(!await checkPass()){alert('Contraseña incorrecta');event.target.value='';return;}
+  const file=event.target.files[0];if(!file)return;event.target.value='';
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array',cellDates:true});
+  
+  let okEnfermas=0, okAltas=0, errores=0;
+  const protoMap={};
+  (window._clinProtocolos||[]).forEach(p=>{ protoMap[p.nombre.toLowerCase()]=p.id; });
+
+  // Hoja Enfermas
+  if(wb.SheetNames.includes('Enfermas')||wb.SheetNames.includes('enfermas')){
+    const wsName=wb.SheetNames.find(n=>n.toLowerCase()==='enfermas');
+    const ws=wb.Sheets[wsName];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+    for(let i=1;i<rows.length;i++){
+      const row=rows[i];
+      if(!row[0]||!row[1]||!row[2]) continue;
+      const hembra=String(row[0]).trim();
+      const fecha=excelDateToISO(row[1]);
+      const protoNombre=String(row[2]).trim().toLowerCase();
+      const comentario=row[3]?String(row[3]).trim():null;
+      const protocolo_id=protoMap[protoNombre];
+      if(!fecha||!protocolo_id) continue;
+      const res=await sbClin('clin_eventos','POST',{hembra, fecha_inicio:fecha, protocolo_id, comentario});
+      if(res&&!res.error) okEnfermas++; else errores++;
+    }
+  }
+
+  // Hoja Altas
+  if(wb.SheetNames.find(n=>n.toLowerCase()==='altas')){
+    const wsName=wb.SheetNames.find(n=>n.toLowerCase()==='altas');
+    const ws=wb.Sheets[wsName];
+    const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+    for(let i=1;i<rows.length;i++){
+      const row=rows[i];
+      if(!row[0]||!row[1]) continue;
+      const hembra=String(row[0]).trim();
+      const fecha_alta=excelDateToISO(row[1]);
+      const comentario=row[2]?String(row[2]).trim():null;
+      if(!fecha_alta) continue;
+      // Find open evento for this hembra
+      const eventos=await sbClin(`clin_eventos?hembra=eq.${hembra}&fecha_alta=is.null&order=fecha_inicio.desc&limit=1`);
+      if(eventos&&eventos.length){
+        const res=await sbClin(`clin_eventos?id=eq.${eventos[0].id}`,'PATCH',{fecha_alta, comentario:comentario||eventos[0].comentario});
+        if(res&&!res.error) okAltas++; else errores++;
+      }
+    }
+  }
+
+  alert(`Enfermas importadas: ${okEnfermas} | Altas: ${okAltas}${errores?' | Errores: '+errores:''}`);
+  await loadClinActivas();
+}
+
+// ---- IMPORT VACUNAS ----
+async function importVacunas(event){
+  if(!await checkPass()){alert('Contraseña incorrecta');event.target.value='';return;}
+  const file=event.target.files[0];if(!file)return;event.target.value='';
+  
+  let rows=[];
+  if(file.name.toLowerCase().endsWith('.csv')){
+    const buf=await file.arrayBuffer();
+    let text;
+    try{text=new TextDecoder('iso-8859-1').decode(buf);}catch(e){text=new TextDecoder('utf-8').decode(buf);}
+    const lines=text.split(/
+?
+/).filter(l=>l.trim());
+    const delim=lines[0].includes(';')?';':',';
+    const headers=lines[0].split(delim);
+    rows=lines.slice(1).map(line=>line.split(delim));
+  } else {
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const arr=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+    rows=arr.slice(1);
+  }
+
+  let ok=0, err=0;
+  for(const row of rows){
+    if(!row[0]||!row[1]||!row[2]) continue;
+    const hembra=String(row[0]).trim();
+    const fecha=excelDateToISO(row[1]);
+    const vacuna=String(row[2]).trim();
+    const notas=row[3]?String(row[3]).trim():null;
+    if(!fecha||!/^\d+$/.test(hembra)) continue;
+    const res=await sbClin('clin_vacunas_aplicadas','POST',{hembra, fecha, vacuna, notas});
+    if(res&&!res.error) ok++; else err++;
+  }
+  alert(`Vacunas importadas: ${ok}${err?' | Errores: '+err:''}`);
+  await loadClinVacunas();
+}
+
+==================
 
 // ---- DATA LOAD ----
 async function loadClinActivas(){
