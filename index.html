@@ -696,8 +696,7 @@
 <script>
 const SUPABASE_URL = 'https://qlgctjnrndzhvqondjvz.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFsZ2N0am5ybmR6aHZxb25kanZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNjQzNjgsImV4cCI6MjA4Nzc0MDM2OH0._4KqKFG0N_zrS2ovwxpvi5SzQpQcPMK71wGZ3N3Cilo';
-const SUPABASE_CLIN_URL = 'https://glxbmcwpxlgqxudovsdj.supabase.co';
-const SUPABASE_CLIN_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsemJtY3dweGxncXh1ZG92c2RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNjQxNDUsImV4cCI6MjA4Nzc0MDE0NX0.f0NEc-u8ThopFiXauHBq20MGUDiEavuY08x3D1s4LNE';
+
 const USERS = { 'Admin':{ pass:'lh2024', role:'admin' }, 'Ale@LaHermida':{ pass:'5678', role:'admin' }, 'Captura':{ pass:'crianza1', role:'user' } };
 let currentUser = null;
 let editingId = null;
@@ -731,6 +730,9 @@ window.addEventListener('DOMContentLoaded',()=>{
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginView').style.display!=='none')doLogin();});
 
 // ==================== SUPABASE ====================
+const SUPABASE_CLIN_URL = 'https://glxbmcwpxlgqxudovsdj.supabase.co';
+const SUPABASE_CLIN_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdsemJtY3dweGxncXh1ZG92c2RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIxNjQxNDUsImV4cCI6MjA4Nzc0MDE0NX0.f0NEc-u8ThopFiXauHBq20MGUDiEavuY08x3D1s4LNE';
+
 async function sbClin(path,method='GET',body=null){
   const url=`${SUPABASE_CLIN_URL}/rest/v1/${path}`;
   const headers={
