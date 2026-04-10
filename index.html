@@ -2113,7 +2113,7 @@ async function readFile(file){
     const buf=await file.arrayBuffer();
     let text;
     try{text=new TextDecoder('iso-8859-1').decode(buf);}catch(e){text=new TextDecoder('utf-8').decode(buf);}
-    const lines=text.split(/\r?\n/).filter(l=>l.trim());
+    const lines=text.split('\n').filter(l=>l.trim());
     if(!lines.length) return [];
     const firstLine=lines[0];
     const delim=(firstLine.split(';').length>firstLine.split(',').length)?';':',';
@@ -2467,9 +2467,7 @@ async function importVacunas(event){
     const buf=await file.arrayBuffer();
     let text;
     try{text=new TextDecoder('iso-8859-1').decode(buf);}catch(e){text=new TextDecoder('utf-8').decode(buf);}
-    const lines=text.split(/
-?
-/).filter(l=>l.trim());
+    const lines=text.split('\n').filter(l=>l.trim());
     const delim=lines[0].includes(';')?';':',';
     const headers=lines[0].split(delim);
     rows=lines.slice(1).map(line=>line.split(delim));
