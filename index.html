@@ -2494,10 +2494,11 @@ async function loadClinActivas(){
 }
 
 async function loadClinVacunas(){
-  const [calendario, partosH, todosPartos] = await Promise.all([
+  const [calendario, partosH, todosPartos, salidas] = await Promise.all([
     sbClin('clin_vacunas_calendario?order=dias_min.asc'),
     sbFetch('partos_crianza?sexo=eq.H&order=fecha_parto.asc&limit=10000'),
-    sbFetch('partos_crianza?select=madre_vaca,madre_vaquilla&limit=10000')
+    sbFetch('partos_crianza?select=madre_vaca,madre_vaquilla&limit=10000'),
+    sbFetch('salidas_crianza?select=hembra&limit=10000')
   ]);
   // Paginate aplicadas (Supabase default max 1000 rows)
   let aplicadas=[], offset=0;
@@ -2511,13 +2512,19 @@ async function loadClinVacunas(){
   window._clinCalendario = calendario||[];
   window._clinVacAplicadas = aplicadas;
   window._clinPartosH = partosH||[];
-  // Build set of hembras that are already mothers (already gave birth)
+  // Build set of hembras that are already mothers
   const madres = new Set();
   (todosPartos||[]).forEach(p=>{
     if(p.madre_vaca) madres.add(String(p.madre_vaca).trim());
     if(p.madre_vaquilla) madres.add(String(p.madre_vaquilla).trim());
   });
   window._clinMadresSet = madres;
+  // Build set of hembras with salida (muertas, vendidas, descarte)
+  const salidaSet = new Set();
+  (salidas||[]).forEach(s=>{
+    if(s.hembra) salidaSet.add(String(s.hembra).trim());
+  });
+  window._clinSalidaSet = salidaSet;
   renderVacunasPorTipo();
 }
 
@@ -2623,7 +2630,8 @@ function renderVacunasPorTipo(){
 
   const calendario = window._clinCalendario||[];
   const madres = window._clinMadresSet||new Set();
-  const partos = (window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&p.hembra!=='MTA'&&p.hembra!=='ABORTO'&&!madres.has(p.hembra));
+  const salidaSet = window._clinSalidaSet||new Set();
+  const partos = (window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&p.hembra!=='MTA'&&p.hembra!=='ABORTO'&&!madres.has(p.hembra)&&!salidaSet.has(p.hembra));
 
   // Build per-vaccine data
   const vacMap = {};
