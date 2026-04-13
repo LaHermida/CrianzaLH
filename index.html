@@ -2639,14 +2639,11 @@ function renderVacunasPorTipo(){
     calendario.forEach(cal=>{
       if(!vacMap[cal.vacuna]) return;
       const yaAplicada = aplicadas.has(cal.vacuna);
-      const enRango = dias>=cal.dias_min && dias<=cal.dias_max;
-      const vencida = dias>cal.dias_max && !yaAplicada;
+      const elegible = dias>=cal.dias_min;
       if(yaAplicada){
         vacMap[cal.vacuna].aplicadas.push({hembra:p.hembra, raza:p.raza, dias});
-      } else if(enRango){
+      } else if(elegible){
         vacMap[cal.vacuna].pendientes.push({hembra:p.hembra, raza:p.raza, dias});
-      } else if(vencida){
-        vacMap[cal.vacuna].vencidas.push({hembra:p.hembra, raza:p.raza, dias});
       }
     });
   });
@@ -2655,7 +2652,7 @@ function renderVacunasPorTipo(){
   if(!container) return;
 
   container.innerHTML = Object.entries(vacMap).map(([vacuna, data])=>{
-    const total = data.aplicadas.length + data.pendientes.length + data.vencidas.length;
+    const total = data.aplicadas.length + data.pendientes.length;
     const pct = total ? Math.round(data.aplicadas.length/total*100) : 0;
     const btnId = 'vbtn-'+vacuna.replace(/[^a-z0-9]/gi,'_');
     const tblId = 'vtbl-'+vacuna.replace(/[^a-z0-9]/gi,'_');
@@ -2669,15 +2666,6 @@ function renderVacunasPorTipo(){
       '<td><button class="btn btn-primary btn-sm" onclick="aplicarVacunaRapida(&quot;'+p.hembra+'&quot;,&quot;'+vacuna+'&quot;)">Aplicar</button></td></tr>'
     ).join('');
 
-    const vencRow = data.vencidas.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>
-      '<tr style="background:#fff0f0">'+
-      '<td class="mono" style="font-weight:600">'+p.hembra+'</td>'+
-      '<td class="mono">'+p.raza+'</td>'+
-      '<td class="mono">'+p.dias+'d</td>'+
-      '<td style="color:#c62828;font-weight:600">Vencida</td>'+
-      '<td><button class="btn btn-primary btn-sm" onclick="aplicarVacunaRapida(&quot;'+p.hembra+'&quot;,&quot;'+vacuna+'&quot;)">Aplicar</button></td></tr>'
-    ).join('');
-
     const aplRow = data.aplicadas.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>
       '<tr>'+
       '<td class="mono" style="font-weight:600">'+p.hembra+'</td>'+
@@ -2687,8 +2675,6 @@ function renderVacunasPorTipo(){
       '<td></td></tr>'
     ).join('');
 
-    const color = data.pendientes.length>0?'#c77800':data.vencidas.length>0?'#c62828':'#2d6a4f';
-
     return '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.8rem">'+
       '<button id="'+btnId+'" onclick="toggleVacTipo(&quot;'+btnId+'&quot;,&quot;'+tblId+'&quot;)" '+
       'style="width:100%;background:var(--accent);color:white;border:none;border-radius:8px 8px 0 0;padding:.7rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">'+
@@ -2696,12 +2682,11 @@ function renderVacunasPorTipo(){
       '<span style="display:flex;gap:1rem;font-size:.82rem">'+
       '<span style="color:#90ee90">✅ '+data.aplicadas.length+'</span>'+
       (data.pendientes.length?'<span style="color:#ffd700">⏰ '+data.pendientes.length+' pendientes</span>':'')+
-      (data.vencidas.length?'<span style="color:#ff6b6b">⚠️ '+data.vencidas.length+' vencidas</span>':'')+
       '<span>▼</span></span></button>'+
       '<div id="'+tblId+'" style="display:none">'+
       '<table style="width:100%;font-size:.83rem">'+
       '<thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Estado</th><th>Acción</th></tr></thead>'+
-      '<tbody>'+pendRow+vencRow+aplRow+'</tbody></table></div></div>';
+      '<tbody>'+pendRow+aplRow+'</tbody></table></div></div>';
   }).join('');
 }
 
