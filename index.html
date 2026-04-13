@@ -2496,7 +2496,7 @@ async function loadClinActivas(){
 async function loadClinVacunas(){
   const [calendario, aplicadas, partos] = await Promise.all([
     sbClin('clin_vacunas_calendario?order=dias_min.asc'),
-    sbClin('clin_vacunas_aplicadas?order=fecha.desc&limit=500'),
+    sbClin('clin_vacunas_aplicadas?order=fecha.desc&limit=10000'),
     sbFetch('partos_crianza?sexo=eq.H&order=fecha_parto.asc&limit=10000')
   ]);
   window._clinCalendario = calendario||[];
@@ -2674,7 +2674,7 @@ function renderVacunasPorTipo(){
 
     return '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.8rem">'+
       '<button id="'+btnId+'" onclick="toggleVacTipo(&quot;'+btnId+'&quot;,&quot;'+tblId+'&quot;)" '+
-      'style="width:100%;background:var(--header-bg);color:white;border:none;border-radius:8px 8px 0 0;padding:.7rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">'+
+      'style="width:100%;background:var(--accent);color:white;border:none;border-radius:8px 8px 0 0;padding:.7rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">'+
       '<span style="font-weight:600">'+vacuna+'</span>'+
       '<span style="display:flex;gap:1rem;font-size:.82rem">'+
       '<span style="color:#90ee90">✅ '+data.aplicadas.length+'</span>'+
@@ -2683,7 +2683,7 @@ function renderVacunasPorTipo(){
       '<span>▼</span></span></button>'+
       '<div id="'+tblId+'" style="display:none">'+
       '<table style="width:100%;font-size:.83rem">'+
-      '<thead><tr style="background:var(--table-header-bg)"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Estado</th><th>Acción</th></tr></thead>'+
+      '<thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Estado</th><th>Acción</th></tr></thead>'+
       '<tbody>'+pendRow+vencRow+aplRow+'</tbody></table></div></div>';
   }).join('');
 }
