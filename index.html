@@ -518,23 +518,9 @@
           <button class="btn btn-primary" onclick="openVacunaModal()">+ Registrar Vacuna</button>
         </div>
       </div>
-      <div class="kpi-group-label">⚠️ Pendientes por Aplicar</div>
-      <div class="table-wrap" style="margin-bottom:1.5rem">
-        <table>
-          <thead><tr>
-            <th>Hembra</th><th>Raza</th><th>Días de Vida</th><th>Vacuna Pendiente</th><th>Acciones</th>
-          </tr></thead>
-          <tbody id="vac-pendientes-body"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
-        </table>
-      </div>
-      <div class="kpi-group-label">📋 Historial de Vacunación</div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>Fecha</th><th>Hembra</th><th>Vacuna</th><th>Lote</th><th>Notas</th><th>Acciones</th>
-          </tr></thead>
-          <tbody id="vac-historial-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
-        </table>
+      <div class="kpi-group-label">💉 Vacunas por Tipo</div>
+      <div id="vac-por-tipo-container" style="margin-bottom:1.5rem">
+        <p style="color:var(--text-muted);padding:1rem">Cargando...</p>
       </div>
     </div>
 
@@ -2516,8 +2502,7 @@ async function loadClinVacunas(){
   window._clinCalendario = calendario||[];
   window._clinVacAplicadas = aplicadas||[];
   window._clinPartosH = partos||[];
-  renderVacPendientes();
-  renderVacHistorial();
+  renderVacunasPorTipo();
 }
 
 async function loadClinAdmin(){
@@ -2605,53 +2590,112 @@ function renderClinActivas(){
 
 // ---- RENDER VACUNAS ----
 function renderVacPendientes(){
-  const hoy = new Date();
-  const aplicadasMap = {};
-  (window._clinVacAplicadas||[]).forEach(v=>{
-    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]=[];
-    aplicadasMap[v.hembra].push(v.vacuna);
-  });
-  const calendario = window._clinCalendario||[];
-  const pendientes = [];
-  (window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)).forEach(p=>{
-    const nac = new Date(p.fecha_parto+'T12:00:00');
-    const dias = Math.floor((hoy-nac)/86400000);
-    const aplicadas = aplicadasMap[p.hembra]||[];
-    calendario.forEach(cal=>{
-      if(dias>=cal.dias_min && dias<=cal.dias_max && !aplicadas.includes(cal.vacuna)){
-        pendientes.push({hembra:p.hembra, raza:p.raza, dias, vacuna:cal.vacuna});
-      }
-    });
-  });
-  const tbody = document.getElementById('vac-pendientes-body');
-  if(!pendientes.length){
-    tbody.innerHTML='<tr><td colspan="5" class="empty">Sin vacunas pendientes.</td></tr>';
-  } else {
-    tbody.innerHTML = pendientes.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>`<tr>
-      <td class="mono" style="font-weight:600">${p.hembra}</td>
-      <td class="mono">${p.raza||'—'}</td>
-      <td class="mono">${p.dias}d</td>
-      <td style="font-weight:600;color:#c77800">${p.vacuna}</td>
-      <td><button class="btn btn-primary btn-sm" onclick="aplicarVacunaRapida('${p.hembra}','${p.vacuna}')">Aplicar</button></td>
-    </tr>`).join('');
-  }
+  // Not used - replaced by renderVacunasPorTipo
 }
 
 function renderVacHistorial(){
-  const tbody = document.getElementById('vac-historial-body');
-  const aplicadas = window._clinVacAplicadas||[];
-  if(!aplicadas.length){
-    tbody.innerHTML='<tr><td colspan="6" class="empty">Sin vacunas registradas.</td></tr>';
-  } else {
-    tbody.innerHTML = aplicadas.map(v=>`<tr>
-      <td class="mono">${fmtFecha(v.fecha)}</td>
-      <td class="mono" style="font-weight:600">${v.hembra}</td>
-      <td>${v.vacuna}</td>
-      <td class="mono">${v.lote||'—'}</td>
-      <td style="font-size:.82rem">${v.notas||'—'}</td>
-      <td><button class="btn btn-danger btn-sm" onclick="deleteVacuna(${v.id})">🗑</button></td>
-    </tr>`).join('');
-  }
+  // Not used - replaced by renderVacunasPorTipo
+}
+
+function renderVacunasPorTipo(){
+  const hoy = new Date();
+  const aplicadasMap = {};
+  (window._clinVacAplicadas||[]).forEach(v=>{
+    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]=new Set();
+    aplicadasMap[v.hembra].add(v.vacuna);
+  });
+
+  const calendario = window._clinCalendario||[];
+  const partos = (window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&p.hembra!=='MTA'&&p.hembra!=='ABORTO');
+
+  // Build per-vaccine data
+  const vacMap = {};
+  calendario.forEach(cal=>{
+    if(!vacMap[cal.vacuna]) vacMap[cal.vacuna]={cal, aplicadas:[], pendientes:[], vencidas:[]};
+  });
+
+  partos.forEach(p=>{
+    const nac = new Date(p.fecha_parto+'T12:00:00');
+    const dias = Math.floor((hoy-nac)/86400000);
+    const aplicadas = aplicadasMap[p.hembra]||new Set();
+
+    calendario.forEach(cal=>{
+      if(!vacMap[cal.vacuna]) return;
+      const yaAplicada = aplicadas.has(cal.vacuna);
+      const enRango = dias>=cal.dias_min && dias<=cal.dias_max;
+      const vencida = dias>cal.dias_max && !yaAplicada;
+      if(yaAplicada){
+        vacMap[cal.vacuna].aplicadas.push({hembra:p.hembra, raza:p.raza, dias});
+      } else if(enRango){
+        vacMap[cal.vacuna].pendientes.push({hembra:p.hembra, raza:p.raza, dias});
+      } else if(vencida){
+        vacMap[cal.vacuna].vencidas.push({hembra:p.hembra, raza:p.raza, dias});
+      }
+    });
+  });
+
+  const container = document.getElementById('vac-por-tipo-container');
+  if(!container) return;
+
+  container.innerHTML = Object.entries(vacMap).map(([vacuna, data])=>{
+    const total = data.aplicadas.length + data.pendientes.length + data.vencidas.length;
+    const pct = total ? Math.round(data.aplicadas.length/total*100) : 0;
+    const btnId = 'vbtn-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+    const tblId = 'vtbl-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+    
+    const pendRow = data.pendientes.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>
+      '<tr style="background:#fff8e1">'+
+      '<td class="mono" style="font-weight:600">'+p.hembra+'</td>'+
+      '<td class="mono">'+p.raza+'</td>'+
+      '<td class="mono">'+p.dias+'d</td>'+
+      '<td style="color:#c77800;font-weight:600">Pendiente</td>'+
+      '<td><button class="btn btn-primary btn-sm" onclick="aplicarVacunaRapida(''+p.hembra+'',''+vacuna+'')">Aplicar</button></td></tr>'
+    ).join('');
+
+    const vencRow = data.vencidas.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>
+      '<tr style="background:#fff0f0">'+
+      '<td class="mono" style="font-weight:600">'+p.hembra+'</td>'+
+      '<td class="mono">'+p.raza+'</td>'+
+      '<td class="mono">'+p.dias+'d</td>'+
+      '<td style="color:#c62828;font-weight:600">Vencida</td>'+
+      '<td><button class="btn btn-primary btn-sm" onclick="aplicarVacunaRapida(''+p.hembra+'',''+vacuna+'')">Aplicar</button></td></tr>'
+    ).join('');
+
+    const aplRow = data.aplicadas.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>
+      '<tr>'+
+      '<td class="mono" style="font-weight:600">'+p.hembra+'</td>'+
+      '<td class="mono">'+p.raza+'</td>'+
+      '<td class="mono">'+p.dias+'d</td>'+
+      '<td style="color:#2d6a4f;font-weight:600">✅ Aplicada</td>'+
+      '<td></td></tr>'
+    ).join('');
+
+    const color = data.pendientes.length>0?'#c77800':data.vencidas.length>0?'#c62828':'#2d6a4f';
+
+    return '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.8rem">'+
+      '<button id="'+btnId+'" onclick="toggleVacTipo(''+btnId+'',''+tblId+'')" '+
+      'style="width:100%;background:var(--header-bg);color:white;border:none;border-radius:8px 8px 0 0;padding:.7rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">'+
+      '<span style="font-weight:600">'+vacuna+'</span>'+
+      '<span style="display:flex;gap:1rem;font-size:.82rem">'+
+      '<span style="color:#90ee90">✅ '+data.aplicadas.length+'</span>'+
+      (data.pendientes.length?'<span style="color:#ffd700">⏰ '+data.pendientes.length+' pendientes</span>':'')+
+      (data.vencidas.length?'<span style="color:#ff6b6b">⚠️ '+data.vencidas.length+' vencidas</span>':'')+
+      '<span>▼</span></span></button>'+
+      '<div id="'+tblId+'" style="display:none">'+
+      '<table style="width:100%;font-size:.83rem">'+
+      '<thead><tr style="background:var(--table-header-bg)"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Estado</th><th>Acción</th></tr></thead>'+
+      '<tbody>'+pendRow+vencRow+aplRow+'</tbody></table></div></div>';
+  }).join('');
+}
+
+function toggleVacTipo(btnId, tblId){
+  const tbl = document.getElementById(tblId);
+  const btn = document.getElementById(btnId);
+  if(!tbl) return;
+  const open = tbl.style.display!=='none';
+  tbl.style.display = open?'none':'block';
+  // Update arrow
+  btn.innerHTML = btn.innerHTML.replace(open?'▲':'▼', open?'▼':'▲');
 }
 
 // ---- RENDER ADMIN ----
