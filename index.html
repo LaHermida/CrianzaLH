@@ -2673,7 +2673,7 @@ function renderVacunasPorTipo(){
     const color = data.pendientes.length>0?'#c77800':data.vencidas.length>0?'#c62828':'#2d6a4f';
 
     return '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.8rem">'+
-      '<button id="'+btnId+'" onclick="toggleVacTipo(''+btnId+'',''+tblId+'')" '+
+      '<button id="'+btnId+'" onclick="toggleVacTipo(&quot;'+btnId+'&quot;,&quot;'+tblId+'&quot;)" '+
       'style="width:100%;background:var(--header-bg);color:white;border:none;border-radius:8px 8px 0 0;padding:.7rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">'+
       '<span style="font-weight:600">'+vacuna+'</span>'+
       '<span style="display:flex;gap:1rem;font-size:.82rem">'+
