@@ -2011,8 +2011,9 @@ async function importSalidas(event){
     
     if(isFormatC){
       hembra=toStr(g(1));
-      fecha_salida=parseDateFlex(gRaw(5));
-      fecha_nacimiento=parseDateFlex(gRaw(6));
+      // Col 5=Fecha Nacimiento, Col 6=Fecha Salida (fixed)
+      fecha_nacimiento=parseDateFlex(gRaw(5));
+      fecha_salida=parseDateFlex(gRaw(6));
       edad_dias=g(3)?parseInt(g(3)):null;
       ultimo_peso=null;
       razon_original=toStr(g(7))||null;
