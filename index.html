@@ -395,20 +395,17 @@
       <div id="inv-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
 
       <!-- Mortalidad por etapa -->
-      <div class="kpi-group-label">📋 Mortalidad por Etapa</div>
-      <div class="table-wrap" style="max-width:700px;margin-bottom:1.5rem">
+      <div class="kpi-group-label">📋 Salidas por Etapa</div>
+      <div class="table-wrap" style="max-width:500px;margin-bottom:1.5rem">
         <table id="inv-etapa-table">
           <thead>
             <tr>
               <th>Etapa</th>
               <th>Iniciaron</th>
-              <th>Muertas</th>
-              <th>Diarrea</th>
-              <th>Pulmonar</th>
-              <th>Otra</th>
+              <th>Salidas</th>
             </tr>
           </thead>
-          <tbody id="inv-etapa-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+          <tbody id="inv-etapa-body"><tr><td colspan="3" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
 
@@ -443,14 +440,10 @@
               <th>Nacidas</th>
               <th>Activas</th>
               <th>% Superv.</th>
-              <th>Muertas</th>
               <th>Salidas</th>
-              <th>- Diarrea</th>
-              <th>- Pulmonar</th>
-              <th>- Otra</th>
             </tr>
           </thead>
-          <tbody id="inv-lote-body"><tr><td colspan="11" class="empty">Cargando...</td></tr></tbody>
+          <tbody id="inv-lote-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -1851,31 +1844,23 @@ function renderInventario(partos, salidas){
   const salidasFiltradas=salidas.filter(s=>hembraSet.has(s.hembra));
   const totalSalidas=salidasFiltradas.length;
   const totalActivas=totalNacidas-totalSalidas;
-  const totalMuertas=salidasFiltradas.filter(s=>s.motivo&&s.motivo.startsWith('Muerta')).length;
-  const totalVendidas=salidasFiltradas.filter(s=>s.motivo==='Vendida').length;
-  const totalDescarte=salidasFiltradas.filter(s=>s.motivo==='Descarte').length;
-  const totalCuatas=salidasFiltradas.filter(s=>s.motivo==='Cuata').length;
   const pctSuperv=totalNacidas?Math.round(totalActivas/totalNacidas*100):0;
 
-  // Show ultimo arete activo y ultima muerta
+  // Show ultimo arete activo y ultima salida
   const ultActiva=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
-  const ultMuerta=salidasFiltradas.filter(s=>s.motivo&&s.motivo.startsWith('Muerta')&&/^\d+$/.test(String(s.hembra||'').trim())).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
+  const ultSalida=salidasFiltradas.filter(s=>/^\d+$/.test(String(s.hembra||'').trim())).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
   const ultInvEl=document.getElementById('ultimo-inv');
   if(ultInvEl){
     const partes=[];
     if(ultActiva) partes.push(`Último activo: ${ultActiva.hembra}`);
-    if(ultMuerta) partes.push(`Última muerta: ${ultMuerta.hembra} (${fmtFecha(ultMuerta.fecha_salida)})`);
+    if(ultSalida) partes.push(`Última salida: ${ultSalida.hembra} (${fmtFecha(ultSalida.fecha_salida)})`);
     ultInvEl.textContent=partes.length?'— '+partes.join(' | '):'';
   }
 
   document.getElementById('inv-kpis').innerHTML=
     kpiCard('Total Nacidas (hembras)',totalNacidas,'','','',false)+
     kpiCard('Activas en Hato',`${totalActivas} (${pctSuperv}%)`,'','% supervivencia','',false)+
-    kpiCard('Total Salidas',totalSalidas,'','','',false)+
-    kpiCard('Muertas',totalMuertas,'','','',false)+
-    kpiCard('Vendidas',totalVendidas,'','','',false)+
-    kpiCard('Descartes',totalDescarte,'','','',false)+
-    kpiCard('Cuatas',totalCuatas,'','','',false);
+    kpiCard('Total Salidas',totalSalidas,'','','',false);
 
   // Etapa table - calculate how many reached each stage
   const etapasDef=[
@@ -1894,43 +1879,27 @@ function renderInventario(partos, salidas){
   let acumuladaSalidas=0;
   etapaBody.innerHTML=etapasDef.map((etapa,idx)=>{
     const iniciaronN = totalNacidas - acumuladaSalidas;
-
-    const mEnEtapa = salidasFiltradas.filter(s=>s.etapa===etapa.nombre && s.motivo && s.motivo.startsWith('Muerta'));
-    const diarrea=mEnEtapa.filter(s=>s.motivo==='Muerta - Diarrea').length;
-    const pulmonar=mEnEtapa.filter(s=>s.motivo==='Muerta - Pulmonar').length;
-    const otra=mEnEtapa.filter(s=>s.motivo==='Muerta - Otra').length;
-    const totalMuertas=mEnEtapa.length;
-
     const todasSalidasEtapa=salidasFiltradas.filter(s=>s.etapa===etapa.nombre).length;
     acumuladaSalidas+=todasSalidasEtapa;
-
-    const pctMort=iniciaronN?Math.round(totalMuertas/iniciaronN*100):0;
-    const pctClass=pctMort>=15?'gdp-bad':pctMort>=8?'gdp-warn':'gdp-ok';
+    const pct=iniciaronN?Math.round(todasSalidasEtapa/iniciaronN*100):0;
+    const pctClass=pct>=15?'gdp-bad':pct>=8?'gdp-warn':'gdp-ok';
 
     return `<tr>
       <td>${etapa.nombre}</td>
       <td class="mono">${iniciaronN}</td>
-      <td class="mono ${pctClass}" style="font-weight:600">${totalMuertas} (${pctMort}%)</td>
-      <td class="mono">${diarrea}</td>
-      <td class="mono">${pulmonar}</td>
-      <td class="mono">${otra}</td>
+      <td class="mono ${pctClass}" style="font-weight:600">${todasSalidasEtapa} (${pct}%)</td>
     </tr>`;
   }).join('');
 
   // Lote table
   const loteBody=document.getElementById('inv-lote-body');
-  if(!lotes.length){loteBody.innerHTML='<tr><td colspan="10" class="empty">Sin datos.</td></tr>';return;}
+  if(!lotes.length){loteBody.innerHTML='<tr><td colspan="6" class="empty">Sin datos.</td></tr>';return;}
   loteBody.innerHTML=lotes.map(lote=>{
     const n=lote.nacidas.length;
     const s=lote.salidas;
     const activas=n-s.length;
     const pct=n?Math.round(activas/n*100):0;
-    // All non-vendida exits count as muertas
-    const muertas=s.filter(x=>x.motivo&&(x.motivo.startsWith('Muerta')||x.motivo==='Descarte'||x.motivo==='Cuata')).length;
-    const diarrea=s.filter(x=>x.motivo==='Muerta - Diarrea').length;
-    const pulmonar=s.filter(x=>x.motivo==='Muerta - Pulmonar').length;
-    const otraMuerta=s.filter(x=>x.motivo&&(x.motivo==='Muerta - Otra'||x.motivo==='Descarte'||x.motivo==='Cuata')).length;
-    const salidas=s.filter(x=>x.motivo==='Vendida').length;
+    const totalSalidasLote=s.length;
     // Arete range
     const aretesN=lote.nacidas.map(p=>parseInt(p.hembra)).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
     const areteRng=aretesN.length?aretesN[0]+' – '+aretesN[aretesN.length-1]:'—';
@@ -1941,11 +1910,7 @@ function renderInventario(partos, salidas){
       <td class="mono" style="text-align:center">${n}</td>
       <td class="mono" style="text-align:center">${activas}</td>
       <td class="mono ${pctClass}" style="text-align:center">${pct}%</td>
-      <td class="mono" style="text-align:center">${muertas} (${n?Math.round(muertas/n*100):0}%)</td>
-      <td class="mono" style="text-align:center">${salidas} (${n?Math.round(salidas/n*100):0}%)</td>
-      <td class="mono" style="text-align:center">${n?Math.round(diarrea/n*100):0}%</td>
-      <td class="mono" style="text-align:center">${n?Math.round(pulmonar/n*100):0}%</td>
-      <td class="mono" style="text-align:center">${n?Math.round(otraMuerta/n*100):0}%</td>
+      <td class="mono" style="text-align:center">${totalSalidasLote} (${n?Math.round(totalSalidasLote/n*100):0}%)</td>
     </tr>`;
   }).join('');
 }
@@ -2061,6 +2026,7 @@ async function importSalidas(event){
   }
   alert(`Importadas: ${ok} salidas${err?', Errores: '+err:''}`);
   await loadInventario();
+  showTab('inventario');
 }
 
 function exportActivasExcel(){
