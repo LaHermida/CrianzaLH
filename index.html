@@ -444,10 +444,10 @@
               <th>Activas</th>
               <th>% Superv.</th>
               <th>Muertas</th>
+              <th>Salidas</th>
               <th>- Diarrea</th>
               <th>- Pulmonar</th>
               <th>- Otra</th>
-              <th>Salidas</th>
             </tr>
           </thead>
           <tbody id="inv-lote-body"><tr><td colspan="11" class="empty">Cargando...</td></tr></tbody>
@@ -1942,10 +1942,10 @@ function renderInventario(partos, salidas){
       <td class="mono" style="text-align:center">${activas}</td>
       <td class="mono ${pctClass}" style="text-align:center">${pct}%</td>
       <td class="mono" style="text-align:center">${muertas} (${n?Math.round(muertas/n*100):0}%)</td>
+      <td class="mono" style="text-align:center">${salidas} (${n?Math.round(salidas/n*100):0}%)</td>
       <td class="mono" style="text-align:center">${n?Math.round(diarrea/n*100):0}%</td>
       <td class="mono" style="text-align:center">${n?Math.round(pulmonar/n*100):0}%</td>
       <td class="mono" style="text-align:center">${n?Math.round(otraMuerta/n*100):0}%</td>
-      <td class="mono" style="text-align:center">${salidas} (${n?Math.round(salidas/n*100):0}%)</td>
     </tr>`;
   }).join('');
 }
