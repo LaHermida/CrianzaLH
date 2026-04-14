@@ -1967,7 +1967,24 @@ async function importPartos(event){
       twinSecondIdx.add(i);
     }
   }
-  importQueue=rows.map((row,idx)=>mapPartoRowFromExcel(row, twinSecondIdx.has(idx))).filter(r=>r.fecha_parto);
+  importQueue=[];
+  rows.forEach((row,idx)=>{
+    const mapped=mapPartoRowFromExcel(row, twinSecondIdx.has(idx));
+    if(!mapped||!mapped.fecha_parto) return;
+    // Handle twin aretes like "4871-4872" — split into two records
+    if(mapped.hembra && /^\d+\s*-\s*\d+$/.test(mapped.hembra)){
+      const parts=mapped.hembra.split('-').map(s=>s.trim());
+      parts.forEach((arete,i)=>{
+        const clone={...mapped, hembra:arete};
+        // Second twin: no ordeña data
+        if(i>0){clone.o1_lts=null;clone.o1_calidad=null;clone.o2_lts=null;clone.o2_calidad=null;}
+        importQueue.push(clone);
+      });
+    } else {
+      importQueue.push(mapped);
+    }
+  });
+  importQueue=importQueue.filter(r=>r.fecha_parto);
   showImportPreview(importQueue.length,rows.length);
 }
 async function importSalidas(event){
