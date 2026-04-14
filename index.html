@@ -1998,16 +1998,26 @@ async function importSalidas(event){
   // Auto-detect format:
   // Format A (simple): Col 0=hembra, 1=fecha_salida, 2=motivo
   // Format B (full):   Col 1=hembra(Vaca), 5=edad, 7=fecha_salida, 8=fecha_nac, 9=ultimo_peso, 10=motivo
+  // Format C (Salidas_Para_Claude): Col 1=Vaca, 3=Edad, 5=Fecha Salida, 6=Fecha Nacimiento, 7=Razón
   const firstRow=rows[0]?.__row||[];
-  const isFormatB = firstRow.length >= 10 && (firstRow[6]||'').toString().includes('ginecol') ||
-                    rows.some(r=>{const p=r.__row||[]; return p[6]&&p[6].toString().includes('Nacimiento');});
+  const isFormatC = firstRow.length >= 7 && firstRow.length <= 9 &&
+                    rows.some(r=>{const p=r.__row||[]; return p[4]&&p[4].toString().includes('Nacimiento');});
+  const isFormatB = !isFormatC && (firstRow.length >= 10 && (firstRow[6]||'').toString().includes('ginecol') ||
+                    rows.some(r=>{const p=r.__row||[]; return p[6]&&p[6].toString().includes('Nacimiento');}));
   
   const mapped=rows.map(row=>{
     const p=row.__row||[];
     const g=i=>(p[i]!==undefined&&p[i]!==null&&String(p[i]).trim()!=='')?p[i]:null;
     let hembra, fecha_salida, razon_original, fecha_nacimiento, edad_dias, ultimo_peso;
     
-    if(isFormatB){
+    if(isFormatC){
+      hembra=toStr(g(1));
+      fecha_salida=parseDateDMY(g(5));
+      fecha_nacimiento=parseDateDMY(g(6));
+      edad_dias=g(3)?parseInt(g(3)):null;
+      ultimo_peso=null;
+      razon_original=toStr(g(7))||null;
+    } else if(isFormatB){
       hembra=toStr(g(1));
       fecha_salida=excelDateToISO(g(7));
       fecha_nacimiento=excelDateToISO(g(8));
@@ -2039,8 +2049,10 @@ async function importSalidas(event){
   if(!mapped.length){alert('Sin datos válidos.');return;}
   let ok=0,err=0;
   for(const r of mapped){
-    const res=await sbFetch('salidas_crianza','POST',r);
-    if(res&&!res.error) ok++; else err++;
+    try{
+      const res=await sbFetch('salidas_crianza','POST',r);
+      if(res.ok) ok++; else{const e=await res.json().catch(()=>({}));console.error('Salida error:',e,'Data:',r);err++;}
+    }catch(e){console.error('Salida exception:',e);err++;}
   }
   alert(`Importadas: ${ok} salidas${err?', Errores: '+err:''}`);
   await loadInventario();
@@ -2125,16 +2137,36 @@ async function readFile(file){
     ...Object.fromEntries(headers.map((h,i)=>[h,row[i]]))
   }));
 }
+function parseDateDMY(val){
+  if(!val) return null;
+  const s=String(val).trim();
+  if(!s) return null;
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  // D/M/YYYY
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  // D/M/YY
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if(m){ const y=parseInt(m[3]); const full=y>=50?1900+y:2000+y; return `${full}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+  return excelDateToISO(val);
+}
 function excelDateToISO(val){
   if(!val) return null;
   const s=String(val).trim();
   if(!s) return null;
   if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
-  // Always treat as DD/MM/YYYY
+  // DD/MM/YYYY or D/M/YYYY
   let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  // D/M/YY (2-digit year)
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
+  if(m){ const y=parseInt(m[3]); const full=y>=50?1900+y:2000+y; return `${full}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
   m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
+  if(m){ const y=parseInt(m[3]); const full=y>=50?1900+y:2000+y; return `${full}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+  // Excel serial number
+  if(/^\d{5}$/.test(s)||/^\d+\.\d+$/.test(s)){const n=parseFloat(s);const d=new Date((n-25569)*86400000);if(!isNaN(d))return d.toISOString().slice(0,10);}
   const d=new Date(s);
   if(!isNaN(d)) return d.toISOString().slice(0,10);
   return null;
