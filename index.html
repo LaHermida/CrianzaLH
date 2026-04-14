@@ -2219,7 +2219,9 @@ function mapPartoRowFromExcel(row, isTwinSecond=false){
   // 18=c2_hora,19=c2_lts,20=c2_calidad,21=c2_calostrero,22=c2_sonda
   // 23=o1_refrac,24=o1_lts,25=o1_calidad,26=o2_lts,27=o2_calidad
   const p = row.__row || [];
+  const raw = row.__raw || p;
   const g = i => (p[i]!==undefined && p[i]!==null && p[i]!=='') ? p[i] : null;
+  const gRaw = i => (raw[i]!==undefined && raw[i]!==null) ? raw[i] : null;
 
   const hembra_raw = toStr(g(3))||'';
   const macho_raw  = toStr(g(4))||'';
@@ -2246,7 +2248,7 @@ function mapPartoRowFromExcel(row, isTwinSecond=false){
   const o2_calidad= isTwinSecond ? null : toFloat(g(27));
 
   return {
-    fecha_parto:    excelDateToISO(g(0)),
+    fecha_parto:    parseDateFlex(gRaw(0)),
     madre_vaca:     toStr(g(1)),
     madre_vaquilla: toStr(g(2)),
     hembra, sexo,
@@ -2277,16 +2279,20 @@ function mapPesajeRow(row){
   // Format A: Col 0=hembra, Col 1=Kg, Col 2=Fecha  (old format)
   // Format B: Col 0=hembra, Col 1=Fecha, Col 2=Kg  (new 2026 format)
   const p=row.__row||[];
+  const raw=row.__raw||p;
   const g=i=>(p[i]!==undefined&&p[i]!==null&&p[i]!=='')?p[i]:null;
+  const gRaw=i=>(raw[i]!==undefined&&raw[i]!==null)?raw[i]:null;
   const col1=g(1), col2=g(2);
-  // Detect format: if col1 looks like a date string or Date object -> Format B
-  const isFormatB = col1 && (col1 instanceof Date || 
+  const rawCol1=gRaw(1), rawCol2=gRaw(2);
+  // Detect format: if raw col1 is a date serial number -> Format B
+  const isFormatB = rawCol1 && (typeof rawCol1==='number' && rawCol1>30000 && rawCol1<60000) ||
+    (col1 && (col1 instanceof Date || 
     (typeof col1==='string' && /\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/.test(col1)) ||
-    (typeof col1==='string' && /^\d{4}-\d{2}-\d{2}/.test(col1)));
+    (typeof col1==='string' && /^\d{4}-\d{2}-\d{2}/.test(col1))));
   return{
     hembra: toStr(g(0)),
     peso:   isFormatB ? toFloat(col2) : toFloat(col1),
-    fecha:  isFormatB ? excelDateToISO(col1) : excelDateToISO(col2),
+    fecha:  isFormatB ? parseDateFlex(rawCol1) : parseDateFlex(rawCol2),
     notas:  null
   };
 }
