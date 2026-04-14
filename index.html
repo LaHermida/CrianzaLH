@@ -2007,13 +2007,15 @@ async function importSalidas(event){
   
   const mapped=rows.map(row=>{
     const p=row.__row||[];
+    const raw=row.__raw||p;
     const g=i=>(p[i]!==undefined&&p[i]!==null&&String(p[i]).trim()!=='')?p[i]:null;
+    const gRaw=i=>(raw[i]!==undefined&&raw[i]!==null)?raw[i]:null;
     let hembra, fecha_salida, razon_original, fecha_nacimiento, edad_dias, ultimo_peso;
     
     if(isFormatC){
       hembra=toStr(g(1));
-      fecha_salida=parseDateDMY(g(5));
-      fecha_nacimiento=parseDateDMY(g(6));
+      fecha_salida=parseDateFlex(gRaw(6));
+      fecha_nacimiento=parseDateFlex(gRaw(5));
       edad_dias=g(3)?parseInt(g(3)):null;
       ultimo_peso=null;
       razon_original=toStr(g(7))||null;
@@ -2125,29 +2127,35 @@ async function readFile(file){
     }).filter(r=>r.__row.some(v=>v));
   }
   const data=await file.arrayBuffer();
-  const wb=XLSX.read(data,{type:'array',cellDates:true});
+  const wb=XLSX.read(data,{type:'array',cellDates:false});
   const ws=wb.Sheets[wb.SheetNames[0]];
   // Use header:1 to get raw arrays - avoids duplicate column name issues
   const arrays=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+  const arraysRaw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   if(!arrays.length) return [];
   // Convert to objects using first row as header, but keep positional access too
   const headers=arrays[0];
-  return arrays.slice(1).map(row=>({
-    __row: row, // raw positional array
-    ...Object.fromEntries(headers.map((h,i)=>[h,row[i]]))
+  return arrays.slice(1).map((row,i)=>({
+    __row: row, // formatted positional array
+    __raw: arraysRaw[i+1]||row, // raw positional array (dates as numeric serials)
+    ...Object.fromEntries(headers.map((h,j)=>[h,row[j]]))
   }));
 }
-function parseDateDMY(val){
+function parseDateFlex(val){
   if(!val) return null;
+  // Date object
+  if(val instanceof Date && !isNaN(val)) return val.toISOString().slice(0,10);
+  // Numeric Excel serial (e.g. 45750)
+  if(typeof val==='number' && val>30000 && val<60000){
+    const d=new Date((val-25569)*86400000);
+    if(!isNaN(d)) return d.toISOString().slice(0,10);
+  }
   const s=String(val).trim();
   if(!s) return null;
+  // ISO format
   if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
-  // D/M/YYYY
-  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-  if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  // D/M/YY
-  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
-  if(m){ const y=parseInt(m[3]); const full=y>=50?1900+y:2000+y; return `${full}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
+  // Numeric string serial
+  if(/^\d{4,5}$/.test(s)){const n=parseFloat(s);const d=new Date((n-25569)*86400000);if(!isNaN(d))return d.toISOString().slice(0,10);}
   return excelDateToISO(val);
 }
 function excelDateToISO(val){
