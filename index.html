@@ -2978,13 +2978,14 @@ async function buscarFicha(){
   container.innerHTML='<p><span class="spinner"></span> Buscando...</p>';
 
   try{
-    const [partos, salidas, pesajes, vacunas, eventos] = await Promise.all([
+    const [partos, salidas, pesajes, vacunas] = await Promise.all([
       sbFetch(`partos_crianza?hembra=eq.${arete}&limit=10`),
       sbFetch(`salidas_crianza?hembra=eq.${arete}&limit=10`),
       sbFetch(`pesajes_crianza?hembra=eq.${arete}&order=fecha.asc&limit=50`),
-      sbClin(`clin_vacunas_aplicadas?hembra=eq.${arete}&order=fecha.desc&limit=50`),
-      sbClin(`clin_eventos?hembra=eq.${arete}&order=fecha.desc&limit=50`)
+      sbClin(`clin_vacunas_aplicadas?hembra=eq.${arete}&order=fecha.desc&limit=50`)
     ]);
+    let eventosArr = [];
+    try{ const ev=await sbClin(`clin_eventos?hembra=eq.${arete}&order=fecha_inicio.desc&limit=50`); if(Array.isArray(ev)) eventosArr=ev; }catch(e){}
 
     // Also check if this arete appears as madre
     const comoMadreVaca = await sbFetch(`partos_crianza?madre_vaca=eq.${arete}&order=fecha_parto.asc&limit=50`);
@@ -2995,7 +2996,6 @@ async function buscarFicha(){
     const salida = salidas && salidas.length ? salidas[0] : null;
     const pesajesArr = pesajes || [];
     const vacunasArr = vacunas || [];
-    const eventosArr = eventos || [];
 
     let html = '';
 
@@ -3065,9 +3065,9 @@ async function buscarFicha(){
     // Eventos clínicos
     if(eventosArr.length){
       html += `<div class="kpi-group-label">🏥 Eventos Clínicos (${eventosArr.length})</div>`;
-      html += `<table style="width:100%;font-size:.85rem;margin-bottom:1rem"><thead><tr style="background:var(--accent);color:#fff"><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Tratamiento</th></tr></thead><tbody>`;
+      html += `<table style="width:100%;font-size:.85rem;margin-bottom:1rem"><thead><tr style="background:var(--accent);color:#fff"><th>Fecha Inicio</th><th>Fecha Alta</th><th>Protocolo</th><th>Comentario</th></tr></thead><tbody>`;
       eventosArr.forEach(e=>{
-        html += `<tr><td class="mono">${fmtFecha(e.fecha)}</td><td>${e.tipo||''}</td><td>${e.descripcion||''}</td><td>${e.tratamiento||''}</td></tr>`;
+        html += `<tr><td class="mono">${fmtFecha(e.fecha_inicio)}</td><td class="mono">${fmtFecha(e.fecha_alta)}</td><td>${e.protocolo_id||'—'}</td><td>${e.comentario||''}</td></tr>`;
       });
       html += `</tbody></table>`;
     }
