@@ -1847,16 +1847,19 @@ function renderInventario(partos, salidas){
 
   // Global KPIs
   const totalNacidas=hembras.length;
-  const totalSalidas=hembras.filter(p=>salidaMap[p.hembra]).length;
+  const hembraSet=new Set(hembras.map(p=>p.hembra));
+  const salidasFiltradas=salidas.filter(s=>hembraSet.has(s.hembra));
+  const totalSalidas=salidasFiltradas.length;
   const totalActivas=totalNacidas-totalSalidas;
-  const totalMuertas=salidas.filter(s=>s.motivo&&s.motivo.startsWith('Muerta')).length;
-  const totalVendidas=salidas.filter(s=>s.motivo==='Vendida').length;
-  const totalDescarte=salidas.filter(s=>s.motivo==='Descarte').length;
+  const totalMuertas=salidasFiltradas.filter(s=>s.motivo&&s.motivo.startsWith('Muerta')).length;
+  const totalVendidas=salidasFiltradas.filter(s=>s.motivo==='Vendida').length;
+  const totalDescarte=salidasFiltradas.filter(s=>s.motivo==='Descarte').length;
+  const totalCuatas=salidasFiltradas.filter(s=>s.motivo==='Cuata').length;
   const pctSuperv=totalNacidas?Math.round(totalActivas/totalNacidas*100):0;
 
   // Show ultimo arete activo y ultima muerta
   const ultActiva=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
-  const ultMuerta=salidas.filter(s=>s.motivo&&s.motivo.startsWith('Muerta')&&/^\d+$/.test(String(s.hembra||'').trim())).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
+  const ultMuerta=salidasFiltradas.filter(s=>s.motivo&&s.motivo.startsWith('Muerta')&&/^\d+$/.test(String(s.hembra||'').trim())).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
   const ultInvEl=document.getElementById('ultimo-inv');
   if(ultInvEl){
     const partes=[];
@@ -1865,7 +1868,6 @@ function renderInventario(partos, salidas){
     ultInvEl.textContent=partes.length?'— '+partes.join(' | '):'';
   }
 
-  const totalCuatas=salidas.filter(s=>s.motivo==='Cuata').length;
   document.getElementById('inv-kpis').innerHTML=
     kpiCard('Total Nacidas (hembras)',totalNacidas,'','','',false)+
     kpiCard('Activas en Hato',`${totalActivas} (${pctSuperv}%)`,'','% supervivencia','',false)+
@@ -1886,24 +1888,20 @@ function renderInventario(partos, salidas){
 
   // For each hembra, track at what age she left (if she left)
   const salidaEdadMap={};
-  salidas.forEach(s=>{ if(s.hembra) salidaEdadMap[s.hembra]=s.edad_dias||0; });
+  salidasFiltradas.forEach(s=>{ if(s.hembra) salidaEdadMap[s.hembra]=s.edad_dias||0; });
 
   const etapaBody=document.getElementById('inv-etapa-body');
   let acumuladaSalidas=0;
   etapaBody.innerHTML=etapasDef.map((etapa,idx)=>{
-    // Iniciaron = hembras que llegaron vivas al inicio de esta etapa
-    // = total hembras - las que murieron/salieron en etapas anteriores
     const iniciaronN = totalNacidas - acumuladaSalidas;
 
-    // Muertas en esta etapa
-    const mEnEtapa = salidas.filter(s=>s.etapa===etapa.nombre && s.motivo && s.motivo.startsWith('Muerta'));
+    const mEnEtapa = salidasFiltradas.filter(s=>s.etapa===etapa.nombre && s.motivo && s.motivo.startsWith('Muerta'));
     const diarrea=mEnEtapa.filter(s=>s.motivo==='Muerta - Diarrea').length;
     const pulmonar=mEnEtapa.filter(s=>s.motivo==='Muerta - Pulmonar').length;
     const otra=mEnEtapa.filter(s=>s.motivo==='Muerta - Otra').length;
     const totalMuertas=mEnEtapa.length;
 
-    // All exits this stage (to accumulate for next)
-    const todasSalidasEtapa=salidas.filter(s=>s.etapa===etapa.nombre).length;
+    const todasSalidasEtapa=salidasFiltradas.filter(s=>s.etapa===etapa.nombre).length;
     acumuladaSalidas+=todasSalidasEtapa;
 
     const pctMort=iniciaronN?Math.round(totalMuertas/iniciaronN*100):0;
