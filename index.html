@@ -926,10 +926,11 @@ function computePartoKPIs(data){
   const hembras=data.filter(r=>r.sexo==='H').length;
   const machos=data.filter(r=>r.sexo==='M').length;
   const mtas=data.filter(r=>r.hembra==='MTA').length;
-  const vendidasNacer=data.filter(r=>r.sexo==='H'&&r.hembra&&!/^\d+$/.test(String(r.hembra).trim())&&r.hembra!=='MTA'&&r.hembra!=='ABORTO').length;
   const mtos=data.filter(r=>r.hembra==='MTO').length;
   const abortos=data.filter(r=>r.sexo==='A').length;
-  const vivas=data.filter(r=>r.sexo==='H'&&r.hembra!=='MTA').length;
+  // Hembras vivas = sexo H + arete numérico (excluye MTA, vendidas al nacer, cuatas, etc.)
+  const vivas=data.filter(r=>r.sexo==='H'&&r.hembra&&/^\d+$/.test(String(r.hembra).trim())).length;
+  const vendidasNacer=data.filter(r=>r.sexo==='H'&&r.hembra&&!/^\d+$/.test(String(r.hembra).trim())&&r.hembra!=='MTA'&&r.hembra!=='ABORTO').length;
   const partosDenom=data.filter(r=>r.sexo!=='A').length;
   const dificiles=data.filter(r=>r.dificultad&&r.dificultad.toLowerCase()!=='normal').length;
   const noche=data.filter(r=>r.dia_noche==='Noche').length;
@@ -1525,7 +1526,7 @@ function renderDashGDP(){
 
   // Build partoMap (hembras only)
   const partoMap={};
-  allPartos.forEach(p=>{if(p.hembra&&p.sexo==='H'&&p.hembra!=='MTA'&&p.hembra!=='ABORTO') partoMap[p.hembra]=p;});
+  allPartos.forEach(p=>{if(p.hembra&&p.sexo==='H'&&/^\d+$/.test(String(p.hembra).trim())) partoMap[p.hembra]=p;});
 
   // Filter by raza
   const pesajes=allPesajes.filter(r=>{
@@ -2013,9 +2014,6 @@ async function importSalidas(event){
     
     return {hembra, fecha_salida, fecha_nacimiento, edad_dias, ultimo_peso, razon_original, motivo, etapa};
   }).filter(r=>r);
-  console.log(`Salidas import: ${mapped.length} mapped from ${rows.length} rows, isFormatC=${isFormatC}, isFormatB=${isFormatB}`);
-  if(mapped.length>0) console.log('Sample row 0:', JSON.stringify(mapped[0]));
-  if(mapped.length<rows.length) console.log(`${rows.length-mapped.length} rows filtered out (null fecha_salida or invalid hembra)`);
   if(!mapped.length){alert('Sin datos válidos.');return;}
   let ok=0,err=0;
   for(const r of mapped){
@@ -2026,7 +2024,8 @@ async function importSalidas(event){
   }
   alert(`Importadas: ${ok} salidas${err?', Errores: '+err:''}`);
   await loadInventario();
-  showTab('inventario');
+  const invBtn=document.querySelector('#mainNav button[onclick*="inventario"]');
+  if(invBtn) showTab('inventario',invBtn);
 }
 
 function exportActivasExcel(){
@@ -2648,7 +2647,7 @@ function renderVacunasPorTipo(){
   const calendario = window._clinCalendario||[];
   const madres = window._clinMadresSet||new Set();
   const salidaSet = window._clinSalidaSet||new Set();
-  const partos = (window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&p.hembra!=='MTA'&&p.hembra!=='ABORTO'&&!madres.has(p.hembra)&&!salidaSet.has(p.hembra));
+  const partos = (window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&!madres.has(p.hembra)&&!salidaSet.has(p.hembra));
 
   // Build per-vaccine data
   const vacMap = {};
