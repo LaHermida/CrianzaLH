@@ -2048,6 +2048,9 @@ async function importSalidas(event){
     
     return {hembra, fecha_salida, fecha_nacimiento, edad_dias, ultimo_peso, razon_original, motivo, etapa};
   }).filter(r=>r);
+  console.log(`Salidas import: ${mapped.length} mapped from ${rows.length} rows, isFormatC=${isFormatC}, isFormatB=${isFormatB}`);
+  if(mapped.length>0) console.log('Sample row 0:', JSON.stringify(mapped[0]));
+  if(mapped.length<rows.length) console.log(`${rows.length-mapped.length} rows filtered out (null fecha_salida or invalid hembra)`);
   if(!mapped.length){alert('Sin datos válidos.');return;}
   let ok=0,err=0;
   for(const r of mapped){
@@ -2129,15 +2132,23 @@ async function readFile(file){
   const data=await file.arrayBuffer();
   const wb=XLSX.read(data,{type:'array',cellDates:false});
   const ws=wb.Sheets[wb.SheetNames[0]];
-  // Use header:1 to get raw arrays - avoids duplicate column name issues
   const arrays=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
-  const arraysRaw=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   if(!arrays.length) return [];
-  // Convert to objects using first row as header, but keep positional access too
+  // Build raw values directly from worksheet cells (v = raw value, no formatting)
+  const range=XLSX.utils.decode_range(ws['!ref']||'A1');
+  function getRawRow(rowIdx){
+    const out=[];
+    for(let c=range.s.c;c<=range.e.c;c++){
+      const addr=XLSX.utils.encode_cell({r:rowIdx,c:c});
+      const cell=ws[addr];
+      out.push(cell?cell.v:null);
+    }
+    return out;
+  }
   const headers=arrays[0];
   return arrays.slice(1).map((row,i)=>({
-    __row: row, // formatted positional array
-    __raw: arraysRaw[i+1]||row, // raw positional array (dates as numeric serials)
+    __row: row,
+    __raw: getRawRow(i+1+range.s.r),
     ...Object.fromEntries(headers.map((h,j)=>[h,row[j]]))
   }));
 }
