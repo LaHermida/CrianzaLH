@@ -175,6 +175,8 @@
     <button onclick="showTab('clin-activas',this)">🏥 Clínica</button>
     <button onclick="showTab('clin-vacunas',this)">💉 Vacunación</button>
     <button onclick="showTab('clin-admin',this)">⚙️ Admin Clínico</button>
+    <div class="nav-sep"></div>
+    <button onclick="showTab('ficha-animal',this)">🔍 Ficha Animal</button>
   </nav>
   <main>
 
@@ -549,6 +551,18 @@
       </div>
     </div>
 
+    <!-- ===== FICHA ANIMAL ===== -->
+    <div id="tab-ficha-animal" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🔍 Ficha Animal</span>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1.5rem;max-width:500px">
+        <input type="text" id="ficha-arete" placeholder="Número de arete..." style="flex:1" onkeydown="if(event.key==='Enter')buscarFicha()"/>
+        <button class="btn btn-primary" onclick="buscarFicha()">🔍 Buscar</button>
+      </div>
+      <div id="ficha-resultado"></div>
+    </div>
+
   </main>
 </div>
 
@@ -752,7 +766,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','reg-partos','reg-pesajes','inventario','clin-activas','clin-vacunas','clin-admin'].forEach(t=>{
+  ['dashboard','dash-gdp','reg-partos','reg-pesajes','inventario','clin-activas','clin-vacunas','clin-admin','ficha-animal'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -2954,5 +2968,131 @@ async function editProtoDia(protocolo_id, dia){
     await sbClin('clin_protocolo_dias','POST',{protocolo_id, dia, medicamento:med, dosis:dosis||null});
   }
   await loadClinAdmin();
+}
+
+// ==================== FICHA ANIMAL ====================
+async function buscarFicha(){
+  const arete=document.getElementById('ficha-arete').value.trim();
+  const container=document.getElementById('ficha-resultado');
+  if(!arete){container.innerHTML='<p style="color:var(--text-muted)">Ingresa un número de arete.</p>';return;}
+  container.innerHTML='<p><span class="spinner"></span> Buscando...</p>';
+
+  try{
+    const [partos, salidas, pesajes, vacunas, eventos] = await Promise.all([
+      sbFetch(`partos_crianza?hembra=eq.${arete}&limit=10`),
+      sbFetch(`salidas_crianza?hembra=eq.${arete}&limit=10`),
+      sbFetch(`pesajes_crianza?hembra=eq.${arete}&order=fecha.asc&limit=50`),
+      sbClin(`clin_vacunas_aplicadas?hembra=eq.${arete}&order=fecha.desc&limit=50`),
+      sbClin(`clin_eventos?hembra=eq.${arete}&order=fecha.desc&limit=50`)
+    ]);
+
+    // Also check if this arete appears as madre
+    const comoMadreVaca = await sbFetch(`partos_crianza?madre_vaca=eq.${arete}&order=fecha_parto.asc&limit=50`);
+    const comoMadreVaquilla = await sbFetch(`partos_crianza?madre_vaquilla=eq.${arete}&order=fecha_parto.asc&limit=50`);
+    const comoCria = [...(comoMadreVaca||[]), ...(comoMadreVaquilla||[])];
+
+    const parto = partos && partos.length ? partos[0] : null;
+    const salida = salidas && salidas.length ? salidas[0] : null;
+    const pesajesArr = pesajes || [];
+    const vacunasArr = vacunas || [];
+    const eventosArr = eventos || [];
+
+    let html = '';
+
+    // Header
+    const status = salida ? '🔴 Salida' : '🟢 Activa';
+    html += `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.2rem;margin-bottom:1rem">`;
+    html += `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.8rem">`;
+    html += `<h2 style="margin:0;font-size:1.4rem">🐄 Arete: ${arete}</h2>`;
+    html += `<span style="font-size:1rem;font-weight:600;padding:.3rem .8rem;border-radius:6px;background:${salida?'#fff0f0':'#f0fff0'};color:${salida?'#c62828':'#2d6a4f'}">${status}</span>`;
+    html += `</div>`;
+
+    // Parto info
+    if(parto){
+      const edad = Math.floor((new Date() - new Date(parto.fecha_parto+'T12:00:00'))/86400000);
+      html += `<div class="kpi-group-label" style="margin-top:0">🐣 Nacimiento</div>`;
+      html += `<table style="width:100%;font-size:.88rem;margin-bottom:1rem"><tbody>`;
+      html += `<tr><td style="width:160px;font-weight:600">Fecha Parto</td><td>${fmtFecha(parto.fecha_parto)}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Edad</td><td>${edad} días</td></tr>`;
+      html += `<tr><td style="font-weight:600">Sexo</td><td>${parto.sexo}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Raza</td><td>${parto.raza||'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Madre Vaca</td><td>${parto.madre_vaca||'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Madre Vaquilla</td><td>${parto.madre_vaquilla||'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Peso al Nacer</td><td>${parto.peso_nacer!=null?parto.peso_nacer+' kg':'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Días Gestación</td><td>${parto.dias_gestacion||'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Dificultad</td><td>${parto.dificultad||'Normal'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Partero</td><td>${parto.partero||'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Hora Parto</td><td>${parto.hora_parto||'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Día/Noche</td><td>${parto.dia_noche||'—'}</td></tr>`;
+      html += `</tbody></table>`;
+    } else {
+      html += `<p style="color:var(--text-muted)">⚠️ No se encontró registro de parto para este arete.</p>`;
+    }
+
+    // Salida info
+    if(salida){
+      html += `<div class="kpi-group-label">🚪 Salida</div>`;
+      html += `<table style="width:100%;font-size:.88rem;margin-bottom:1rem"><tbody>`;
+      html += `<tr><td style="width:160px;font-weight:600">Fecha Salida</td><td>${fmtFecha(salida.fecha_salida)}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Edad al Salir</td><td>${salida.edad_dias!=null?salida.edad_dias+' días':'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Motivo</td><td>${salida.motivo||'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Razón Original</td><td>${salida.razon_original||'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Etapa</td><td>${salida.etapa||'—'}</td></tr>`;
+      html += `<tr><td style="font-weight:600">Último Peso</td><td>${salida.ultimo_peso!=null?salida.ultimo_peso+' kg':'—'}</td></tr>`;
+      html += `</tbody></table>`;
+    }
+
+    // Pesajes
+    if(pesajesArr.length){
+      html += `<div class="kpi-group-label">⚖️ Pesajes (${pesajesArr.length})</div>`;
+      html += `<table style="width:100%;font-size:.85rem;margin-bottom:1rem"><thead><tr style="background:var(--accent);color:#fff"><th>Fecha</th><th>Peso (kg)</th><th>Notas</th></tr></thead><tbody>`;
+      pesajesArr.forEach(p=>{
+        html += `<tr><td class="mono">${fmtFecha(p.fecha)}</td><td class="mono">${p.peso}</td><td>${p.notas||''}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+
+    // Vacunas
+    if(vacunasArr.length){
+      html += `<div class="kpi-group-label">💉 Vacunas Aplicadas (${vacunasArr.length})</div>`;
+      html += `<table style="width:100%;font-size:.85rem;margin-bottom:1rem"><thead><tr style="background:var(--accent);color:#fff"><th>Fecha</th><th>Vacuna</th><th>Lote</th><th>Notas</th></tr></thead><tbody>`;
+      vacunasArr.forEach(v=>{
+        html += `<tr><td class="mono">${fmtFecha(v.fecha)}</td><td>${v.vacuna}</td><td>${v.lote||''}</td><td>${v.notas||''}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+
+    // Eventos clínicos
+    if(eventosArr.length){
+      html += `<div class="kpi-group-label">🏥 Eventos Clínicos (${eventosArr.length})</div>`;
+      html += `<table style="width:100%;font-size:.85rem;margin-bottom:1rem"><thead><tr style="background:var(--accent);color:#fff"><th>Fecha</th><th>Tipo</th><th>Descripción</th><th>Tratamiento</th></tr></thead><tbody>`;
+      eventosArr.forEach(e=>{
+        html += `<tr><td class="mono">${fmtFecha(e.fecha)}</td><td>${e.tipo||''}</td><td>${e.descripcion||''}</td><td>${e.tratamiento||''}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+
+    // Crías (si este animal es madre)
+    if(comoCria.length){
+      html += `<div class="kpi-group-label">👶 Crías como Madre (${comoCria.length})</div>`;
+      html += `<table style="width:100%;font-size:.85rem;margin-bottom:1rem"><thead><tr style="background:var(--accent);color:#fff"><th>Fecha</th><th>Cría</th><th>Sexo</th><th>Raza</th></tr></thead><tbody>`;
+      comoCria.forEach(c=>{
+        html += `<tr><td class="mono">${fmtFecha(c.fecha_parto)}</td><td class="mono">${c.hembra||c.sexo}</td><td>${c.sexo}</td><td>${c.raza||''}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+
+    // Summary if nothing found at all
+    if(!parto && !salida && !pesajesArr.length && !vacunasArr.length && !eventosArr.length && !comoCria.length){
+      html += `<p style="color:var(--red);font-weight:600">No se encontró ningún dato para el arete ${arete}.</p>`;
+    }
+
+    html += `</div>`;
+    container.innerHTML = html;
+
+  }catch(e){
+    console.error('Ficha error:',e);
+    container.innerHTML=`<p style="color:var(--red)">Error al buscar: ${e.message}</p>`;
+  }
 }
 </script>
