@@ -1861,17 +1861,19 @@ function renderInventario(partos, salidas){
   if(ultInvEl){
     const partes=[];
     if(ultActiva) partes.push(`Último activo: ${ultActiva.hembra}`);
-    if(ultMuerta) partes.push(`Última muerta: ${ultMuerta.hembra} (${ultMuerta.fecha_salida})`);
+    if(ultMuerta) partes.push(`Última muerta: ${ultMuerta.hembra} (${fmtFecha(ultMuerta.fecha_salida)})`);
     ultInvEl.textContent=partes.length?'— '+partes.join(' | '):'';
   }
 
+  const totalCuatas=salidas.filter(s=>s.motivo==='Cuata').length;
   document.getElementById('inv-kpis').innerHTML=
     kpiCard('Total Nacidas (hembras)',totalNacidas,'','','',false)+
     kpiCard('Activas en Hato',`${totalActivas} (${pctSuperv}%)`,'','% supervivencia','',false)+
     kpiCard('Total Salidas',totalSalidas,'','','',false)+
     kpiCard('Muertas',totalMuertas,'','','',false)+
     kpiCard('Vendidas',totalVendidas,'','','',false)+
-    kpiCard('Descartes',totalDescarte,'','','',false);
+    kpiCard('Descartes',totalDescarte,'','','',false)+
+    kpiCard('Cuatas',totalCuatas,'','','',false);
 
   // Etapa table - calculate how many reached each stage
   const etapasDef=[
@@ -2174,7 +2176,7 @@ function excelDateToISO(val){
   m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
   if(m){ const y=parseInt(m[3]); const full=y>=50?1900+y:2000+y; return `${full}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
   // Excel serial number
-  if(/^\d{5}$/.test(s)||/^\d+\.\d+$/.test(s)){const n=parseFloat(s);const d=new Date((n-25569)*86400000);if(!isNaN(d))return d.toISOString().slice(0,10);}
+  if(/^\d{4,5}$/.test(s)||/^\d+\.\d+$/.test(s)){const n=parseFloat(s);if(n>30000&&n<60000){const d=new Date((n-25569)*86400000);if(!isNaN(d))return d.toISOString().slice(0,10);}}
   const d=new Date(s);
   if(!isNaN(d)) return d.toISOString().slice(0,10);
   return null;
