@@ -2873,16 +2873,15 @@ function renderVacLotes(){
     }).join('');
 
     html+=`<div style="border:2px solid #f9a825;border-radius:8px;margin-bottom:.8rem">
-      <button id="${btnId}" onclick="toggleVacTipo('${btnId}','${tblId}')"
-        style="width:100%;background:#fff8e1;color:#7a4f00;border:none;border-radius:6px 6px 0 0;padding:.65rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">
-        <span style="font-weight:700">${vacuna}</span>
-        <span style="display:flex;gap:1rem;font-size:.82rem;align-items:center">
+      <div style="background:#fff8e1;border-radius:6px 6px 0 0;padding:.65rem 1rem;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-weight:700;color:#7a4f00;cursor:pointer;flex:1" onclick="toggleVacTipo('${btnId}','${tblId}')">${vacuna}</span>
+        <span style="display:flex;gap:.8rem;font-size:.82rem;align-items:center">
           <span style="color:#c77800;font-weight:700">⏰ ${eligCount} elegibles</span>
           ${adelCount?`<span style="color:#888">${adelCount} adelantadas</span>`:''}
-          <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();imprimirLoteVacuna('${vacuna}')" style="font-size:.78rem;padding:.2rem .5rem">🖨️</button>
-          <span>▼</span>
+          <button class="btn btn-secondary btn-sm" onclick="imprimirLoteVacuna('${vacuna}')" style="font-size:.78rem;padding:.2rem .6rem">🖨️</button>
+          <span style="cursor:pointer;color:#7a4f00;font-size:1rem" onclick="toggleVacTipo('${btnId}','${tblId}')" id="${btnId}">▼</span>
         </span>
-      </button>
+      </div>
       <div id="${tblId}" style="display:none">
         <div style="padding:.4rem .6rem;background:#fffbf0;border-bottom:1px solid #f9a825;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="vplanSelVacuna('${vacuna}',true)">☑ Todos</button>
