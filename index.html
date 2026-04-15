@@ -175,6 +175,7 @@
     <button onclick="showTab('clin-activas',this)">🏥 Clínica</button>
     <button onclick="showTab('clin-vacunas',this)">💉 Vacunación</button>
     <button onclick="showTab('clin-admin',this)">⚙️ Admin Clínico</button>
+    <button onclick="showTab('corrales',this)">🏠 Corrales</button>
     <div class="nav-sep"></div>
     <button onclick="showTab('ficha-animal',this)">🔍 Ficha Animal</button>
   </nav>
@@ -558,6 +559,17 @@
       </div>
     </div>
 
+    <!-- ===== CORRALES ===== -->
+    <div id="tab-corrales" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🏠 Corrales</span>
+        <span id="corrales-resumen" style="font-size:.85rem;color:var(--text-muted)"></span>
+      </div>
+      <div id="corrales-container">
+        <p style="color:var(--text-muted);padding:1rem">Cargando...</p>
+      </div>
+    </div>
+
     <!-- ===== FICHA ANIMAL ===== -->
     <div id="tab-ficha-animal" class="hidden">
       <div class="section-header">
@@ -773,7 +785,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','reg-partos','reg-pesajes','inventario','clin-activas','clin-vacunas','clin-admin','ficha-animal'].forEach(t=>{
+  ['dashboard','dash-gdp','reg-partos','reg-pesajes','inventario','clin-activas','clin-vacunas','clin-admin','corrales','ficha-animal'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -784,6 +796,7 @@ function showTab(tab,btn){
   if(tab==='clin-activas') loadClinActivas();
   if(tab==='clin-vacunas') loadClinVacunas();
   if(tab==='clin-admin') loadClinAdmin();
+  if(tab==='corrales') loadCorrales();
   if(tab==='dash-gdp'){
     const needPesajes=!window._pesajes||!window._pesajes.length;
     const needPartos=!window._partos||!window._partos.length;
@@ -2588,7 +2601,7 @@ async function loadClinActivas(){
 async function loadClinVacunas(){
   const [calendario, partosH, todosPartos, salidas] = await Promise.all([
     sbClin('clin_vacunas_calendario?order=dias_min.asc'),
-    sbFetch('partos_crianza?sexo=eq.H&order=fecha_parto.asc&limit=10000'),
+    sbFetch('partos_crianza?sexo=eq.H&order=fecha_parto.asc&limit=10000&select=hembra,sexo,raza,fecha_parto,corral'),
     sbFetch('partos_crianza?select=madre_vaca,madre_vaquilla&limit=10000'),
     sbFetch('salidas_crianza?select=hembra&limit=10000')
   ]);
@@ -2728,7 +2741,7 @@ function renderVacunasPorTipo(){
   // Build per-vaccine data
   const vacMap = {};
   calendario.forEach(cal=>{
-    if(!vacMap[cal.vacuna]) vacMap[cal.vacuna]={cal, aplicadas:[], pendientes:[], vencidas:[]};
+    if(!vacMap[cal.vacuna]) vacMap[cal.vacuna]={cal, aplicadas:[], pendientes:[]};
   });
 
   partos.forEach(p=>{
@@ -2741,9 +2754,9 @@ function renderVacunasPorTipo(){
       const yaAplicada = !!reg;
       const elegible = dias>=cal.dias_min;
       if(yaAplicada){
-        vacMap[cal.vacuna].aplicadas.push({hembra:p.hembra, raza:p.raza, dias, id:reg.id, fecha:reg.fecha});
+        vacMap[cal.vacuna].aplicadas.push({hembra:p.hembra, raza:p.raza, dias, corral:p.corral||'—', id:reg.id, fecha:reg.fecha});
       } else if(elegible){
-        vacMap[cal.vacuna].pendientes.push({hembra:p.hembra, raza:p.raza, dias});
+        vacMap[cal.vacuna].pendientes.push({hembra:p.hembra, raza:p.raza, dias, corral:p.corral||'—'});
       }
     });
   });
@@ -2760,7 +2773,7 @@ function renderVacunasPorTipo(){
     } else {
       sinContainer.innerHTML='<div style="border:1px solid #ffcccc;border-radius:8px;overflow:hidden">'+
         '<table style="width:100%;font-size:.83rem">'+
-        '<thead><tr style="background:#c62828;color:#fff"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Fecha Nac.</th></tr></thead>'+
+        '<thead><tr style="background:#c62828;color:#fff"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Fecha Nac.</th></tr></thead>'+
         '<tbody>'+sinVacunar.map(p=>{
           const nac=new Date(p.fecha_parto+'T12:00:00');
           const dias=Math.floor((hoy-nac)/86400000);
@@ -2768,8 +2781,8 @@ function renderVacunasPorTipo(){
           const mm=String(nac.getMonth()+1).padStart(2,'0');
           const yyyy=nac.getFullYear();
           return '<tr style="background:#fff5f5"><td class="mono" style="font-weight:600;padding:.35rem .4rem">'+p.hembra+'</td>'+
-            '<td class="mono">'+p.raza+'</td>'+
-            '<td class="mono">'+dias+'d</td>'+
+            '<td class="mono">'+p.raza+'</td><td class="mono">'+dias+'d</td>'+
+            '<td class="mono">'+(p.corral||'—')+'</td>'+
             '<td class="mono">'+dd+'/'+mm+'/'+yyyy+'</td></tr>';
         }).join('')+
         '</tbody></table></div>';
@@ -2779,44 +2792,108 @@ function renderVacunasPorTipo(){
   const container = document.getElementById('vac-por-tipo-container');
   if(!container) return;
 
-  container.innerHTML = Object.entries(vacMap).map(([vacuna, data])=>{
-    const total = data.aplicadas.length + data.pendientes.length;
-    const pct = total ? Math.round(data.aplicadas.length/total*100) : 0;
-    const btnId = 'vbtn-'+vacuna.replace(/[^a-z0-9]/gi,'_');
-    const tblId = 'vtbl-'+vacuna.replace(/[^a-z0-9]/gi,'_');
-    
-    const pendRow = data.pendientes.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>
+  // ---- PENDIENTES (arriba) ----
+  const totalPend = Object.values(vacMap).reduce((s,d)=>s+d.pendientes.length,0);
+  let html = '';
+
+  if(totalPend > 0){
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">'+
+      '<span style="font-weight:600;color:#c77800">⏰ Pendientes de Vacunar</span>'+
+      '<button class="btn btn-secondary btn-sm" onclick="imprimirPendientes()">🖨️ Imprimir Pendientes</button></div>';
+  }
+
+  Object.entries(vacMap).forEach(([vacuna, data])=>{
+    if(!data.pendientes.length) return;
+    const btnId = 'vpend-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+    const tblId = 'vtpend-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+    const rows = data.pendientes.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>
       '<tr style="background:#fff8e1">'+
-      '<td class="mono" style="font-weight:600">'+p.hembra+'</td>'+
+      '<td class="mono" style="font-weight:600;padding:.35rem .4rem">'+p.hembra+'</td>'+
       '<td class="mono">'+p.raza+'</td>'+
       '<td class="mono">'+p.dias+'d</td>'+
-      '<td style="color:#c77800;font-weight:600">Pendiente</td>'+
+      '<td class="mono">'+p.corral+'</td>'+
       '<td><button class="btn btn-primary btn-sm" onclick="aplicarVacunaRapida(&quot;'+p.hembra+'&quot;,&quot;'+vacuna+'&quot;)">Aplicar</button></td></tr>'
     ).join('');
-
-    const aplRow = data.aplicadas.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>{
-      const fechaStr = p.fecha ? (' — '+p.fecha.split('-').reverse().join('/')) : '';
-      return '<tr>'+
-      '<td class="mono" style="font-weight:600">'+p.hembra+'</td>'+
-      '<td class="mono">'+p.raza+'</td>'+
-      '<td class="mono">'+p.dias+'d</td>'+
-      '<td style="color:#2d6a4f;font-weight:600">✅ Aplicada'+fechaStr+'</td>'+
-      '<td><button class="btn btn-danger btn-sm" onclick="deleteVacuna('+p.id+')">🗑</button></td></tr>';
-    }).join('');
-
-    return '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.8rem">'+
+    html += '<div style="border:2px solid #f9a825;border-radius:8px;margin-bottom:.6rem">'+
       '<button id="'+btnId+'" onclick="toggleVacTipo(&quot;'+btnId+'&quot;,&quot;'+tblId+'&quot;)" '+
-      'style="width:100%;background:var(--accent);color:white;border:none;border-radius:8px 8px 0 0;padding:.7rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">'+
+      'style="width:100%;background:#fff8e1;color:#7a4f00;border:none;border-radius:6px 6px 0 0;padding:.6rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.88rem">'+
+      '<span style="font-weight:700">'+vacuna+'</span>'+
+      '<span style="display:flex;gap:1rem"><span style="color:#c77800;font-weight:700">⏰ '+data.pendientes.length+' pendientes</span><span>▼</span></span></button>'+
+      '<div id="'+tblId+'" style="display:none"><table style="width:100%;font-size:.83rem">'+
+      '<thead><tr style="background:#f9a825;color:#000"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Acción</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table></div></div>';
+  });
+
+  // ---- APLICADAS (abajo) ----
+  html += '<div style="margin-top:1.5rem"><div class="kpi-group-label">✅ Aplicadas por Vacuna</div>';
+  Object.entries(vacMap).forEach(([vacuna, data])=>{
+    if(!data.aplicadas.length) return;
+    const btnId = 'vapl-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+    const tblId = 'vtapl-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+    const rows = data.aplicadas.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>{
+      const fechaStr = p.fecha ? p.fecha.split('-').reverse().join('/') : '—';
+      return '<tr><td class="mono" style="font-weight:600;padding:.35rem .4rem">'+p.hembra+'</td>'+
+        '<td class="mono">'+p.raza+'</td><td class="mono">'+p.dias+'d</td>'+
+        '<td class="mono">'+p.corral+'</td>'+
+        '<td class="mono" style="color:#2d6a4f">'+fechaStr+'</td>'+
+        '<td><button class="btn btn-danger btn-sm" onclick="deleteVacuna('+p.id+')">🗑</button></td></tr>';
+    }).join('');
+    html += '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.6rem">'+
+      '<button id="'+btnId+'" onclick="toggleVacTipo(&quot;'+btnId+'&quot;,&quot;'+tblId+'&quot;)" '+
+      'style="width:100%;background:var(--accent);color:white;border:none;border-radius:6px 6px 0 0;padding:.6rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.88rem">'+
       '<span style="font-weight:600">'+vacuna+'</span>'+
-      '<span style="display:flex;gap:1rem;font-size:.82rem">'+
-      '<span style="color:#90ee90">✅ '+data.aplicadas.length+'</span>'+
-      (data.pendientes.length?'<span style="color:#ffd700">⏰ '+data.pendientes.length+' pendientes</span>':'')+
-      '<span>▼</span></span></button>'+
-      '<div id="'+tblId+'" style="display:none">'+
-      '<table style="width:100%;font-size:.83rem">'+
-      '<thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Estado</th><th>Acción</th></tr></thead>'+
-      '<tbody>'+pendRow+aplRow+'</tbody></table></div></div>';
-  }).join('');
+      '<span style="display:flex;gap:1rem;font-size:.82rem"><span style="color:#90ee90">✅ '+data.aplicadas.length+'</span><span>▼</span></span></button>'+
+      '<div id="'+tblId+'" style="display:none"><table style="width:100%;font-size:.83rem">'+
+      '<thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Fecha</th><th>Acción</th></tr></thead>'+
+      '<tbody>'+rows+'</tbody></table></div></div>';
+  });
+  html += '</div>';
+
+  container.innerHTML = html;
+}
+
+function imprimirPendientes(){
+  const hoy = new Date();
+  const aplicadasMap = {};
+  (window._clinVacAplicadas||[]).forEach(v=>{
+    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]={};
+    aplicadasMap[v.hembra][v.vacuna] = true;
+  });
+  const calendario = window._clinCalendario||[];
+  const madres = window._clinMadresSet||new Set();
+  const salidaSet = window._clinSalidaSet||new Set();
+  const partos = (window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&!madres.has(p.hembra)&&!salidaSet.has(p.hembra));
+
+  const vacMap = {};
+  calendario.forEach(cal=>{ vacMap[cal.vacuna]={cal, pendientes:[]}; });
+  partos.forEach(p=>{
+    const dias=Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000);
+    const apl=aplicadasMap[p.hembra]||{};
+    calendario.forEach(cal=>{
+      if(!apl[cal.vacuna] && dias>=cal.dias_min)
+        vacMap[cal.vacuna].pendientes.push({hembra:p.hembra, raza:p.raza, dias, corral:p.corral||'—'});
+    });
+  });
+
+  const dd=String(hoy.getDate()).padStart(2,'0');
+  const mm=String(hoy.getMonth()+1).padStart(2,'0');
+  const yyyy=hoy.getFullYear();
+  let body='';
+  Object.entries(vacMap).forEach(([vacuna,data])=>{
+    if(!data.pendientes.length) return;
+    const sorted=data.pendientes.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+    body+=`<div class="seccion"><h2>${vacuna} <span class="cnt">(${sorted.length} becerras)</span></h2>`+
+      `<table><thead><tr><th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th></tr></thead><tbody>`+
+      sorted.map(p=>`<tr><td>${p.hembra}</td><td>${p.raza}</td><td>${p.dias}d</td><td>${p.corral}</td></tr>`).join('')+
+      `</tbody></table></div>`;
+  });
+
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vacunas Pendientes</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h1{font-size:16px;margin-bottom:4px}.fecha{color:#666;font-size:11px;margin-bottom:16px}.seccion{margin-bottom:20px;page-break-inside:avoid}h2{font-size:13px;background:#fff8e1;padding:6px 10px;border-left:4px solid #f9a825;margin-bottom:6px}.cnt{color:#c77800;font-weight:normal}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#2d6a4f;color:white;padding:4px 8px;text-align:left}td{padding:4px 8px;border-bottom:1px solid #eee}@media print{button{display:none}}</style>
+  </head><body><h1>💉 Vacunas Pendientes — CrianzaLH</h1><div class="fecha">Generado: ${dd}/${mm}/${yyyy}</div>${body}</body></html>`);
+  win.document.close();
+  win.print();
 }
 
 function toggleVacTipo(btnId, tblId){
@@ -3061,7 +3138,80 @@ async function editProtoDia(protocolo_id, dia){
   await loadClinAdmin();
 }
 
-// ==================== FICHA ANIMAL ====================
+// ==================== CORRALES ====================
+async function loadCorrales(){
+  const [partos, salidas] = await Promise.all([
+    sbFetch('partos_crianza?sexo=eq.H&select=hembra,raza,fecha_parto,corral&limit=10000'),
+    sbFetch('salidas_crianza?select=hembra&limit=10000')
+  ]);
+  window._corralesPartos = partos||[];
+  window._corralesSalidas = new Set((salidas||[]).map(s=>String(s.hembra)));
+  renderCorrales();
+}
+
+function renderCorrales(){
+  const hoy = new Date();
+  const salidaSet = window._corralesSalidas||new Set();
+  const partos = (window._corralesPartos||[]).filter(p=>
+    p.hembra && /^\d+$/.test(p.hembra) && !salidaSet.has(String(p.hembra))
+  );
+
+  // Agrupar por corral
+  const corrMap = {};
+  partos.forEach(p=>{
+    const c = p.corral!=null ? String(p.corral) : 'Sin corral';
+    if(!corrMap[c]) corrMap[c]=[];
+    corrMap[c].push(p);
+  });
+
+  const total = partos.length;
+  const totalCorrales = Object.keys(corrMap).length;
+  const resumen = document.getElementById('corrales-resumen');
+  if(resumen) resumen.textContent = `${total} becerras activas en ${totalCorrales} corrales`;
+
+  const container = document.getElementById('corrales-container');
+  if(!container) return;
+
+  const sorted = Object.entries(corrMap).sort((a,b)=>{
+    const na = a[0]==='Sin corral'?99999:parseInt(a[0]);
+    const nb = b[0]==='Sin corral'?99999:parseInt(b[0]);
+    return na-nb;
+  });
+
+  container.innerHTML = sorted.map(([corral, animales])=>{
+    const btnId = 'cbtn-'+corral.replace(/[^a-z0-9]/gi,'_');
+    const tblId = 'ctbl-'+corral.replace(/[^a-z0-9]/gi,'_');
+    const rows = animales.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>{
+      const nac = new Date(p.fecha_parto+'T12:00:00');
+      const dias = Math.floor((hoy-nac)/86400000);
+      const dd=String(nac.getDate()).padStart(2,'0');
+      const mm=String(nac.getMonth()+1).padStart(2,'0');
+      const yyyy=nac.getFullYear();
+      return `<tr><td class="mono" style="font-weight:600;padding:.35rem .4rem">${p.hembra}</td>`+
+        `<td class="mono">${p.raza||'—'}</td><td class="mono">${dias}d</td>`+
+        `<td class="mono">${dd}/${mm}/${yyyy}</td></tr>`;
+    }).join('');
+    const esSinCorral = corral==='Sin corral';
+    const bgHeader = esSinCorral ? '#999' : 'var(--accent)';
+    return `<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.7rem">
+      <button id="${btnId}" onclick="toggleVacTipo('${btnId}','${tblId}')"
+        style="width:100%;background:${bgHeader};color:white;border:none;border-radius:6px 6px 0 0;padding:.7rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">
+        <span style="font-weight:700">🏠 Corral ${corral}</span>
+        <span style="display:flex;gap:1rem;font-size:.85rem">
+          <span>${animales.length} becerras</span><span>▼</span></span></button>
+      <div id="${tblId}" style="display:none">
+        <table style="width:100%;font-size:.83rem">
+          <thead><tr style="background:var(--accent);color:#fff">
+            <th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Fecha Nac.</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+
 async function buscarFicha(){
   const arete=document.getElementById('ficha-arete').value.trim();
   const container=document.getElementById('ficha-resultado');
