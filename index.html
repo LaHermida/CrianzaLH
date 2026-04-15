@@ -513,6 +513,11 @@
           <button class="btn btn-primary" onclick="openVacunaModal()">+ Registrar Vacuna</button>
         </div>
       </div>
+      <div class="kpi-group-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>🚫 Becerras Sin Ninguna Vacuna</span>
+        <span id="vac-sin-count" style="font-size:.82rem;color:var(--red);font-weight:600"></span>
+      </div>
+      <div id="vac-sin-vacunar-container" style="margin-bottom:1.5rem"></div>
       <div class="kpi-group-label">💉 Vacunas por Tipo</div>
       <div id="vac-por-tipo-container" style="margin-bottom:1.5rem">
         <p style="color:var(--text-muted);padding:1rem">Cargando...</p>
@@ -2709,6 +2714,34 @@ function renderVacunasPorTipo(){
       }
     });
   });
+
+  // Becerras sin ninguna vacuna
+  const conVacuna = new Set(Object.keys(aplicadasMap));
+  const sinVacunar = partos.filter(p=>!conVacuna.has(p.hembra)).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+  const sinContainer = document.getElementById('vac-sin-vacunar-container');
+  const sinCount = document.getElementById('vac-sin-count');
+  if(sinContainer){
+    if(sinCount) sinCount.textContent = sinVacunar.length ? sinVacunar.length+' becerras' : '';
+    if(!sinVacunar.length){
+      sinContainer.innerHTML='<p style="color:var(--text-muted);padding:.5rem 0">✅ Todas las becerras activas tienen al menos una vacuna registrada.</p>';
+    } else {
+      sinContainer.innerHTML='<div style="border:1px solid #ffcccc;border-radius:8px;overflow:hidden">'+
+        '<table style="width:100%;font-size:.83rem">'+
+        '<thead><tr style="background:#c62828;color:#fff"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Fecha Nac.</th></tr></thead>'+
+        '<tbody>'+sinVacunar.map(p=>{
+          const nac=new Date(p.fecha_parto+'T12:00:00');
+          const dias=Math.floor((hoy-nac)/86400000);
+          const dd=String(nac.getDate()).padStart(2,'0');
+          const mm=String(nac.getMonth()+1).padStart(2,'0');
+          const yyyy=nac.getFullYear();
+          return '<tr style="background:#fff5f5"><td class="mono" style="font-weight:600;padding:.35rem .4rem">'+p.hembra+'</td>'+
+            '<td class="mono">'+p.raza+'</td>'+
+            '<td class="mono">'+dias+'d</td>'+
+            '<td class="mono">'+dd+'/'+mm+'/'+yyyy+'</td></tr>';
+        }).join('')+
+        '</tbody></table></div>';
+    }
+  }
 
   const container = document.getElementById('vac-por-tipo-container');
   if(!container) return;
