@@ -387,6 +387,7 @@
           <button class="btn btn-secondary btn-sm" onclick="setInvQuick('todo')">Todo</button>
           <button class="btn btn-secondary" onclick="window.print()">🖨️ PDF</button>
           <button class="btn btn-secondary" onclick="exportActivasExcel()">📊 Excel Activas</button>
+          <button class="btn btn-secondary" onclick="downloadTemplateSalidas()">📄 Template Salidas</button>
           <button class="btn btn-secondary" onclick="document.getElementById('importSalidasFile').click()">📥 Importar Salidas</button>
           <input type="file" id="importSalidasFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importSalidas(event)"/>
         </div>
@@ -508,6 +509,7 @@
       <div class="section-header">
         <span class="section-title">💉 Vacunación</span>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="downloadTemplateVacunas()">📄 Template</button>
           <button class="btn btn-secondary" onclick="document.getElementById('importVacunasFile').click()">📥 Importar Vacunas</button>
           <input type="file" id="importVacunasFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importVacunas(event)"/>
           <button class="btn btn-primary" onclick="openVacunaModal()">+ Registrar Vacuna</button>
@@ -563,7 +565,7 @@
       </div>
       <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:1.5rem;max-width:500px">
         <input type="text" id="ficha-arete" placeholder="Número de arete..." style="flex:1" onkeydown="if(event.key==='Enter')buscarFicha()"/>
-        <button class="btn btn-primary" onclick="buscarFicha()">🔍 Buscar</button>
+        <button type="button" class="btn btn-primary" onclick="buscarFicha()">🔍 Buscar</button>
       </div>
       <div id="ficha-resultado"></div>
     </div>
@@ -2061,8 +2063,37 @@ async function importSalidas(event){
   }
   alert(`Importadas: ${ok} salidas${err?', Errores: '+err:''}`);
   await loadInventario();
-  const invBtn=document.querySelector('#mainNav button[onclick*="inventario"]');
-  if(invBtn) showTab('inventario',invBtn);
+}
+
+function downloadTemplateSalidas(){
+  const header = 'Hembra,Fecha Salida (DD/MM/YYYY),Motivo';
+  const ejemplos = [
+    '5001,15/04/2026,Vendida',
+    '5002,10/04/2026,Muerta - Diarrea',
+    '5003,08/04/2026,Muerta - Pulmonar',
+    '5004,05/04/2026,Descarte',
+  ].join('\n');
+  const csv = header + '\n' + ejemplos;
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Template_Salidas.csv';
+  a.click();
+}
+
+function downloadTemplateVacunas(){
+  const header = 'Hembra,Vacuna,Fecha (DD/MM/YYYY)';
+  const ejemplos = [
+    '5001,Tsv-3 Nasal,15/04/2026',
+    '5002,Covexin,14/04/2026',
+    '5003,Rb-51,13/04/2026',
+  ].join('\n');
+  const csv = header + '\n' + ejemplos;
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'Template_Vacunas.csv';
+  a.click();
 }
 
 function exportActivasExcel(){
@@ -2562,7 +2593,7 @@ async function loadClinVacunas(){
   // Paginate aplicadas (Supabase default max 1000 rows)
   let aplicadas=[], offset=0;
   while(true){
-    const batch=await sbClin(`clin_vacunas_aplicadas?select=hembra,vacuna&order=id.asc&offset=${offset}&limit=1000`);
+    const batch=await sbClin(`clin_vacunas_aplicadas?select=id,hembra,vacuna,fecha&order=id.asc&offset=${offset}&limit=1000`);
     if(!batch||!batch.length) break;
     aplicadas=aplicadas.concat(batch);
     if(batch.length<1000) break;
@@ -2683,8 +2714,8 @@ function renderVacunasPorTipo(){
   const hoy = new Date();
   const aplicadasMap = {};
   (window._clinVacAplicadas||[]).forEach(v=>{
-    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]=new Set();
-    aplicadasMap[v.hembra].add(v.vacuna);
+    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]={};
+    aplicadasMap[v.hembra][v.vacuna] = {id: v.id, fecha: v.fecha};
   });
 
   const calendario = window._clinCalendario||[];
@@ -2701,14 +2732,14 @@ function renderVacunasPorTipo(){
   partos.forEach(p=>{
     const nac = new Date(p.fecha_parto+'T12:00:00');
     const dias = Math.floor((hoy-nac)/86400000);
-    const aplicadas = aplicadasMap[p.hembra]||new Set();
-
+    const aplicadas = aplicadasMap[p.hembra]||{};
     calendario.forEach(cal=>{
       if(!vacMap[cal.vacuna]) return;
-      const yaAplicada = aplicadas.has(cal.vacuna);
+      const reg = aplicadas[cal.vacuna];
+      const yaAplicada = !!reg;
       const elegible = dias>=cal.dias_min;
       if(yaAplicada){
-        vacMap[cal.vacuna].aplicadas.push({hembra:p.hembra, raza:p.raza, dias});
+        vacMap[cal.vacuna].aplicadas.push({hembra:p.hembra, raza:p.raza, dias, id:reg.id, fecha:reg.fecha});
       } else if(elegible){
         vacMap[cal.vacuna].pendientes.push({hembra:p.hembra, raza:p.raza, dias});
       }
@@ -2716,7 +2747,7 @@ function renderVacunasPorTipo(){
   });
 
   // Becerras sin ninguna vacuna
-  const conVacuna = new Set(Object.keys(aplicadasMap));
+  const conVacuna = new Set(Object.keys(aplicadasMap).filter(h=>Object.keys(aplicadasMap[h]).length>0));
   const sinVacunar = partos.filter(p=>!conVacuna.has(p.hembra)).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
   const sinContainer = document.getElementById('vac-sin-vacunar-container');
   const sinCount = document.getElementById('vac-sin-count');
@@ -2761,14 +2792,15 @@ function renderVacunasPorTipo(){
       '<td><button class="btn btn-primary btn-sm" onclick="aplicarVacunaRapida(&quot;'+p.hembra+'&quot;,&quot;'+vacuna+'&quot;)">Aplicar</button></td></tr>'
     ).join('');
 
-    const aplRow = data.aplicadas.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>
-      '<tr>'+
+    const aplRow = data.aplicadas.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>{
+      const fechaStr = p.fecha ? (' — '+p.fecha.split('-').reverse().join('/')) : '';
+      return '<tr>'+
       '<td class="mono" style="font-weight:600">'+p.hembra+'</td>'+
       '<td class="mono">'+p.raza+'</td>'+
       '<td class="mono">'+p.dias+'d</td>'+
-      '<td style="color:#2d6a4f;font-weight:600">✅ Aplicada</td>'+
-      '<td></td></tr>'
-    ).join('');
+      '<td style="color:#2d6a4f;font-weight:600">✅ Aplicada'+fechaStr+'</td>'+
+      '<td><button class="btn btn-danger btn-sm" onclick="deleteVacuna('+p.id+')">🗑</button></td></tr>';
+    }).join('');
 
     return '<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.8rem">'+
       '<button id="'+btnId+'" onclick="toggleVacTipo(&quot;'+btnId+'&quot;,&quot;'+tblId+'&quot;)" '+
