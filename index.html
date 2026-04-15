@@ -511,19 +511,60 @@
         <span class="section-title">💉 Vacunación</span>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
           <button class="btn btn-secondary" onclick="downloadTemplateVacunas()">📄 Template</button>
-          <button class="btn btn-secondary" onclick="document.getElementById('importVacunasFile').click()">📥 Importar Vacunas</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('importVacunasFile').click()">📥 Importar</button>
           <input type="file" id="importVacunasFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importVacunas(event)"/>
-          <button class="btn btn-primary" onclick="openVacunaModal()">+ Registrar Vacuna</button>
+          <button class="btn btn-primary" onclick="openVacunaModal()">+ Registrar</button>
         </div>
       </div>
-      <div class="kpi-group-label" style="display:flex;justify-content:space-between;align-items:center">
-        <span>🚫 Becerras Sin Ninguna Vacuna</span>
-        <span id="vac-sin-count" style="font-size:.82rem;color:var(--red);font-weight:600"></span>
+
+      <!-- MODO SELECTOR -->
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem;border-bottom:2px solid var(--border);padding-bottom:.75rem">
+        <button id="vmode-btn-plan" class="btn btn-primary btn-sm" onclick="setVacMode('plan')">📋 Planear / Aplicar por Lote</button>
+        <button id="vmode-btn-historial" class="btn btn-secondary btn-sm" onclick="setVacMode('historial')">📜 Historial Aplicadas</button>
+        <button id="vmode-btn-sinvac" class="btn btn-secondary btn-sm" onclick="setVacMode('sinvac')">🚫 Sin Vacunar</button>
       </div>
-      <div id="vac-sin-vacunar-container" style="margin-bottom:1.5rem"></div>
-      <div class="kpi-group-label">💉 Vacunas por Tipo</div>
-      <div id="vac-por-tipo-container" style="margin-bottom:1.5rem">
-        <p style="color:var(--text-muted);padding:1rem">Cargando...</p>
+
+      <!-- PANEL: PLANEAR / APLICAR -->
+      <div id="vac-panel-plan">
+        <!-- Paso 1: seleccionar vacuna -->
+        <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem">
+          <div>
+            <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:.25rem">Vacuna</label>
+            <select id="vplan-vacuna" onchange="onVplanVacunaChange()" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem;min-width:200px">
+              <option value="">— Selecciona vacuna —</option>
+            </select>
+          </div>
+          <div id="vplan-corral-wrap" style="display:none">
+            <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:.25rem">Corral</label>
+            <select id="vplan-corral" onchange="renderVplanLista()" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem;min-width:140px">
+              <option value="">— Todos —</option>
+            </select>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="imprimirSeleccionVplan()">🖨️ Imprimir lista</button>
+        </div>
+        <!-- Lista de elegibles con checkboxes -->
+        <div id="vplan-lista"></div>
+        <!-- Botón aplicar -->
+        <div id="vplan-aplicar-bar" style="display:none;margin-top:1rem;padding:1rem;background:#f0fff0;border:1px solid #2d6a4f;border-radius:8px;display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
+          <span id="vplan-sel-count" style="font-weight:600;color:#2d6a4f"></span>
+          <input type="date" id="vplan-fecha" style="padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/>
+          <button class="btn btn-primary" onclick="aplicarVplanSeleccion()">✅ Registrar Aplicación</button>
+        </div>
+      </div>
+
+      <!-- PANEL: HISTORIAL -->
+      <div id="vac-panel-historial" style="display:none">
+        <div class="kpi-group-label">✅ Aplicadas por Vacuna</div>
+        <div id="vac-por-tipo-container"><p style="color:var(--text-muted);padding:1rem">Cargando...</p></div>
+      </div>
+
+      <!-- PANEL: SIN VACUNAR -->
+      <div id="vac-panel-sinvac" style="display:none">
+        <div class="kpi-group-label" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🚫 Becerras Sin Ninguna Vacuna</span>
+          <span id="vac-sin-count" style="font-size:.82rem;color:var(--red);font-weight:600"></span>
+        </div>
+        <div id="vac-sin-vacunar-container"></div>
       </div>
     </div>
 
@@ -2721,11 +2762,237 @@ function renderVacPendientes(){
   // Not used - replaced by renderVacunasPorTipo
 }
 
-function renderVacHistorial(){
-  // Not used - replaced by renderVacunasPorTipo
+// ==================== VACUNACION MODOS ====================
+const VAC_PMH = 'PMH 37-43 Días'; // se agrupa por lote
+const VAC_TSV = 'TSV-3 1 Día';    // individual (no aplica modo lote/corral)
+
+function setVacMode(mode){
+  document.getElementById('vac-panel-plan').style.display = mode==='plan' ? '' : 'none';
+  document.getElementById('vac-panel-historial').style.display = mode==='historial' ? '' : 'none';
+  document.getElementById('vac-panel-sinvac').style.display = mode==='sinvac' ? '' : 'none';
+  ['plan','historial','sinvac'].forEach(m=>{
+    const b = document.getElementById('vmode-btn-'+m);
+    if(b) b.className = m===mode ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
+  });
+  if(mode==='historial') renderVacHistorialAplicadas();
+  if(mode==='sinvac') renderVacSinVacunar();
+  if(mode==='plan') renderVplanInit();
 }
 
-function renderVacunasPorTipo(){
+function renderVplanInit(){
+  const calendario = window._clinCalendario||[];
+  const sel = document.getElementById('vplan-vacuna');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">— Selecciona vacuna —</option>' +
+    calendario.map(c=>`<option value="${c.vacuna}">${c.vacuna} (${c.dias_min}-${c.dias_max}d)</option>`).join('');
+  document.getElementById('vplan-lista').innerHTML = '';
+  document.getElementById('vplan-aplicar-bar').style.display = 'none';
+  document.getElementById('vplan-corral-wrap').style.display = 'none';
+}
+
+function onVplanVacunaChange(){
+  const vacuna = document.getElementById('vplan-vacuna').value;
+  if(!vacuna){ document.getElementById('vplan-lista').innerHTML=''; return; }
+
+  const esPorCorral = (vacuna !== VAC_PMH && vacuna !== VAC_TSV);
+  const corralWrap = document.getElementById('vplan-corral-wrap');
+  corralWrap.style.display = esPorCorral ? '' : 'none';
+
+  if(esPorCorral){
+    // Poblar selector de corrales con los que tienen elegibles
+    const elegibles = getElegiblesParaVacuna(vacuna);
+    const corrales = [...new Set(elegibles.map(p=>p.corral!=null?String(p.corral):'Sin corral'))].sort((a,b)=>{
+      if(a==='Sin corral') return 1; if(b==='Sin corral') return -1;
+      return parseInt(a)-parseInt(b);
+    });
+    const sel = document.getElementById('vplan-corral');
+    sel.innerHTML = '<option value="">— Todos los corrales —</option>' +
+      corrales.map(c=>`<option value="${c}">Corral ${c} (${elegibles.filter(p=>(p.corral!=null?String(p.corral):'Sin corral')===c).length})</option>`).join('');
+  }
+  renderVplanLista();
+}
+
+function getElegiblesParaVacuna(vacuna){
+  const hoy = new Date();
+  const calendario = window._clinCalendario||[];
+  const cal = calendario.find(c=>c.vacuna===vacuna);
+  if(!cal) return [];
+  const aplicadasMap = {};
+  (window._clinVacAplicadas||[]).forEach(v=>{
+    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]={};
+    aplicadasMap[v.hembra][v.vacuna] = true;
+  });
+  const madres = window._clinMadresSet||new Set();
+  const salidaSet = window._clinSalidaSet||new Set();
+  return (window._clinPartosH||[]).filter(p=>{
+    if(!p.hembra||!/^\d+$/.test(p.hembra)||p.sexo!=='H') return false;
+    if(madres.has(p.hembra)||salidaSet.has(p.hembra)) return false;
+    if(aplicadasMap[p.hembra]&&aplicadasMap[p.hembra][vacuna]) return false;
+    const dias = Math.floor((hoy - new Date(p.fecha_parto+'T12:00:00'))/86400000);
+    return dias >= cal.dias_min;
+  }).map(p=>({...p, dias: Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000)}));
+}
+
+function renderVplanLista(){
+  const vacuna = document.getElementById('vplan-vacuna').value;
+  if(!vacuna) return;
+  const corralSel = document.getElementById('vplan-corral')?.value || '';
+  let elegibles = getElegiblesParaVacuna(vacuna);
+
+  if(corralSel){
+    elegibles = elegibles.filter(p=>(p.corral!=null?String(p.corral):'Sin corral')===corralSel);
+  }
+
+  // Agrupar: PMH por lote (todos juntos), demás por corral
+  const esPMH = vacuna === VAC_PMH;
+  const esTSV = vacuna === VAC_TSV;
+
+  elegibles.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+
+  const container = document.getElementById('vplan-lista');
+  if(!elegibles.length){
+    container.innerHTML='<p style="color:var(--text-muted);padding:.5rem 0">Sin becerras elegibles para esta vacuna.</p>';
+    document.getElementById('vplan-aplicar-bar').style.display='none';
+    return;
+  }
+
+  // Agrupar por corral si no es PMH
+  let grupos = {};
+  if(esPMH || esTSV){
+    grupos['__all'] = elegibles;
+  } else {
+    elegibles.forEach(p=>{
+      const c = p.corral!=null?String(p.corral):'Sin corral';
+      if(!grupos[c]) grupos[c]=[];
+      grupos[c].push(p);
+    });
+  }
+
+  let html = `<div style="margin-bottom:.5rem;display:flex;gap:.5rem;align-items:center">
+    <button class="btn btn-secondary btn-sm" onclick="vplanSelAll(true)">☑ Seleccionar todos</button>
+    <button class="btn btn-secondary btn-sm" onclick="vplanSelAll(false)">☐ Deseleccionar todos</button>
+    <span style="font-size:.82rem;color:var(--text-muted)">${elegibles.length} elegibles</span>
+  </div>`;
+
+  Object.entries(grupos).sort((a,b)=>{
+    if(a[0]==='__all'||a[0]==='Sin corral') return 1;
+    if(b[0]==='__all'||b[0]==='Sin corral') return -1;
+    return parseInt(a[0])-parseInt(b[0]);
+  }).forEach(([grp, animals])=>{
+    const titulo = grp==='__all' ? `${esPMH?'Lote elegible':'Elegibles'} — ${animals.length} becerras` : `Corral ${grp} — ${animals.length} becerras`;
+    html += `<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.6rem;overflow:hidden">
+      <div style="background:var(--accent);color:white;padding:.5rem 1rem;font-weight:600;font-size:.88rem;display:flex;justify-content:space-between">
+        <span>${titulo}</span>
+        <label style="cursor:pointer;font-size:.82rem"><input type="checkbox" onchange="vplanSelGrupo(this,'${grp}')" checked style="margin-right:.3rem"/>Todo el grupo</label>
+      </div>
+      <table style="width:100%;font-size:.83rem"><thead>
+        <tr style="background:#f5f5f5"><th style="padding:.35rem .5rem;width:30px"></th><th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th></tr>
+      </thead><tbody>` +
+      animals.map(p=>`<tr>
+        <td style="padding:.3rem .5rem"><input type="checkbox" class="vplan-check" data-hembra="${p.hembra}" data-grupo="${grp}" checked onchange="updateVplanCount()"/></td>
+        <td class="mono" style="font-weight:600">${p.hembra}</td>
+        <td class="mono">${p.raza||'—'}</td>
+        <td class="mono">${p.dias}d</td>
+        <td class="mono">${p.corral!=null?p.corral:'—'}</td>
+      </tr>`).join('') +
+      `</tbody></table></div>`;
+  });
+
+  container.innerHTML = html;
+  updateVplanCount();
+
+  // Fecha default hoy
+  const hoy = new Date();
+  const fi = document.getElementById('vplan-fecha');
+  if(fi) fi.value = hoy.toISOString().split('T')[0];
+}
+
+function vplanSelAll(val){
+  document.querySelectorAll('.vplan-check').forEach(c=>c.checked=val);
+  updateVplanCount();
+}
+
+function vplanSelGrupo(cb, grp){
+  document.querySelectorAll(`.vplan-check[data-grupo="${grp}"]`).forEach(c=>c.checked=cb.checked);
+  updateVplanCount();
+}
+
+function updateVplanCount(){
+  const checks = document.querySelectorAll('.vplan-check:checked');
+  const bar = document.getElementById('vplan-aplicar-bar');
+  const cnt = document.getElementById('vplan-sel-count');
+  if(checks.length){
+    bar.style.display='flex';
+    cnt.textContent = `${checks.length} becerras seleccionadas`;
+  } else {
+    bar.style.display='none';
+  }
+}
+
+async function aplicarVplanSeleccion(){
+  const vacuna = document.getElementById('vplan-vacuna').value;
+  const fechaVal = document.getElementById('vplan-fecha').value;
+  if(!vacuna||!fechaVal){alert('Selecciona vacuna y fecha');return;}
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  const checks = [...document.querySelectorAll('.vplan-check:checked')];
+  if(!checks.length){alert('Ninguna becerra seleccionada');return;}
+  const hembras = checks.map(c=>c.dataset.hembra);
+  let ok=0,err=0;
+  for(const hembra of hembras){
+    const res = await sbClin('clin_vacunas_aplicadas','POST',{hembra, vacuna, fecha:fechaVal});
+    if(res&&!res.error) ok++; else err++;
+  }
+  alert(`✅ Aplicadas: ${ok}${err?' | Errores: '+err:''}`);
+  await loadClinVacunas();
+  setVacMode('plan');
+}
+
+function imprimirSeleccionVplan(){
+  const vacuna = document.getElementById('vplan-vacuna').value;
+  if(!vacuna){alert('Selecciona una vacuna primero');return;}
+  const corralSel = document.getElementById('vplan-corral')?.value||'';
+  let elegibles = getElegiblesParaVacuna(vacuna);
+  if(corralSel) elegibles = elegibles.filter(p=>(p.corral!=null?String(p.corral):'Sin corral')===corralSel);
+  elegibles.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+
+  const hoy = new Date();
+  const dd=String(hoy.getDate()).padStart(2,'0');
+  const mm=String(hoy.getMonth()+1).padStart(2,'0');
+  const yyyy=hoy.getFullYear();
+
+  // Agrupar por corral para imprimir
+  const grupos = {};
+  const esPMH = vacuna===VAC_PMH||vacuna===VAC_TSV;
+  if(esPMH){ grupos['__all']=elegibles; }
+  else { elegibles.forEach(p=>{ const c=p.corral!=null?String(p.corral):'Sin corral'; if(!grupos[c])grupos[c]=[]; grupos[c].push(p); }); }
+
+  let body='';
+  let totalDosis=0;
+  Object.entries(grupos).sort((a,b)=>{
+    if(a[0]==='__all'||a[0]==='Sin corral') return 1;
+    if(b[0]==='__all'||b[0]==='Sin corral') return -1;
+    return parseInt(a[0])-parseInt(b[0]);
+  }).forEach(([grp,animals])=>{
+    totalDosis+=animals.length;
+    const titulo = grp==='__all'?`Lote (${animals.length} dosis)`:`Corral ${grp} — ${animals.length} dosis`;
+    body+=`<div class="seccion"><h2>${titulo}</h2>`+
+      `<table><thead><tr><th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th></tr></thead><tbody>`+
+      animals.map(p=>`<tr><td>${p.hembra}</td><td>${p.raza||'—'}</td><td>${p.dias}d</td><td>${p.corral!=null?p.corral:'—'}</td></tr>`).join('')+
+      `</tbody></table></div>`;
+  });
+
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vacuna ${vacuna}</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h1{font-size:15px}h2{font-size:13px;background:#fff8e1;padding:5px 10px;border-left:4px solid #f9a825;margin:14px 0 6px}.meta{color:#555;font-size:11px;margin-bottom:4px}.total{font-weight:bold;color:#2d6a4f;margin-bottom:14px}.seccion{page-break-inside:avoid;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#2d6a4f;color:white;padding:4px 8px;text-align:left}td{padding:4px 8px;border-bottom:1px solid #eee}</style>
+  </head><body>
+  <h1>💉 Lista de Vacunación — ${vacuna}</h1>
+  <div class="meta">Generado: ${dd}/${mm}/${yyyy}</div>
+  <div class="total">Total dosis requeridas: ${totalDosis}</div>
+  ${body}</body></html>`);
+  win.document.close(); win.print();
+}
+
+
   const hoy = new Date();
   const aplicadasMap = {};
   (window._clinVacAplicadas||[]).forEach(v=>{
@@ -2894,6 +3161,58 @@ function imprimirPendientes(){
   </head><body><h1>💉 Vacunas Pendientes — CrianzaLH</h1><div class="fecha">Generado: ${dd}/${mm}/${yyyy}</div>${body}</body></html>`);
   win.document.close();
   win.print();
+}
+
+function renderVacunasPorTipo(){
+  renderVplanInit();
+  renderVacSinVacunar();
+}
+
+function renderVacSinVacunar(){
+  const hoy=new Date();
+  const aplicadasMap={};
+  (window._clinVacAplicadas||[]).forEach(v=>{if(!aplicadasMap[v.hembra])aplicadasMap[v.hembra]={};aplicadasMap[v.hembra][v.vacuna]=true;});
+  const madres=window._clinMadresSet||new Set();
+  const salidaSet=window._clinSalidaSet||new Set();
+  const partos=(window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&!madres.has(p.hembra)&&!salidaSet.has(p.hembra));
+  const conVacuna=new Set(Object.keys(aplicadasMap).filter(h=>Object.keys(aplicadasMap[h]).length>0));
+  const sinVacunar=partos.filter(p=>!conVacuna.has(p.hembra)).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+  const sinContainer=document.getElementById('vac-sin-vacunar-container');
+  const sinCount=document.getElementById('vac-sin-count');
+  if(!sinContainer) return;
+  if(sinCount) sinCount.textContent=sinVacunar.length?sinVacunar.length+' becerras':'';
+  if(!sinVacunar.length){sinContainer.innerHTML='<p style="color:var(--text-muted);padding:.5rem 0">✅ Todas las becerras activas tienen al menos una vacuna registrada.</p>';return;}
+  sinContainer.innerHTML='<div style="border:1px solid #ffcccc;border-radius:8px;overflow:hidden"><table style="width:100%;font-size:.83rem"><thead><tr style="background:#c62828;color:#fff"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Fecha Nac.</th></tr></thead><tbody>'+
+    sinVacunar.map(p=>{const nac=new Date(p.fecha_parto+'T12:00:00');const dias=Math.floor((hoy-nac)/86400000);const dd=String(nac.getDate()).padStart(2,'0');const mm=String(nac.getMonth()+1).padStart(2,'0');const yyyy=nac.getFullYear();return '<tr style="background:#fff5f5"><td class="mono" style="font-weight:600;padding:.35rem .4rem">'+p.hembra+'</td><td class="mono">'+p.raza+'</td><td class="mono">'+dias+'d</td><td class="mono">'+(p.corral||'—')+'</td><td class="mono">'+dd+'/'+mm+'/'+yyyy+'</td></tr>';}).join('')+
+    '</tbody></table></div>';
+}
+
+function renderVacHistorialAplicadas(){
+  const hoy=new Date();
+  const aplicadasMap={};
+  (window._clinVacAplicadas||[]).forEach(v=>{if(!aplicadasMap[v.hembra])aplicadasMap[v.hembra]={};aplicadasMap[v.hembra][v.vacuna]={id:v.id,fecha:v.fecha};});
+  const calendario=window._clinCalendario||[];
+  const madres=window._clinMadresSet||new Set();
+  const salidaSet=window._clinSalidaSet||new Set();
+  const partos=(window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&!madres.has(p.hembra)&&!salidaSet.has(p.hembra));
+  const vacMap={};
+  calendario.forEach(cal=>{vacMap[cal.vacuna]={cal,aplicadas:[]};});
+  partos.forEach(p=>{
+    const dias=Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000);
+    const apl=aplicadasMap[p.hembra]||{};
+    calendario.forEach(cal=>{if(!vacMap[cal.vacuna])return;const reg=apl[cal.vacuna];if(reg)vacMap[cal.vacuna].aplicadas.push({hembra:p.hembra,raza:p.raza,dias,corral:p.corral||'—',id:reg.id,fecha:reg.fecha});});
+  });
+  const container=document.getElementById('vac-por-tipo-container');
+  if(!container) return;
+  let html='';
+  Object.entries(vacMap).forEach(([vacuna,data])=>{
+    if(!data.aplicadas.length) return;
+    const btnId='vapl-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+    const tblId='vtapl-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+    const rows=data.aplicadas.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)).map(p=>{const f=p.fecha?p.fecha.split('-').reverse().join('/'):'—';return '<tr><td class="mono" style="font-weight:600;padding:.35rem .4rem">'+p.hembra+'</td><td class="mono">'+p.raza+'</td><td class="mono">'+p.dias+'d</td><td class="mono">'+p.corral+'</td><td class="mono" style="color:#2d6a4f">'+f+'</td><td><button class="btn btn-danger btn-sm" onclick="deleteVacuna('+p.id+')">🗑</button></td></tr>';}).join('');
+    html+='<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.6rem"><button id="'+btnId+'" onclick="toggleVacTipo(&quot;'+btnId+'&quot;,&quot;'+tblId+'&quot;)" style="width:100%;background:var(--accent);color:white;border:none;border-radius:6px 6px 0 0;padding:.6rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.88rem"><span style="font-weight:600">'+vacuna+'</span><span style="display:flex;gap:1rem;font-size:.82rem"><span style="color:#90ee90">✅ '+data.aplicadas.length+'</span><span>▼</span></span></button><div id="'+tblId+'" style="display:none"><table style="width:100%;font-size:.83rem"><thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Fecha</th><th>Acción</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  });
+  container.innerHTML=html||'<p style="color:var(--text-muted)">Sin registros aplicados.</p>';
 }
 
 function toggleVacTipo(btnId, tblId){
