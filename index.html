@@ -526,6 +526,9 @@
 
       <!-- PANEL PENDIENTES -->
       <div id="vac-panel-plan">
+        <div style="display:flex;justify-content:flex-end;margin-bottom:.75rem">
+          <button class="btn btn-secondary" onclick="imprimirTodosLotes()">🖨️ Imprimir Todas las Pendientes</button>
+        </div>
         <div id="vac-lotes-container"></div>
         <!-- Barra aplicar flotante -->
         <div id="vplan-aplicar-bar" style="display:none;position:sticky;bottom:1rem;margin-top:1rem;padding:.8rem 1rem;background:#f0fff0;border:2px solid #2d6a4f;border-radius:8px;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;z-index:10">
@@ -2952,6 +2955,65 @@ async function aplicarVplanSeleccion(){
   alert(`✅ Aplicadas: ${ok}${err?' | Errores: '+err:''}`);
   await loadClinVacunas();
   setVacMode('plan');
+}
+
+function imprimirTodosLotes(){
+  const hoy=new Date();
+  const calendario=window._clinCalendario||[];
+  const madres=window._clinMadresSet||new Set();
+  const salidaSet=window._clinSalidaSet||new Set();
+  const todasPartos=(window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&!madres.has(p.hembra)&&!salidaSet.has(p.hembra));
+  const aplicadasMap={};
+  (window._clinVacAplicadas||[]).forEach(v=>{if(!aplicadasMap[v.hembra])aplicadasMap[v.hembra]={};aplicadasMap[v.hembra][v.vacuna]=true;});
+
+  const dd=String(hoy.getDate()).padStart(2,'0'),mm=String(hoy.getMonth()+1).padStart(2,'0'),yyyy=hoy.getFullYear();
+  let body=''; let totalGlobal=0;
+
+  calendario.forEach(cal=>{
+    const vacuna=cal.vacuna;
+    const noAplicadas=todasPartos.filter(p=>!(aplicadasMap[p.hembra]&&aplicadasMap[p.hembra][vacuna]));
+    const elegiblesReales=noAplicadas.filter(p=>Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000)>=cal.dias_min)
+      .map(p=>({...p,dias:Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000),adelantada:false}));
+    if(!elegiblesReales.length) return;
+
+    let lote=[];
+    if(vacuna===VAC_TSV){ lote=[...elegiblesReales]; }
+    else if(vacuna===VAC_PMH){
+      lote=[...elegiblesReales];
+      if(lote.length<PMH_LOTE_MIN){
+        const proximas=noAplicadas.map(p=>({...p,dias:Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000),adelantada:true}))
+          .filter(p=>p.dias<cal.dias_min).sort((a,b)=>b.dias-a.dias);
+        proximas.slice(0,PMH_LOTE_MIN-lote.length).forEach(p=>lote.push(p));
+      }
+    } else {
+      const corralesConElegible=new Set(elegiblesReales.map(p=>p.corral!=null?String(p.corral):'Sin corral'));
+      noAplicadas.forEach(p=>{
+        const c=p.corral!=null?String(p.corral):'Sin corral';
+        const dias=Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000);
+        if(corralesConElegible.has(c)){const ya=elegiblesReales.find(e=>e.hembra===p.hembra);lote.push({...p,dias,adelantada:!ya});}
+      });
+      const seen=new Set();lote=lote.filter(p=>{if(seen.has(p.hembra))return false;seen.add(p.hembra);return true;});
+    }
+    if(!lote.length) return;
+    lote.sort((a,b)=>{const ca=a.corral!=null?parseInt(a.corral):9999,cb=b.corral!=null?parseInt(b.corral):9999;return ca!==cb?ca-cb:parseInt(a.hembra)-parseInt(b.hembra);});
+
+    const eligCount=lote.filter(p=>!p.adelantada).length;
+    totalGlobal+=lote.length;
+    const rows=lote.map(p=>`<tr style="background:${p.adelantada?'#f5f5f5':'#fff8e1'}"><td>${p.hembra}</td><td>${p.raza||'—'}</td><td>${p.dias}d</td><td>${p.corral!=null?p.corral:'—'}</td><td style="color:${p.adelantada?'#888':'#c77800'}">${p.adelantada?'Adelantada':'Elegible'}</td></tr>`).join('');
+    body+=`<div class="seccion"><h2>${vacuna} <span class="cnt">${lote.length} dosis (${eligCount} elegibles${lote.length-eligCount?' + '+(lote.length-eligCount)+' adelantadas':''})</span></h2>
+    <table><thead><tr><th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  });
+
+  if(!body){alert('No hay lotes pendientes.');return;}
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vacunas Pendientes</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h1{font-size:15px}h2{font-size:13px;background:#fff8e1;padding:5px 10px;border-left:4px solid #f9a825;margin:14px 0 5px}.cnt{color:#c77800;font-weight:normal;font-size:11px}.meta{color:#555;font-size:11px;margin-bottom:4px}.total{font-weight:bold;color:#2d6a4f;margin-bottom:14px}.seccion{page-break-inside:avoid;margin-bottom:18px}table{width:100%;border-collapse:collapse}th{background:#2d6a4f;color:white;padding:4px 8px;text-align:left}td{padding:4px 8px;border-bottom:1px solid #eee}</style>
+  </head><body>
+  <h1>💉 Vacunas Pendientes — CrianzaLH</h1>
+  <div class="meta">Generado: ${dd}/${mm}/${yyyy}</div>
+  <div class="total">Total dosis: ${totalGlobal}</div>
+  ${body}</body></html>`);
+  win.document.close();win.print();
 }
 
 function imprimirLoteVacuna(vacuna){
