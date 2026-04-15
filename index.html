@@ -2063,6 +2063,7 @@ async function importSalidas(event){
   }
   alert(`Importadas: ${ok} salidas${err?', Errores: '+err:''}`);
   await loadInventario();
+  document.getElementById('tab-inventario').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 function downloadTemplateSalidas(){
@@ -2568,6 +2569,7 @@ async function importVacunas(event){
   }
   alert(`Vacunas importadas: ${ok}${err?' | Errores: '+err:''}`);
   await loadClinVacunas();
+  document.getElementById('tab-clin-vacunas').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 // ---- DATA LOAD ----
@@ -3131,12 +3133,46 @@ async function buscarFicha(){
       html += `</tbody></table>`;
     }
 
-    // Pesajes
+    // Pesajes con GDP
     if(pesajesArr.length){
       html += `<div class="kpi-group-label">⚖️ Pesajes (${pesajesArr.length})</div>`;
-      html += `<table style="width:100%;font-size:.85rem;margin-bottom:1rem"><thead><tr style="background:var(--accent);color:#fff"><th>Fecha</th><th>Peso (kg)</th><th>Notas</th></tr></thead><tbody>`;
-      pesajesArr.forEach(p=>{
-        html += `<tr><td class="mono">${fmtFecha(p.fecha)}</td><td class="mono">${p.peso}</td><td>${p.notas||''}</td></tr>`;
+      html += `<table style="width:100%;font-size:.85rem;margin-bottom:1rem"><thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Fecha</th><th>Peso (kg)</th><th>ADG vs anterior</th><th>ADG acumulado</th><th>Notas</th></tr></thead><tbody>`;
+      const pesoNacer = parto && parto.peso_nacer != null ? parseFloat(parto.peso_nacer) : null;
+      const fechaNac = parto ? new Date(parto.fecha_parto+'T12:00:00') : null;
+      pesajesArr.forEach((p, i)=>{
+        const fechaP = new Date(p.fecha+'T12:00:00');
+        // ADG acumulado desde nacimiento
+        let adgAcum = '—';
+        if(pesoNacer != null && fechaNac){
+          const dias = Math.floor((fechaP - fechaNac)/86400000);
+          if(dias > 0){
+            const adg = ((parseFloat(p.peso) - pesoNacer) / dias).toFixed(3);
+            const color = adg >= 0.8 ? '#2d6a4f' : adg >= 0.6 ? '#c77800' : '#c62828';
+            adgAcum = `<span style="color:${color};font-weight:600">${adg} kg/d</span>`;
+          }
+        }
+        // ADG vs pesada anterior (o vs nacer si es la primera)
+        let adgVsAnt = '—';
+        if(i === 0){
+          if(pesoNacer != null && fechaNac){
+            const dias = Math.floor((fechaP - fechaNac)/86400000);
+            if(dias > 0){
+              const adg = ((parseFloat(p.peso) - pesoNacer) / dias).toFixed(3);
+              const color = adg >= 0.8 ? '#2d6a4f' : adg >= 0.6 ? '#c77800' : '#c62828';
+              adgVsAnt = `<span style="color:${color};font-weight:600">${adg} kg/d</span>`;
+            }
+          }
+        } else {
+          const prev = pesajesArr[i-1];
+          const fechaPrev = new Date(prev.fecha+'T12:00:00');
+          const dias = Math.floor((fechaP - fechaPrev)/86400000);
+          if(dias > 0){
+            const adg = ((parseFloat(p.peso) - parseFloat(prev.peso)) / dias).toFixed(3);
+            const color = adg >= 0.8 ? '#2d6a4f' : adg >= 0.6 ? '#c77800' : '#c62828';
+            adgVsAnt = `<span style="color:${color};font-weight:600">${adg} kg/d</span>`;
+          }
+        }
+        html += `<tr><td class="mono">${fmtFecha(p.fecha)}</td><td class="mono">${p.peso}</td><td>${adgVsAnt}</td><td>${adgAcum}</td><td>${p.notas||''}</td></tr>`;
       });
       html += `</tbody></table>`;
     }
@@ -3178,6 +3214,7 @@ async function buscarFicha(){
 
     html += `</div>`;
     container.innerHTML = html;
+    container.scrollIntoView({behavior:'smooth', block:'start'});
 
   }catch(e){
     console.error('Ficha error:',e);
