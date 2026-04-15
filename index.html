@@ -517,48 +517,31 @@
         </div>
       </div>
 
-      <!-- MODO SELECTOR -->
+      <!-- TABS -->
       <div style="display:flex;gap:.5rem;margin-bottom:1rem;border-bottom:2px solid var(--border);padding-bottom:.75rem">
-        <button id="vmode-btn-plan" class="btn btn-primary btn-sm" onclick="setVacMode('plan')">📋 Planear / Aplicar por Lote</button>
-        <button id="vmode-btn-historial" class="btn btn-secondary btn-sm" onclick="setVacMode('historial')">📜 Historial Aplicadas</button>
+        <button id="vmode-btn-plan" class="btn btn-primary btn-sm" onclick="setVacMode('plan')">💉 Pendientes / Aplicar</button>
+        <button id="vmode-btn-historial" class="btn btn-secondary btn-sm" onclick="setVacMode('historial')">📜 Historial</button>
         <button id="vmode-btn-sinvac" class="btn btn-secondary btn-sm" onclick="setVacMode('sinvac')">🚫 Sin Vacunar</button>
       </div>
 
-      <!-- PANEL: PLANEAR / APLICAR -->
+      <!-- PANEL PENDIENTES -->
       <div id="vac-panel-plan">
-        <!-- Paso 1: seleccionar vacuna -->
-        <div style="display:flex;gap:1rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem">
-          <div>
-            <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:.25rem">Vacuna</label>
-            <select id="vplan-vacuna" onchange="onVplanVacunaChange()" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem;min-width:200px">
-              <option value="">— Selecciona vacuna —</option>
-            </select>
-          </div>
-          <div id="vplan-corral-wrap" style="display:none">
-            <label style="font-size:.82rem;font-weight:600;display:block;margin-bottom:.25rem">Corral</label>
-            <select id="vplan-corral" onchange="renderVplanLista()" style="padding:.4rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem;min-width:140px">
-              <option value="">— Todos —</option>
-            </select>
-          </div>
-          <button class="btn btn-secondary btn-sm" onclick="imprimirSeleccionVplan()">🖨️ Imprimir lista</button>
-        </div>
-        <!-- Lista de elegibles con checkboxes -->
-        <div id="vplan-lista"></div>
-        <!-- Botón aplicar -->
-        <div id="vplan-aplicar-bar" style="display:none;margin-top:1rem;padding:1rem;background:#f0fff0;border:1px solid #2d6a4f;border-radius:8px;display:flex;gap:1rem;align-items:center;flex-wrap:wrap">
-          <span id="vplan-sel-count" style="font-weight:600;color:#2d6a4f"></span>
+        <div id="vac-lotes-container"></div>
+        <!-- Barra aplicar flotante -->
+        <div id="vplan-aplicar-bar" style="display:none;position:sticky;bottom:1rem;margin-top:1rem;padding:.8rem 1rem;background:#f0fff0;border:2px solid #2d6a4f;border-radius:8px;display:flex;gap:1rem;align-items:center;flex-wrap:wrap;z-index:10">
+          <span id="vplan-sel-count" style="font-weight:600;color:#2d6a4f;flex:1"></span>
           <input type="date" id="vplan-fecha" style="padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/>
           <button class="btn btn-primary" onclick="aplicarVplanSeleccion()">✅ Registrar Aplicación</button>
         </div>
       </div>
 
-      <!-- PANEL: HISTORIAL -->
+      <!-- PANEL HISTORIAL -->
       <div id="vac-panel-historial" style="display:none">
         <div class="kpi-group-label">✅ Aplicadas por Vacuna</div>
         <div id="vac-por-tipo-container"><p style="color:var(--text-muted);padding:1rem">Cargando...</p></div>
       </div>
 
-      <!-- PANEL: SIN VACUNAR -->
+      <!-- PANEL SIN VACUNAR -->
       <div id="vac-panel-sinvac" style="display:none">
         <div class="kpi-group-label" style="display:flex;justify-content:space-between;align-items:center">
           <span>🚫 Becerras Sin Ninguna Vacuna</span>
@@ -2763,233 +2746,265 @@ function renderVacPendientes(){
 }
 
 // ==================== VACUNACION MODOS ====================
-const VAC_PMH = 'PMH 37-43 Días'; // se agrupa por lote
-const VAC_TSV = 'TSV-3 1 Día';    // individual (no aplica modo lote/corral)
+const VAC_PMH = 'PMH 37-43 Días';
+const VAC_TSV = 'TSV-3 1 Día';
+const PMH_LOTE_MIN = 10;
 
 function setVacMode(mode){
   document.getElementById('vac-panel-plan').style.display = mode==='plan' ? '' : 'none';
   document.getElementById('vac-panel-historial').style.display = mode==='historial' ? '' : 'none';
   document.getElementById('vac-panel-sinvac').style.display = mode==='sinvac' ? '' : 'none';
   ['plan','historial','sinvac'].forEach(m=>{
-    const b = document.getElementById('vmode-btn-'+m);
+    const b=document.getElementById('vmode-btn-'+m);
     if(b) b.className = m===mode ? 'btn btn-primary btn-sm' : 'btn btn-secondary btn-sm';
   });
   if(mode==='historial') renderVacHistorialAplicadas();
   if(mode==='sinvac') renderVacSinVacunar();
-  if(mode==='plan') renderVplanInit();
+  if(mode==='plan') renderVacLotes();
 }
 
-function renderVplanInit(){
-  const calendario = window._clinCalendario||[];
-  const sel = document.getElementById('vplan-vacuna');
-  if(!sel) return;
-  sel.innerHTML = '<option value="">— Selecciona vacuna —</option>' +
-    calendario.map(c=>`<option value="${c.vacuna}">${c.vacuna} (${c.dias_min}-${c.dias_max}d)</option>`).join('');
-  document.getElementById('vplan-lista').innerHTML = '';
-  document.getElementById('vplan-aplicar-bar').style.display = 'none';
-  document.getElementById('vplan-corral-wrap').style.display = 'none';
+function renderVacunasPorTipo(){
+  renderVacLotes();
+  renderVacSinVacunar();
 }
 
-function onVplanVacunaChange(){
-  const vacuna = document.getElementById('vplan-vacuna').value;
-  if(!vacuna){ document.getElementById('vplan-lista').innerHTML=''; return; }
-
-  const esPorCorral = (vacuna !== VAC_PMH && vacuna !== VAC_TSV);
-  const corralWrap = document.getElementById('vplan-corral-wrap');
-  corralWrap.style.display = esPorCorral ? '' : 'none';
-
-  if(esPorCorral){
-    // Poblar selector de corrales con los que tienen elegibles
-    const elegibles = getElegiblesParaVacuna(vacuna);
-    const corrales = [...new Set(elegibles.map(p=>p.corral!=null?String(p.corral):'Sin corral'))].sort((a,b)=>{
-      if(a==='Sin corral') return 1; if(b==='Sin corral') return -1;
-      return parseInt(a)-parseInt(b);
-    });
-    const sel = document.getElementById('vplan-corral');
-    sel.innerHTML = '<option value="">— Todos los corrales —</option>' +
-      corrales.map(c=>`<option value="${c}">Corral ${c} (${elegibles.filter(p=>(p.corral!=null?String(p.corral):'Sin corral')===c).length})</option>`).join('');
-  }
-  renderVplanLista();
-}
-
-function getElegiblesParaVacuna(vacuna){
+function renderVacLotes(){
   const hoy = new Date();
   const calendario = window._clinCalendario||[];
-  const cal = calendario.find(c=>c.vacuna===vacuna);
-  if(!cal) return [];
-  const aplicadasMap = {};
-  (window._clinVacAplicadas||[]).forEach(v=>{
-    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]={};
-    aplicadasMap[v.hembra][v.vacuna] = true;
-  });
   const madres = window._clinMadresSet||new Set();
   const salidaSet = window._clinSalidaSet||new Set();
-  return (window._clinPartosH||[]).filter(p=>{
-    if(!p.hembra||!/^\d+$/.test(p.hembra)||p.sexo!=='H') return false;
-    if(madres.has(p.hembra)||salidaSet.has(p.hembra)) return false;
-    if(aplicadasMap[p.hembra]&&aplicadasMap[p.hembra][vacuna]) return false;
-    const dias = Math.floor((hoy - new Date(p.fecha_parto+'T12:00:00'))/86400000);
-    return dias >= cal.dias_min;
-  }).map(p=>({...p, dias: Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000)}));
-}
+  const todasPartos = (window._clinPartosH||[]).filter(p=>
+    p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&!madres.has(p.hembra)&&!salidaSet.has(p.hembra)
+  );
 
-function renderVplanLista(){
-  const vacuna = document.getElementById('vplan-vacuna').value;
-  if(!vacuna) return;
-  const corralSel = document.getElementById('vplan-corral')?.value || '';
-  let elegibles = getElegiblesParaVacuna(vacuna);
+  // Map aplicadas
+  const aplicadasMap={};
+  (window._clinVacAplicadas||[]).forEach(v=>{
+    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]={};
+    aplicadasMap[v.hembra][v.vacuna]=true;
+  });
 
-  if(corralSel){
-    elegibles = elegibles.filter(p=>(p.corral!=null?String(p.corral):'Sin corral')===corralSel);
-  }
+  const container = document.getElementById('vac-lotes-container');
+  if(!container) return;
 
-  // Agrupar: PMH por lote (todos juntos), demás por corral
-  const esPMH = vacuna === VAC_PMH;
-  const esTSV = vacuna === VAC_TSV;
+  // Para cada vacuna del calendario construir lotes
+  let html='';
+  let anyLote=false;
 
-  elegibles.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+  calendario.forEach(cal=>{
+    const vacuna = cal.vacuna;
+    // Becerras NO aplicadas para esta vacuna
+    const noAplicadas = todasPartos.filter(p=>!(aplicadasMap[p.hembra]&&aplicadasMap[p.hembra][vacuna]));
+    // Elegibles reales (cumplen dias_min)
+    const elegiblesReales = noAplicadas.filter(p=>{
+      const dias=Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000);
+      return dias>=cal.dias_min;
+    }).map(p=>({...p, dias:Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000), adelantada:false}));
 
-  const container = document.getElementById('vplan-lista');
-  if(!elegibles.length){
-    container.innerHTML='<p style="color:var(--text-muted);padding:.5rem 0">Sin becerras elegibles para esta vacuna.</p>';
-    document.getElementById('vplan-aplicar-bar').style.display='none';
-    return;
-  }
+    if(!elegiblesReales.length) return; // sin elegibles, no mostrar card
 
-  // Agrupar por corral si no es PMH
-  let grupos = {};
-  if(esPMH || esTSV){
-    grupos['__all'] = elegibles;
-  } else {
-    elegibles.forEach(p=>{
-      const c = p.corral!=null?String(p.corral):'Sin corral';
-      if(!grupos[c]) grupos[c]=[];
-      grupos[c].push(p);
+    let lote=[];
+
+    if(vacuna===VAC_TSV){
+      // Individual — solo elegibles reales
+      lote = elegiblesReales;
+    } else if(vacuna===VAC_PMH){
+      // Por lote de 10 — si hay ≥10 elegibles, completar con las más próximas a cumplir
+      lote = [...elegiblesReales];
+      if(lote.length < PMH_LOTE_MIN){
+        // Agregar las más cercanas a cumplir (ordenadas por dias desc entre las no elegibles)
+        const proximas = noAplicadas
+          .filter(p=>!(aplicadasMap[p.hembra]&&aplicadasMap[p.hembra][vacuna]))
+          .map(p=>({...p, dias:Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000), adelantada:false}))
+          .filter(p=>p.dias<cal.dias_min)
+          .sort((a,b)=>b.dias-a.dias); // más cercanas primero
+        // Completar hasta PMH_LOTE_MIN si hay elegibles suficientes para justificar
+        // Solo mostrar grupo si hay al menos 1 elegible real
+        const faltan = PMH_LOTE_MIN - lote.length;
+        proximas.slice(0,faltan).forEach(p=>lote.push({...p,adelantada:true}));
+      }
+    } else {
+      // Por corral — si ≥1 elegible en un corral, todo el corral es candidato
+      // Agrupar elegibles por corral
+      const corralesConElegible = new Set(elegiblesReales.map(p=>p.corral!=null?String(p.corral):'Sin corral'));
+      // Incluir todas las no-aplicadas de esos corrales
+      noAplicadas.forEach(p=>{
+        const c=p.corral!=null?String(p.corral):'Sin corral';
+        const dias=Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000);
+        if(corralesConElegible.has(c)){
+          const yaEnLote=elegiblesReales.find(e=>e.hembra===p.hembra);
+          if(!yaEnLote) lote.push({...p,dias,adelantada:true});
+          else lote.push({...p,dias,adelantada:false});
+        }
+      });
+      // Deduplicar
+      const seen=new Set();
+      lote=lote.filter(p=>{if(seen.has(p.hembra))return false;seen.add(p.hembra);return true;});
+    }
+
+    if(!lote.length) return;
+    anyLote=true;
+
+    lote.sort((a,b)=>{
+      // Ordenar: primero por corral, luego por arete
+      const ca=a.corral!=null?parseInt(a.corral):9999;
+      const cb=b.corral!=null?parseInt(b.corral):9999;
+      if(ca!==cb) return ca-cb;
+      return parseInt(a.hembra)-parseInt(b.hembra);
     });
-  }
 
-  let html = `<div style="margin-bottom:.5rem;display:flex;gap:.5rem;align-items:center">
-    <button class="btn btn-secondary btn-sm" onclick="vplanSelAll(true)">☑ Seleccionar todos</button>
-    <button class="btn btn-secondary btn-sm" onclick="vplanSelAll(false)">☐ Deseleccionar todos</button>
-    <span style="font-size:.82rem;color:var(--text-muted)">${elegibles.length} elegibles</span>
-  </div>`;
+    const eligCount = lote.filter(p=>!p.adelantada).length;
+    const adelCount = lote.filter(p=>p.adelantada).length;
+    const btnId='vlote-btn-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+    const tblId='vlote-tbl-'+vacuna.replace(/[^a-z0-9]/gi,'_');
 
-  Object.entries(grupos).sort((a,b)=>{
-    if(a[0]==='__all'||a[0]==='Sin corral') return 1;
-    if(b[0]==='__all'||b[0]==='Sin corral') return -1;
-    return parseInt(a[0])-parseInt(b[0]);
-  }).forEach(([grp, animals])=>{
-    const titulo = grp==='__all' ? `${esPMH?'Lote elegible':'Elegibles'} — ${animals.length} becerras` : `Corral ${grp} — ${animals.length} becerras`;
-    html += `<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.6rem;overflow:hidden">
-      <div style="background:var(--accent);color:white;padding:.5rem 1rem;font-weight:600;font-size:.88rem;display:flex;justify-content:space-between">
-        <span>${titulo}</span>
-        <label style="cursor:pointer;font-size:.82rem"><input type="checkbox" onchange="vplanSelGrupo(this,'${grp}')" checked style="margin-right:.3rem"/>Todo el grupo</label>
-      </div>
-      <table style="width:100%;font-size:.83rem"><thead>
-        <tr style="background:#f5f5f5"><th style="padding:.35rem .5rem;width:30px"></th><th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th></tr>
-      </thead><tbody>` +
-      animals.map(p=>`<tr>
-        <td style="padding:.3rem .5rem"><input type="checkbox" class="vplan-check" data-hembra="${p.hembra}" data-grupo="${grp}" checked onchange="updateVplanCount()"/></td>
+    const rows=lote.map(p=>{
+      const bg = p.adelantada ? '#f5f5f5' : '#fff8e1';
+      const colorEstado = p.adelantada ? '#888' : '#c77800';
+      const estado = p.adelantada ? '⬜ Adelantada' : '⏰ Elegible';
+      return `<tr style="background:${bg}">
+        <td style="padding:.3rem .4rem"><input type="checkbox" class="vplan-check" data-hembra="${p.hembra}" data-vacuna="${vacuna}" ${p.adelantada?'':'checked'} onchange="updateVplanCount()"/></td>
         <td class="mono" style="font-weight:600">${p.hembra}</td>
         <td class="mono">${p.raza||'—'}</td>
         <td class="mono">${p.dias}d</td>
         <td class="mono">${p.corral!=null?p.corral:'—'}</td>
-      </tr>`).join('') +
-      `</tbody></table></div>`;
+        <td style="color:${colorEstado};font-size:.8rem;font-weight:600">${estado}</td>
+      </tr>`;
+    }).join('');
+
+    html+=`<div style="border:2px solid #f9a825;border-radius:8px;margin-bottom:.8rem">
+      <button id="${btnId}" onclick="toggleVacTipo('${btnId}','${tblId}')"
+        style="width:100%;background:#fff8e1;color:#7a4f00;border:none;border-radius:6px 6px 0 0;padding:.65rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">
+        <span style="font-weight:700">${vacuna}</span>
+        <span style="display:flex;gap:1rem;font-size:.82rem;align-items:center">
+          <span style="color:#c77800;font-weight:700">⏰ ${eligCount} elegibles</span>
+          ${adelCount?`<span style="color:#888">${adelCount} adelantadas</span>`:''}
+          <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();imprimirLoteVacuna('${vacuna}')" style="font-size:.78rem;padding:.2rem .5rem">🖨️</button>
+          <span>▼</span>
+        </span>
+      </button>
+      <div id="${tblId}" style="display:none">
+        <div style="padding:.4rem .6rem;background:#fffbf0;border-bottom:1px solid #f9a825;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" onclick="vplanSelVacuna('${vacuna}',true)">☑ Todos</button>
+          <button class="btn btn-secondary btn-sm" onclick="vplanSelVacuna('${vacuna}',false)">☐ Ninguno</button>
+          <span style="font-size:.8rem;color:var(--text-muted)">🟡 Amarillo = elegible por edad &nbsp; ⬜ Gris = adelantada por corral/lote</span>
+        </div>
+        <table style="width:100%;font-size:.83rem">
+          <thead><tr style="background:#f9a825;color:#000">
+            <th style="padding:.35rem .4rem;width:30px"></th>
+            <th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Estado</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>`;
   });
 
-  container.innerHTML = html;
+  if(!anyLote){
+    html='<p style="color:var(--text-muted);padding:1rem">✅ No hay lotes pendientes en este momento.</p>';
+  }
+
+  container.innerHTML=html;
   updateVplanCount();
 
   // Fecha default hoy
-  const hoy = new Date();
-  const fi = document.getElementById('vplan-fecha');
-  if(fi) fi.value = hoy.toISOString().split('T')[0];
+  const fi=document.getElementById('vplan-fecha');
+  if(fi) fi.value=new Date().toISOString().split('T')[0];
 }
 
-function vplanSelAll(val){
-  document.querySelectorAll('.vplan-check').forEach(c=>c.checked=val);
-  updateVplanCount();
-}
-
-function vplanSelGrupo(cb, grp){
-  document.querySelectorAll(`.vplan-check[data-grupo="${grp}"]`).forEach(c=>c.checked=cb.checked);
+function vplanSelVacuna(vacuna, val){
+  document.querySelectorAll(`.vplan-check[data-vacuna="${vacuna}"]`).forEach(c=>c.checked=val);
   updateVplanCount();
 }
 
 function updateVplanCount(){
-  const checks = document.querySelectorAll('.vplan-check:checked');
-  const bar = document.getElementById('vplan-aplicar-bar');
-  const cnt = document.getElementById('vplan-sel-count');
+  const checks=document.querySelectorAll('.vplan-check:checked');
+  const bar=document.getElementById('vplan-aplicar-bar');
+  const cnt=document.getElementById('vplan-sel-count');
+  if(!bar||!cnt) return;
   if(checks.length){
     bar.style.display='flex';
-    cnt.textContent = `${checks.length} becerras seleccionadas`;
+    cnt.textContent=`${checks.length} becerras seleccionadas`;
   } else {
     bar.style.display='none';
   }
 }
 
 async function aplicarVplanSeleccion(){
-  const vacuna = document.getElementById('vplan-vacuna').value;
-  const fechaVal = document.getElementById('vplan-fecha').value;
-  if(!vacuna||!fechaVal){alert('Selecciona vacuna y fecha');return;}
+  const fechaVal=document.getElementById('vplan-fecha').value;
+  if(!fechaVal){alert('Selecciona fecha');return;}
   if(!await checkPass()){alert('Contraseña incorrecta');return;}
-  const checks = [...document.querySelectorAll('.vplan-check:checked')];
+  const checks=[...document.querySelectorAll('.vplan-check:checked')];
   if(!checks.length){alert('Ninguna becerra seleccionada');return;}
-  const hembras = checks.map(c=>c.dataset.hembra);
+  // Agrupar por vacuna
+  const grupos={};
+  checks.forEach(c=>{
+    const v=c.dataset.vacuna, h=c.dataset.hembra;
+    if(!grupos[v]) grupos[v]=[];
+    grupos[v].push(h);
+  });
   let ok=0,err=0;
-  for(const hembra of hembras){
-    const res = await sbClin('clin_vacunas_aplicadas','POST',{hembra, vacuna, fecha:fechaVal});
-    if(res&&!res.error) ok++; else err++;
+  for(const [vacuna,hembras] of Object.entries(grupos)){
+    for(const hembra of hembras){
+      const res=await sbClin('clin_vacunas_aplicadas','POST',{hembra,vacuna,fecha:fechaVal});
+      if(res&&!res.error) ok++; else err++;
+    }
   }
   alert(`✅ Aplicadas: ${ok}${err?' | Errores: '+err:''}`);
   await loadClinVacunas();
   setVacMode('plan');
 }
 
-function imprimirSeleccionVplan(){
-  const vacuna = document.getElementById('vplan-vacuna').value;
-  if(!vacuna){alert('Selecciona una vacuna primero');return;}
-  const corralSel = document.getElementById('vplan-corral')?.value||'';
-  let elegibles = getElegiblesParaVacuna(vacuna);
-  if(corralSel) elegibles = elegibles.filter(p=>(p.corral!=null?String(p.corral):'Sin corral')===corralSel);
-  elegibles.sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+function imprimirLoteVacuna(vacuna){
+  const hoy=new Date();
+  const calendario=window._clinCalendario||[];
+  const cal=calendario.find(c=>c.vacuna===vacuna);
+  if(!cal) return;
+  const madres=window._clinMadresSet||new Set();
+  const salidaSet=window._clinSalidaSet||new Set();
+  const todasPartos=(window._clinPartosH||[]).filter(p=>p.hembra&&/^\d+$/.test(p.hembra)&&p.sexo==='H'&&!madres.has(p.hembra)&&!salidaSet.has(p.hembra));
+  const aplicadasMap={};
+  (window._clinVacAplicadas||[]).forEach(v=>{if(!aplicadasMap[v.hembra])aplicadasMap[v.hembra]={};aplicadasMap[v.hembra][v.vacuna]=true;});
 
-  const hoy = new Date();
-  const dd=String(hoy.getDate()).padStart(2,'0');
-  const mm=String(hoy.getMonth()+1).padStart(2,'0');
-  const yyyy=hoy.getFullYear();
+  // Reconstruir lote igual que renderVacLotes
+  const noAplicadas=todasPartos.filter(p=>!(aplicadasMap[p.hembra]&&aplicadasMap[p.hembra][vacuna]));
+  const elegiblesReales=noAplicadas.filter(p=>Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000)>=cal.dias_min)
+    .map(p=>({...p,dias:Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000),adelantada:false}));
+  let lote=[];
+  if(vacuna===VAC_TSV){ lote=[...elegiblesReales]; }
+  else if(vacuna===VAC_PMH){
+    lote=[...elegiblesReales];
+    if(lote.length<PMH_LOTE_MIN){
+      const proximas=noAplicadas.map(p=>({...p,dias:Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000),adelantada:true}))
+        .filter(p=>p.dias<cal.dias_min).sort((a,b)=>b.dias-a.dias);
+      proximas.slice(0,PMH_LOTE_MIN-lote.length).forEach(p=>lote.push(p));
+    }
+  } else {
+    const corralesConElegible=new Set(elegiblesReales.map(p=>p.corral!=null?String(p.corral):'Sin corral'));
+    noAplicadas.forEach(p=>{
+      const c=p.corral!=null?String(p.corral):'Sin corral';
+      const dias=Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000);
+      if(corralesConElegible.has(c)){const ya=elegiblesReales.find(e=>e.hembra===p.hembra);lote.push({...p,dias,adelantada:!ya});}
+    });
+    const seen=new Set();lote=lote.filter(p=>{if(seen.has(p.hembra))return false;seen.add(p.hembra);return true;});
+  }
+  lote.sort((a,b)=>{const ca=a.corral!=null?parseInt(a.corral):9999,cb=b.corral!=null?parseInt(b.corral):9999;return ca!==cb?ca-cb:parseInt(a.hembra)-parseInt(b.hembra);});
 
-  // Agrupar por corral para imprimir
-  const grupos = {};
-  const esPMH = vacuna===VAC_PMH||vacuna===VAC_TSV;
-  if(esPMH){ grupos['__all']=elegibles; }
-  else { elegibles.forEach(p=>{ const c=p.corral!=null?String(p.corral):'Sin corral'; if(!grupos[c])grupos[c]=[]; grupos[c].push(p); }); }
-
-  let body='';
-  let totalDosis=0;
-  Object.entries(grupos).sort((a,b)=>{
-    if(a[0]==='__all'||a[0]==='Sin corral') return 1;
-    if(b[0]==='__all'||b[0]==='Sin corral') return -1;
-    return parseInt(a[0])-parseInt(b[0]);
-  }).forEach(([grp,animals])=>{
-    totalDosis+=animals.length;
-    const titulo = grp==='__all'?`Lote (${animals.length} dosis)`:`Corral ${grp} — ${animals.length} dosis`;
-    body+=`<div class="seccion"><h2>${titulo}</h2>`+
-      `<table><thead><tr><th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th></tr></thead><tbody>`+
-      animals.map(p=>`<tr><td>${p.hembra}</td><td>${p.raza||'—'}</td><td>${p.dias}d</td><td>${p.corral!=null?p.corral:'—'}</td></tr>`).join('')+
-      `</tbody></table></div>`;
-  });
+  const dd=String(hoy.getDate()).padStart(2,'0'),mm=String(hoy.getMonth()+1).padStart(2,'0'),yyyy=hoy.getFullYear();
+  const eligCount=lote.filter(p=>!p.adelantada).length;
+  const rows=lote.map(p=>`<tr style="background:${p.adelantada?'#f5f5f5':'#fff8e1'}"><td>${p.hembra}</td><td>${p.raza||'—'}</td><td>${p.dias}d</td><td>${p.corral!=null?p.corral:'—'}</td><td style="color:${p.adelantada?'#888':'#c77800'}">${p.adelantada?'Adelantada':'Elegible'}</td></tr>`).join('');
 
   const win=window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vacuna ${vacuna}</title>
-  <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h1{font-size:15px}h2{font-size:13px;background:#fff8e1;padding:5px 10px;border-left:4px solid #f9a825;margin:14px 0 6px}.meta{color:#555;font-size:11px;margin-bottom:4px}.total{font-weight:bold;color:#2d6a4f;margin-bottom:14px}.seccion{page-break-inside:avoid;margin-bottom:16px}table{width:100%;border-collapse:collapse;font-size:11px}th{background:#2d6a4f;color:white;padding:4px 8px;text-align:left}td{padding:4px 8px;border-bottom:1px solid #eee}</style>
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${vacuna}</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h1{font-size:15px}h2{font-size:12px;color:#555}.total{color:#2d6a4f;font-weight:bold;margin:6px 0 14px}table{width:100%;border-collapse:collapse}th{background:#2d6a4f;color:white;padding:4px 8px;text-align:left}td{padding:4px 8px;border-bottom:1px solid #eee}</style>
   </head><body>
-  <h1>💉 Lista de Vacunación — ${vacuna}</h1>
-  <div class="meta">Generado: ${dd}/${mm}/${yyyy}</div>
-  <div class="total">Total dosis requeridas: ${totalDosis}</div>
-  ${body}</body></html>`);
-  win.document.close(); win.print();
+  <h1>💉 ${vacuna}</h1>
+  <h2>Generado: ${dd}/${mm}/${yyyy}</h2>
+  <div class="total">Total dosis: ${lote.length} (${eligCount} elegibles + ${lote.length-eligCount} adelantadas)</div>
+  <table><thead><tr><th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Estado</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  </body></html>`);
+  win.document.close();win.print();
 }
 
 
@@ -3038,7 +3053,7 @@ function imprimirPendientes(){
 }
 
 function renderVacunasPorTipo(){
-  renderVplanInit();
+  renderVacLotes();
   renderVacSinVacunar();
 }
 
