@@ -3015,7 +3015,6 @@ async function aplicarVplanSeleccion(){
 }
 
 function imprimirTodosLotes(){
-  // Tomar todas las becerras seleccionadas agrupadas por vacuna
   const checks = [...document.querySelectorAll('.vplan-check:checked')];
   if(!checks.length){ alert('No hay becerras seleccionadas.'); return; }
 
@@ -3029,91 +3028,99 @@ function imprimirTodosLotes(){
   checks.forEach(c=>{
     const v=c.dataset.vacuna, h=c.dataset.hembra;
     if(!grupos[v]) grupos[v]=[];
-    const p=partosMap[h]||{hembra:h,raza:'—',corral:null};
+    const p=partosMap[h]||{hembra:h,corral:null};
     const dias=p.fecha_parto?Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000):'—';
-    const cal=(window._clinCalendario||[]).find(c=>c.vacuna===v);
+    const cal=(window._clinCalendario||[]).find(x=>x.vacuna===v);
     const adelantada=cal&&typeof dias==='number'?dias<cal.dias_min:false;
     grupos[v].push({...p,dias,adelantada});
   });
 
-  // Resumen de dosis por vacuna
+  // Resumen
   let resumenRows='';
   Object.entries(grupos).forEach(([vac,lista])=>{
-    resumenRows+=`<tr><td style="font-weight:600">${vac}</td><td style="text-align:center">${lista.length}</td></tr>`;
+    resumenRows+=`<tr><td style="font-weight:600;padding:2px 6px">${vac}</td><td style="text-align:center;padding:2px 6px">${lista.length}</td></tr>`;
   });
 
   let body='';
   Object.entries(grupos).forEach(([vacuna,lista])=>{
     lista.sort((a,b)=>{const ca=a.corral!=null?parseInt(a.corral):9999,cb=b.corral!=null?parseInt(b.corral):9999;return ca!==cb?ca-cb:parseInt(a.hembra)-parseInt(b.hembra);});
     const eligCount=lista.filter(p=>!p.adelantada).length;
-    const rows=lista.map(p=>`<tr style="background:${p.adelantada?'#f5f5f5':'#fff8e1'}"><td>${p.hembra}</td><td>${p.raza||'—'}</td><td>${p.dias}d</td><td>${p.corral!=null?p.corral:'—'}</td><td style="color:${p.adelantada?'#888':'#c77800'}">${p.adelantada?'Adelantada':'Elegible'}</td></tr>`).join('');
-    body+=`<div class="seccion"><h2>${vacuna} <span class="cnt">${lista.length} dosis (${eligCount} elegibles${lista.length-eligCount?' + '+(lista.length-eligCount)+' adelantadas':''})</span></h2>
-    <table><thead><tr><th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Estado</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    body+=`<div class="seccion">
+      <h2>${vacuna} <span class="cnt">${lista.length} dosis (${eligCount} elegibles${lista.length-eligCount?' + '+(lista.length-eligCount)+' adelantadas':''})</span></h2>
+      ${tablaCondensada(lista,4)}
+    </div>`;
   });
 
   const win=window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vacunas Pendientes</title>
-  <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h1{font-size:15px}h2{font-size:13px;background:#fff8e1;padding:5px 10px;border-left:4px solid #f9a825;margin:14px 0 5px}.cnt{color:#c77800;font-weight:normal;font-size:11px}.meta{color:#555;font-size:11px;margin-bottom:4px}.resumen{margin-bottom:16px}.seccion{page-break-inside:avoid;margin-bottom:18px}table{width:100%;border-collapse:collapse}th{background:#2d6a4f;color:white;padding:4px 8px;text-align:left}td{padding:4px 8px;border-bottom:1px solid #eee}.res-table{max-width:300px;margin-bottom:16px}.res-table th{background:#2d6a4f}.res-table td{padding:3px 8px}</style>
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vacunas Seleccionadas</title>
+  <style>body{font-family:Arial,sans-serif;font-size:10px;margin:12px}h1{font-size:13px;margin-bottom:2px}h2{font-size:11px;background:#fff8e1;padding:4px 8px;border-left:3px solid #f9a825;margin:12px 0 4px}.cnt{color:#c77800;font-weight:normal}.meta{color:#555;font-size:10px;margin-bottom:6px}.seccion{page-break-inside:avoid;margin-bottom:14px}.res-table{border-collapse:collapse;margin-bottom:12px}.res-table th{background:#2d6a4f;color:white;padding:2px 8px}.res-table td{padding:2px 8px;border-bottom:1px solid #ddd}@media print{body{margin:6px}}</style>
   </head><body>
   <h1>💉 Vacunas Seleccionadas — CrianzaLH</h1>
   <div class="meta">Generado: ${dd}/${mm}/${yyyy}</div>
-  <div class="resumen">
-    <strong>Resumen de dosis por vacuna:</strong>
-    <table class="res-table"><thead><tr><th>Vacuna</th><th>Dosis</th></tr></thead>
-    <tbody>${resumenRows}</tbody></table>
-  </div>
+  <table class="res-table"><thead><tr><th>Vacuna</th><th>Dosis</th></tr></thead><tbody>${resumenRows}</tbody></table>
   ${body}</body></html>`);
   win.document.close();win.print();
 }
 
+function tablaCondensada(lista, cols){
+  // lista = [{hembra, corral}], cols = número de bloques lado a lado
+  const rows = [];
+  for(let i=0; i<lista.length; i+=cols){
+    const celdas = [];
+    for(let j=0; j<cols; j++){
+      const p = lista[i+j];
+      if(p){
+        celdas.push(`<td style="padding:2px 5px;font-weight:600">${p.hembra}</td><td style="padding:2px 5px;color:#555">${p.corral!=null?p.corral:'—'}</td>`);
+      } else {
+        celdas.push(`<td></td><td></td>`);
+      }
+      if(j<cols-1) celdas.push(`<td style="padding:0;width:8px;border:none"></td>`); // separador
+    }
+    rows.push(`<tr>${celdas.join('')}</tr>`);
+  }
+  // Header
+  const headers = [];
+  for(let j=0; j<cols; j++){
+    headers.push(`<th style="padding:2px 5px">Arete</th><th style="padding:2px 5px">Corral</th>`);
+    if(j<cols-1) headers.push(`<th style="border:none;width:8px"></th>`);
+  }
+  return `<table style="width:100%;border-collapse:collapse;font-size:10px">
+    <thead><tr style="background:#2d6a4f;color:white">${headers.join('')}</tr></thead>
+    <tbody>${rows.join('')}</tbody>
+  </table>`;
+}
+
 function imprimirLoteVacuna(vacuna){
-  // Tomar solo las becerras seleccionadas (checkbox marcado) de esta vacuna
   const checks = [...document.querySelectorAll(`.vplan-check[data-vacuna="${vacuna}"]:checked`)];
   const hoy = new Date();
   const dd=String(hoy.getDate()).padStart(2,'0'),mm=String(hoy.getMonth()+1).padStart(2,'0'),yyyy=hoy.getFullYear();
+  if(!checks.length){ alert('No hay becerras seleccionadas para esta vacuna.'); return; }
 
-  if(!checks.length){
-    alert('No hay becerras seleccionadas para esta vacuna.');
-    return;
-  }
-
-  // Obtener datos de cada becerra seleccionada
-  const madres=window._clinMadresSet||new Set();
-  const salidaSet=window._clinSalidaSet||new Set();
   const partosMap={};
   (window._clinPartosH||[]).forEach(p=>{ partosMap[p.hembra]=p; });
+  const cal=(window._clinCalendario||[]).find(c=>c.vacuna===vacuna);
 
   const seleccionadas = checks.map(c=>{
-    const p = partosMap[c.dataset.hembra]||{hembra:c.dataset.hembra,raza:'—',corral:null};
-    const dias = p.fecha_parto ? Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000) : '—';
-    const cal = (window._clinCalendario||[]).find(c=>c.vacuna===vacuna);
-    const adelantada = cal && typeof dias==='number' ? dias < cal.dias_min : false;
-    return {...p, dias, adelantada};
+    const p=partosMap[c.dataset.hembra]||{hembra:c.dataset.hembra,corral:null};
+    const dias=p.fecha_parto?Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000):'—';
+    const adelantada=cal&&typeof dias==='number'?dias<cal.dias_min:false;
+    return {...p,dias,adelantada};
   }).sort((a,b)=>{
     const ca=a.corral!=null?parseInt(a.corral):9999,cb=b.corral!=null?parseInt(b.corral):9999;
     return ca!==cb?ca-cb:parseInt(a.hembra)-parseInt(b.hembra);
   });
 
-  const eligCount = seleccionadas.filter(p=>!p.adelantada).length;
-  const rows = seleccionadas.map(p=>`<tr style="background:${p.adelantada?'#f5f5f5':'#fff8e1'}">
-    <td>${p.hembra}</td><td>${p.raza||'—'}</td><td>${p.dias}d</td>
-    <td>${p.corral!=null?p.corral:'—'}</td>
-    <td style="color:${p.adelantada?'#888':'#c77800'}">${p.adelantada?'Adelantada':'Elegible'}</td>
-  </tr>`).join('');
+  const eligCount=seleccionadas.filter(p=>!p.adelantada).length;
+  const tabla=tablaCondensada(seleccionadas, 4); // 4 bloques = ~200+ por hoja
 
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${vacuna}</title>
-  <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}h1{font-size:15px}h2{font-size:12px;color:#555}.resumen{margin:8px 0 14px;padding:6px 10px;background:#f0fff0;border-left:4px solid #2d6a4f}table{width:100%;border-collapse:collapse}th{background:#2d6a4f;color:white;padding:4px 8px;text-align:left}td{padding:4px 8px;border-bottom:1px solid #eee}</style>
+  <style>body{font-family:Arial,sans-serif;font-size:11px;margin:15px}h1{font-size:14px;margin-bottom:2px}h2{font-size:10px;color:#555;margin-bottom:6px}.resumen{margin:4px 0 10px;padding:4px 8px;background:#f0fff0;border-left:3px solid #2d6a4f;font-size:10px}@media print{body{margin:8px}}</style>
   </head><body>
   <h1>💉 ${vacuna}</h1>
   <h2>Generado: ${dd}/${mm}/${yyyy}</h2>
-  <div class="resumen">
-    <strong>Dosis ${vacuna}:</strong> ${seleccionadas.length} 
-    &nbsp;|&nbsp; Elegibles: ${eligCount} 
-    &nbsp;|&nbsp; Adelantadas: ${seleccionadas.length-eligCount}
-  </div>
-  <table><thead><tr><th>Arete</th><th>Raza</th><th>Edad</th><th>Corral</th><th>Estado</th></tr></thead>
-  <tbody>${rows}</tbody></table>
+  <div class="resumen"><strong>Dosis:</strong> ${seleccionadas.length} &nbsp;|&nbsp; Elegibles: ${eligCount} &nbsp;|&nbsp; Adelantadas: ${seleccionadas.length-eligCount}</div>
+  ${tabla}
   </body></html>`);
   win.document.close();win.print();
 }
