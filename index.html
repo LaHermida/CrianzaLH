@@ -1910,7 +1910,7 @@ function renderInventario(partos, salidas){
 
   // Show ultimo arete activo y ultima salida
   const ultActiva=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
-  const ultSalida=salidasFiltradas.filter(s=>/^\d+$/.test(String(s.hembra||'').trim())).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
+  const ultSalida=salidasFiltradas.filter(s=>/^\d+$/.test(String(s.hembra||'').trim())).sort((a,b)=>new Date(b.fecha_salida)-new Date(a.fecha_salida))[0];
   const ultInvEl=document.getElementById('ultimo-inv');
   if(ultInvEl){
     const partes=[];
