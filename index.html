@@ -3063,28 +3063,26 @@ function imprimirTodosLotes(){
 }
 
 function tablaCondensada(lista, cols){
-  // lista = [{hembra, corral}], cols = número de bloques lado a lado
   const rows = [];
   for(let i=0; i<lista.length; i+=cols){
     const celdas = [];
     for(let j=0; j<cols; j++){
       const p = lista[i+j];
       if(p){
-        celdas.push(`<td style="padding:2px 5px;font-weight:600">${p.hembra}</td><td style="padding:2px 5px;color:#555">${p.corral!=null?p.corral:'—'}</td>`);
+        celdas.push(`<td style="padding:2px 5px;font-weight:600;border-bottom:1px solid #eee">${p.hembra}</td><td style="padding:2px 5px;color:#555;border-bottom:1px solid #eee;border-right:2px solid #ccc">${p.corral!=null?p.corral:'—'}</td>`);
       } else {
-        celdas.push(`<td></td><td></td>`);
+        celdas.push(`<td style="border-bottom:1px solid #eee"></td><td style="border-bottom:1px solid #eee;border-right:2px solid #ccc"></td>`);
       }
-      if(j<cols-1) celdas.push(`<td style="padding:0;width:8px;border:none"></td>`); // separador
     }
     rows.push(`<tr>${celdas.join('')}</tr>`);
   }
-  // Header
+  // Header — mismo ancho que datos
   const headers = [];
   for(let j=0; j<cols; j++){
-    headers.push(`<th style="padding:2px 5px">Arete</th><th style="padding:2px 5px">Corral</th>`);
-    if(j<cols-1) headers.push(`<th style="border:none;width:8px"></th>`);
+    headers.push(`<th style="padding:2px 5px;text-align:left">Arete</th><th style="padding:2px 5px;text-align:left;border-right:2px solid #aaa">Corral</th>`);
   }
-  return `<table style="width:100%;border-collapse:collapse;font-size:10px">
+  return `<table style="width:100%;border-collapse:collapse;font-size:10px;table-layout:fixed">
+    <colgroup>${Array(cols).fill('<col style="width:auto"><col style="width:40px">').join('')}</colgroup>
     <thead><tr style="background:#2d6a4f;color:white">${headers.join('')}</tr></thead>
     <tbody>${rows.join('')}</tbody>
   </table>`;
