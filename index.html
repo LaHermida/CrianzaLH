@@ -482,6 +482,7 @@
       <div class="section-header">
         <span class="section-title">🏥 Becerras en Tratamiento</span>
         <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+          <button class="btn btn-secondary" onclick="downloadTemplateClinica()">📄 Template</button>
           <button class="btn btn-secondary" onclick="document.getElementById('importClinicaFile').click()">📥 Importar Clínica</button>
           <input type="file" id="importClinicaFile" accept=".xlsx,.xls" class="hidden" onchange="importClinica(event)"/>
           <button class="btn btn-primary" onclick="openClinEventoModal()">+ Nueva Enfermedad</button>
@@ -2541,6 +2542,28 @@ async function confirmImport(){
 // ==================== CLINICAL MODULE ==
 
 // ---- IMPORT CLINICA (Enfermas + Altas) ----
+function downloadTemplateClinica(){
+  // Usar SheetJS para generar Excel con dos hojas
+  const wb = XLSX.utils.book_new();
+
+  // Hoja Enfermas
+  const enfermas = [
+    ['Hembra', 'Fecha Inicio (DD/MM/YYYY)', 'Enfermedad', 'Protocolo Inicial', 'Comentario'],
+    ['5001', '16/04/2026', 'Diarrea', '1', 'Ejemplo leve'],
+    ['5002', '16/04/2026', 'Neumonia', '2', 'Ejemplo moderado'],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(enfermas), 'Enfermas');
+
+  // Hoja Altas
+  const altas = [
+    ['Hembra', 'Fecha Alta (DD/MM/YYYY)', 'Comentario'],
+    ['5001', '19/04/2026', 'Recuperada'],
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(altas), 'Altas');
+
+  XLSX.writeFile(wb, 'Template_Clinica.xlsx');
+}
+
 async function importClinica(event){
   if(!await checkPass()){alert('Contraseña incorrecta');event.target.value='';return;}
   const file=event.target.files[0];if(!file)return;event.target.value='';
@@ -2562,10 +2585,11 @@ async function importClinica(event){
       const hembra=String(row[0]).trim();
       const fecha=excelDateToISO(row[1]);
       const protoNombre=String(row[2]).trim().toLowerCase();
-      const comentario=row[3]?String(row[3]).trim():null;
+      const protocolo_num=row[3]?parseInt(row[3]):1;
+      const comentario=row[4]?String(row[4]).trim():null;
       const protocolo_id=protoMap[protoNombre];
       if(!fecha||!protocolo_id) continue;
-      const res=await sbClin('clin_eventos','POST',{hembra, fecha_inicio:fecha, protocolo_id, comentario});
+      const res=await sbClin('clin_eventos','POST',{hembra, fecha_inicio:fecha, protocolo_id, protocolo_num, comentario});
       if(res&&!res.error) okEnfermas++; else errores++;
     }
   }
