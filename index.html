@@ -162,7 +162,10 @@
 <div id="appView" class="hidden">
   <header>
     <h1>🐄 CrianzaLH</h1>
-    <span id="userLabel"></span>
+    <span style="display:flex;gap:1rem;align-items:center">
+      <span id="headerFecha" style="font-size:.82rem;opacity:.8"></span>
+      <span id="userLabel"></span>
+    </span>
   </header>
   <nav id="mainNav">
     <button onclick="showTab('dashboard',this)">📊 Dashboard Partos</button>
@@ -763,6 +766,14 @@ function launchApp(u){
   document.getElementById('loginView').classList.add('hidden');
   document.getElementById('appView').classList.remove('hidden');
   document.getElementById('userLabel').textContent=u;
+  // Fecha en header
+  const hoy=new Date();
+  const dd=String(hoy.getDate()).padStart(2,'0');
+  const mm=String(hoy.getMonth()+1).padStart(2,'0');
+  const yyyy=hoy.getFullYear();
+  const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const hFecha=document.getElementById('headerFecha');
+  if(hFecha) hFecha.textContent=`${dias[hoy.getDay()]} ${dd}/${mm}/${yyyy}`;
   loadPartos(); loadPesajes();
   // Show dashboard tab
   const firstBtn=document.querySelector('#mainNav button');
@@ -2420,8 +2431,18 @@ async function confirmImport(){
       <div class="form-grid">
         <div class="form-group"><label>Hembra (arete) *</label><input type="text" id="clin-evento-hembra"/></div>
         <div class="form-group"><label>Fecha inicio *</label><input type="date" id="clin-evento-fecha"/></div>
-        <div class="form-group wide"><label>Protocolo *</label>
-          <select id="clin-evento-proto"><option value="">-- Seleccionar --</option><span id="clin-evento-proto-opts"></span></select>
+        <div class="form-group wide"><label>Enfermedad *</label>
+          <select id="clin-evento-proto" onchange="onClinProtoChange()" style="width:100%">
+            <option value="">-- Seleccionar --</option>
+          </select>
+        </div>
+        <div class="form-group wide"><label>Protocolo inicial *</label>
+          <select id="clin-evento-proto-num" style="width:100%">
+            <option value="1">Protocolo 1</option>
+            <option value="2">Protocolo 2</option>
+            <option value="3">Protocolo 3</option>
+            <option value="4">Protocolo 4</option>
+          </select>
         </div>
         <div class="form-group wide"><label>Comentario</label><input type="text" id="clin-evento-comment"/></div>
       </div>
@@ -3299,12 +3320,27 @@ async function deleteCalVac(id){
 // ---- MODALS ----
 function openClinEventoModal(){
   const protos = window._clinProtocolos||[];
-  const opts = protos.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
-  document.getElementById('clin-evento-proto-opts').innerHTML = opts;
-  document.getElementById('clin-evento-fecha').value = '';
+  const sel = document.getElementById('clin-evento-proto');
+  sel.innerHTML = '<option value="">-- Seleccionar --</option>' +
+    protos.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
+  document.getElementById('clin-evento-fecha').value = new Date().toISOString().split('T')[0];
   document.getElementById('clin-evento-hembra').value = '';
+  document.getElementById('clin-evento-proto-num').value = '1';
   document.getElementById('clin-evento-comment').value = '';
   document.getElementById('clinEventoModal').classList.add('open');
+}
+
+function onClinProtoChange(){
+  // Actualizar opciones de protocolo_num según cuántos protocolos tiene la enfermedad
+  const proto_id = parseInt(document.getElementById('clin-evento-proto').value);
+  if(!proto_id) return;
+  const pDias = (window._clinProtocoloDias||[]).filter(d=>d.protocolo_id===proto_id);
+  const maxProto = pDias.length ? Math.max(...pDias.map(d=>d.protocolo_num||d.dia)) : 4;
+  const sel = document.getElementById('clin-evento-proto-num');
+  sel.innerHTML = '';
+  for(let i=1;i<=maxProto;i++){
+    sel.innerHTML += `<option value="${i}">Protocolo ${i}</option>`;
+  }
 }
 function closeClinEventoModal(){ document.getElementById('clinEventoModal').classList.remove('open'); }
 
@@ -3323,10 +3359,11 @@ async function saveClinEvento(){
   const hembra = document.getElementById('clin-evento-hembra').value.trim();
   const fecha_raw = document.getElementById('clin-evento-fecha').value;
   const proto_id = parseInt(document.getElementById('clin-evento-proto').value);
+  const proto_num = parseInt(document.getElementById('clin-evento-proto-num').value)||1;
   const comentario = document.getElementById('clin-evento-comment').value;
-  if(!hembra||!fecha_raw||!proto_id){alert('Hembra, fecha y protocolo son obligatorios');return;}
+  if(!hembra||!fecha_raw||!proto_id){alert('Hembra, fecha y enfermedad son obligatorios');return;}
   const fecha_inicio = ddmmToISO(fecha_raw)||fecha_raw;
-  await sbClin('clin_eventos','POST',{hembra, protocolo_id:proto_id, fecha_inicio, comentario:comentario||null, protocolo_num:1});
+  await sbClin('clin_eventos','POST',{hembra, protocolo_id:proto_id, fecha_inicio, comentario:comentario||null, protocolo_num:proto_num});
   closeClinEventoModal();
   await loadClinActivas();
 }
