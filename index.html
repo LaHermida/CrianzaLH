@@ -488,10 +488,10 @@
       <div class="table-wrap" style="margin-bottom:1.5rem">
         <table>
           <thead><tr>
-            <th>Hembra</th><th>Raza</th><th>Edad</th><th>Protocolo</th>
-            <th>Inicio</th><th>Día</th><th>Medicamentos Hoy</th><th>Comentario</th><th>Acciones</th>
+            <th>Hembra</th><th>Raza</th><th>Edad</th><th>Enfermedad</th>
+            <th>Protocolo</th><th>Inicio</th><th>Día</th><th>Medicamentos Hoy</th><th>Comentario</th><th>Acciones</th>
           </tr></thead>
-          <tbody id="clin-activas-body"><tr><td colspan="9" class="empty">Cargando...</td></tr></tbody>
+          <tbody id="clin-activas-body"><tr><td colspan="10" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
       <div class="kpi-group-label">✅ Altas Recientes</div>
@@ -2663,7 +2663,7 @@ async function loadClinVacunas(){
 async function loadClinAdmin(){
   const [protocolos, dias, meds, calendario] = await Promise.all([
     sbClin('clin_protocolos?order=nombre.asc'),
-    sbClin('clin_protocolo_dias?order=protocolo_id.asc,dia.asc'),
+    sbClin('clin_protocolo_dias?order=protocolo_id.asc,protocolo_num.asc'),
     sbClin('clin_medicamentos?order=nombre.asc'),
     sbClin('clin_vacunas_calendario?order=dias_min.asc')
   ]);
@@ -2683,6 +2683,7 @@ function renderClinActivas(){
   (window._clinPartos||[]).forEach(p=>{ if(p.hembra) partoMap[p.hembra]=p; });
   const protoMap = {};
   (window._clinProtocolos||[]).forEach(p=>{ protoMap[p.id]=p; });
+  const DIAS_PROTOCOLO = 3;
 
   const activas = (window._clinEventos||[]).filter(e=>!e.fecha_alta);
   const altas = (window._clinEventos||[]).filter(e=>e.fecha_alta).slice(0,20);
@@ -2690,7 +2691,7 @@ function renderClinActivas(){
   // Activas
   const activasBody = document.getElementById('clin-activas-body');
   if(!activas.length){
-    activasBody.innerHTML='<tr><td colspan="9" class="empty">Sin becerras en tratamiento.</td></tr>';
+    activasBody.innerHTML='<tr><td colspan="10" class="empty">Sin becerras en tratamiento.</td></tr>';
   } else {
     activasBody.innerHTML = activas.map(e=>{
       const parto = partoMap[e.hembra];
@@ -2698,22 +2699,32 @@ function renderClinActivas(){
       const nac = parto ? new Date(parto.fecha_parto+'T12:00:00') : null;
       const edad = nac ? Math.floor((hoy-nac)/86400000) : '—';
       const inicio = new Date(e.fecha_inicio+'T12:00:00');
-      const diaNum = Math.floor((hoy-inicio)/86400000)+1;
+      const protocoloNum = e.protocolo_num || 1;
+      // Día dentro del protocolo actual (1-3)
+      const diaEnProtocolo = Math.min(Math.floor((hoy-inicio)/86400000)+1, DIAS_PROTOCOLO);
+      const protocoloTerminado = Math.floor((hoy-inicio)/86400000)+1 > DIAS_PROTOCOLO;
+      // Medicamentos del día actual dentro del protocolo actual
       const meds = (window._clinProtocoloDias||[])
-        .filter(d=>d.protocolo_id===e.protocolo_id && d.dia===diaNum)
+        .filter(d=>d.protocolo_id===e.protocolo_id && d.protocolo_num===protocoloNum)
         .map(d=>d.medicamento+(d.dosis?' '+d.dosis:''))
-        .join(', ') || (diaNum > (proto?.duracion_dias||4) ? '✅ Protocolo terminado' : '—');
-      return `<tr>
+        .join(', ') || '—';
+      const diaLabel = protocoloTerminado
+        ? `<span style="color:#c77800;font-weight:600">⚠️ Completado</span>`
+        : `Día ${diaEnProtocolo} / ${DIAS_PROTOCOLO}`;
+      const bgRow = protocoloTerminado ? 'background:#fff8e1' : '';
+      return `<tr style="${bgRow}">
         <td class="mono" style="font-weight:600">${e.hembra}</td>
         <td class="mono">${parto?.raza||'—'}</td>
         <td class="mono">${edad}d</td>
         <td>${proto?.nombre||'—'}</td>
+        <td class="mono" style="font-weight:600;color:#2d6a4f">P${protocoloNum}</td>
         <td class="mono">${fmtFecha(e.fecha_inicio)}</td>
-        <td class="mono" style="text-align:center;font-weight:600">Día ${diaNum}</td>
+        <td class="mono" style="text-align:center">${diaLabel}</td>
         <td style="font-size:.82rem">${meds}</td>
         <td style="font-size:.82rem">${e.comentario||'—'}</td>
-        <td>
-          <button class="btn btn-secondary btn-sm" onclick="darAlta(${e.id})">Alta</button>
+        <td style="white-space:nowrap">
+          <button class="btn btn-secondary btn-sm" onclick="subirProtocolo(${e.id},${protocoloNum})" title="Subir al siguiente protocolo">⬆️ P${protocoloNum+1}</button>
+          <button class="btn btn-primary btn-sm" onclick="darAlta(${e.id})">Alta</button>
           <button class="btn btn-danger btn-sm" onclick="deleteClinEvento(${e.id})">🗑</button>
         </td>
       </tr>`;
@@ -2730,9 +2741,10 @@ function renderClinActivas(){
       const inicio = new Date(e.fecha_inicio+'T12:00:00');
       const alta = new Date(e.fecha_alta+'T12:00:00');
       const dias = Math.floor((alta-inicio)/86400000)+1;
+      const protocoloNum = e.protocolo_num||1;
       return `<tr>
         <td class="mono" style="font-weight:600">${e.hembra}</td>
-        <td>${proto?.nombre||'—'}</td>
+        <td>${proto?.nombre||'—'} <span style="color:#2d6a4f;font-size:.8rem">P${protocoloNum}</span></td>
         <td class="mono">${fmtFecha(e.fecha_inicio)}</td>
         <td class="mono">${fmtFecha(e.fecha_alta)}</td>
         <td class="mono" style="text-align:center">${dias}d</td>
@@ -3185,19 +3197,19 @@ function renderAdminProtocolos(){
     return;
   }
   container.innerHTML = protocolos.map(p=>{
-    const pDias = dias.filter(d=>d.protocolo_id===p.id).sort((a,b)=>a.dia-b.dia);
-    const maxDia = pDias.length ? Math.max(...pDias.map(d=>d.dia)) : 0;
+    const pDias = dias.filter(d=>d.protocolo_id===p.id).sort((a,b)=>(a.protocolo_num||a.dia)-(b.protocolo_num||b.dia));
+    const maxProto = pDias.length ? Math.max(...pDias.map(d=>d.protocolo_num||d.dia)) : 0;
     let diasHtml = '';
-    for(let i=1;i<=maxDia;i++){
-      const meds = pDias.filter(d=>d.dia===i).map(d=>`${d.medicamento} ${d.dosis||''}`).join(', ');
-      diasHtml += `<tr><td style="padding:.3rem .5rem;font-weight:600">Día ${i}</td><td style="padding:.3rem .5rem">${meds||'—'}</td>
+    for(let i=1;i<=maxProto;i++){
+      const meds = pDias.filter(d=>(d.protocolo_num||d.dia)===i).map(d=>`${d.medicamento} ${d.dosis||''}`).join(', ');
+      diasHtml += `<tr><td style="padding:.3rem .5rem;font-weight:600">Protocolo ${i}</td><td style="padding:.3rem .5rem">${meds||'—'}</td>
         <td style="padding:.3rem .5rem"><button class="btn btn-secondary btn-sm" onclick="editProtoDia(${p.id},${i})">Editar</button></td></tr>`;
     }
     return `<div style="border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;max-width:700px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
         <strong style="font-size:1rem">${p.nombre}</strong>
         <div style="display:flex;gap:.5rem">
-          <button class="btn btn-primary btn-sm" onclick="addProtoDia(${p.id})">+ Día</button>
+          <button class="btn btn-primary btn-sm" onclick="addProtoDia(${p.id})">+ Protocolo</button>
           <button class="btn btn-danger btn-sm" onclick="deleteProtocolo(${p.id})">🗑</button>
         </div>
       </div>
@@ -3296,6 +3308,17 @@ function openClinEventoModal(){
 }
 function closeClinEventoModal(){ document.getElementById('clinEventoModal').classList.remove('open'); }
 
+async function subirProtocolo(eventoId, protocoloActual){
+  if(!confirm(`¿Subir al Protocolo ${protocoloActual+1}? Esto reinicia el conteo de días.`)) return;
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  const hoy = new Date().toISOString().split('T')[0];
+  await sbClin(`clin_eventos?id=eq.${eventoId}`,'PATCH',{
+    protocolo_num: protocoloActual+1,
+    fecha_inicio: hoy
+  });
+  await loadClinActivas();
+}
+
 async function saveClinEvento(){
   const hembra = document.getElementById('clin-evento-hembra').value.trim();
   const fecha_raw = document.getElementById('clin-evento-fecha').value;
@@ -3303,7 +3326,7 @@ async function saveClinEvento(){
   const comentario = document.getElementById('clin-evento-comment').value;
   if(!hembra||!fecha_raw||!proto_id){alert('Hembra, fecha y protocolo son obligatorios');return;}
   const fecha_inicio = ddmmToISO(fecha_raw)||fecha_raw;
-  await sbClin('clin_eventos','POST',{hembra, protocolo_id:proto_id, fecha_inicio, comentario:comentario||null});
+  await sbClin('clin_eventos','POST',{hembra, protocolo_id:proto_id, fecha_inicio, comentario:comentario||null, protocolo_num:1});
   closeClinEventoModal();
   await loadClinActivas();
 }
@@ -3381,28 +3404,27 @@ async function saveVacuna(){
 }
 
 async function addProtoDia(protocolo_id){
-  const dia = prompt('¿Qué día del protocolo?');
-  if(!dia) return;
+  const proto_num = prompt('¿Número de protocolo? (1, 2, 3, 4...)');
+  if(!proto_num) return;
   const med = prompt('Medicamento:');
   if(!med) return;
   const dosis = prompt('Dosis:');
   const via = prompt('Vía (opcional):');
-  await sbClin('clin_protocolo_dias','POST',{protocolo_id, dia:parseInt(dia), medicamento:med, dosis:dosis||null, via:via||null});
+  await sbClin('clin_protocolo_dias','POST',{protocolo_id, protocolo_num:parseInt(proto_num), medicamento:med, dosis:dosis||null, via:via||null});
   await loadClinAdmin();
 }
 
-async function editProtoDia(protocolo_id, dia){
-  const existing = (window._clinProtocoloDias||[]).filter(d=>d.protocolo_id===protocolo_id&&d.dia===dia);
-  // Delete existing and re-add
+async function editProtoDia(protocolo_id, proto_num){
+  const existing = (window._clinProtocoloDias||[]).filter(d=>d.protocolo_id===protocolo_id&&(d.protocolo_num||d.dia)===proto_num);
   for(const d of existing){
     await sbClin(`clin_protocolo_dias?id=eq.${d.id}`,'DELETE');
   }
-  const cuantos = parseInt(prompt(`¿Cuántos medicamentos para el día ${dia}?`,'1'));
+  const cuantos = parseInt(prompt(`¿Cuántos medicamentos para el Protocolo ${proto_num}?`,'1'));
   for(let i=0;i<cuantos;i++){
     const med = prompt(`Medicamento ${i+1}:`);
     if(!med) continue;
     const dosis = prompt(`Dosis ${i+1}:`);
-    await sbClin('clin_protocolo_dias','POST',{protocolo_id, dia, medicamento:med, dosis:dosis||null});
+    await sbClin('clin_protocolo_dias','POST',{protocolo_id, protocolo_num:proto_num, medicamento:med, dosis:dosis||null});
   }
   await loadClinAdmin();
 }
