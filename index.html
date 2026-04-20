@@ -2743,11 +2743,12 @@ function renderClinActivas(){
       const proto = protoMap[e.protocolo_id];
       const nac = parto ? new Date(parto.fecha_parto+'T12:00:00') : null;
       const edad = nac ? Math.floor((hoy-nac)/86400000) : '—';
-      const inicio = new Date(e.fecha_inicio+'T12:00:00');
+      const inicio = new Date(e.fecha_inicio+'T00:00:00');
+      const hoyFecha = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
       const protocoloNum = e.protocolo_num || 1;
       // Día dentro del protocolo actual (1-3)
-      const diaEnProtocolo = Math.min(Math.floor((hoy-inicio)/86400000)+1, DIAS_PROTOCOLO);
-      const protocoloTerminado = Math.floor((hoy-inicio)/86400000)+1 > DIAS_PROTOCOLO;
+      const diaEnProtocolo = Math.min(Math.floor((hoyFecha-inicio)/86400000)+1, DIAS_PROTOCOLO);
+      const protocoloTerminado = Math.floor((hoyFecha-inicio)/86400000)+1 > DIAS_PROTOCOLO;
       // Medicamentos del día actual dentro del protocolo actual
       const meds = (window._clinProtocoloDias||[])
         .filter(d=>d.protocolo_id===e.protocolo_id && d.protocolo_num===protocoloNum)
