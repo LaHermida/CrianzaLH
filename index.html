@@ -484,13 +484,8 @@
         <span class="section-title">🧪 Refractometría Pendiente</span>
         <span style="font-size:.82rem;color:var(--text-muted)" id="refrac-count"></span>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>Arete</th><th>Fecha Parto</th><th>Raza</th><th>Partero</th><th>Refractometría</th><th>Acción</th>
-          </tr></thead>
-          <tbody id="refrac-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
-        </table>
+      <div id="refrac-container">
+        <p style="color:var(--text-muted);padding:1rem">Cargando...</p>
       </div>
     </div>
 
@@ -3509,28 +3504,79 @@ async function editProtoDia(protocolo_id, proto_num){
 
 // ==================== REFRACTOMETRÍA ====================
 async function loadRefractometria(){
-  const partos = await sbFetch('partos_crianza?sexo=eq.H&o1_refrac=is.null&order=fecha_parto.desc&limit=500&select=id,hembra,fecha_parto,raza,partero');
-  const tbody = document.getElementById('refrac-body');
+  const [partos, salidas] = await Promise.all([
+    sbFetch('partos_crianza?sexo=eq.H&o1_refrac=is.null&order=fecha_parto.desc&limit=2000&select=id,hembra,sexo,fecha_parto,raza,partero'),
+    sbFetch('salidas_crianza?select=hembra&limit=10000')
+  ]);
+  const container = document.getElementById('refrac-container');
   const count = document.getElementById('refrac-count');
-  if(!partos||!partos.length){
-    tbody.innerHTML='<tr><td colspan="6" class="empty">✅ Sin refractometrías pendientes.</td></tr>';
+
+  // Filtrar: solo hembras activas (no muertas, no abortos, no machos)
+  const salidaSet = new Set((salidas||[]).map(s=>String(s.hembra)));
+  const validas = (partos||[]).filter(p=>
+    p.hembra &&
+    /^\d+$/.test(String(p.hembra).trim()) && // solo aretes numéricos
+    p.sexo === 'H' &&                          // solo hembras
+    !salidaSet.has(String(p.hembra))           // excluir muertas/salidas
+  );
+
+  if(!validas.length){
+    container.innerHTML='<p style="color:var(--text-muted);padding:1rem">✅ Sin refractometrías pendientes.</p>';
     if(count) count.textContent='';
     return;
   }
-  if(count) count.textContent=`${partos.length} pendientes`;
-  tbody.innerHTML = partos.map(p=>{
-    const dd=p.fecha_parto?p.fecha_parto.split('-').reverse().join('/'):'—';
-    return `<tr id="refrac-row-${p.id}">
-      <td class="mono" style="font-weight:600">${p.hembra}</td>
-      <td class="mono">${dd}</td>
-      <td class="mono">${p.raza||'—'}</td>
-      <td>${p.partero||'—'}</td>
-      <td><input type="number" id="refrac-val-${p.id}" step="0.1" min="0" max="30" placeholder="ej: 9.5"
-        style="width:90px;padding:.3rem .4rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"
-        onkeydown="if(event.key==='Enter') guardarRefrac(${p.id})"/></td>
-      <td><button class="btn btn-primary btn-sm" onclick="guardarRefrac(${p.id})">✓ Guardar</button></td>
-    </tr>`;
-  }).join('');
+  if(count) count.textContent=`${validas.length} pendientes`;
+
+  // Agrupar por mes
+  const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const grupos={};
+  validas.forEach(p=>{
+    if(!p.fecha_parto) return;
+    const [yyyy,mm] = p.fecha_parto.split('-');
+    const key=`${yyyy}-${mm}`;
+    const label=`${MESES[parseInt(mm)-1]} ${yyyy}`;
+    if(!grupos[key]) grupos[key]={label, partos:[]};
+    grupos[key].partos.push(p);
+  });
+
+  const html = Object.entries(grupos)
+    .sort((a,b)=>b[0].localeCompare(a[0])) // más reciente primero
+    .map(([key,{label,partos:gPartos}])=>{
+      const btnId=`refrac-btn-${key}`;
+      const tblId=`refrac-tbl-${key}`;
+      const rows = gPartos.map(p=>{
+        const dd=p.fecha_parto?p.fecha_parto.split('-').reverse().join('/'):'—';
+        return `<tr id="refrac-row-${p.id}">
+          <td class="mono" style="font-weight:600">${p.hembra}</td>
+          <td class="mono">${dd}</td>
+          <td class="mono">${p.raza||'—'}</td>
+          <td>${p.partero||'—'}</td>
+          <td><input type="number" id="refrac-val-${p.id}" step="0.1" min="0" max="30" placeholder="ej: 9.5"
+            style="width:90px;padding:.3rem .4rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"
+            onkeydown="if(event.key==='Enter') guardarRefrac(${p.id})"/></td>
+          <td><button class="btn btn-primary btn-sm" onclick="guardarRefrac(${p.id})">✓</button></td>
+        </tr>`;
+      }).join('');
+      return `<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.7rem">
+        <button id="${btnId}" onclick="toggleVacTipo('${btnId}','${tblId}')"
+          style="width:100%;background:var(--accent);color:white;border:none;border-radius:6px 6px 0 0;padding:.65rem 1rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">
+          <span style="font-weight:600">${label}</span>
+          <span style="display:flex;gap:1rem;font-size:.85rem">
+            <span id="refrac-cnt-${key}">${gPartos.length} pendientes</span><span>▼</span>
+          </span>
+        </button>
+        <div id="${tblId}" style="display:none">
+          <table style="width:100%;font-size:.83rem">
+            <thead><tr style="background:#f5f5f5">
+              <th style="padding:.35rem .5rem">Arete</th><th>Fecha</th><th>Raza</th><th>Partero</th><th>Refractometría</th><th>Acción</th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`;
+    }).join('');
+
+  container.innerHTML = html;
 }
 
 async function guardarRefrac(id){
@@ -3539,15 +3585,24 @@ async function guardarRefrac(id){
   if(isNaN(val)||val<=0||val>30){alert('Valor inválido. Ingresa entre 0 y 30.');return;}
   const res = await sbFetch(`partos_crianza?id=eq.${id}`,'PATCH',{o1_refrac:val});
   if(res&&res.ok){
-    // Quitar la fila de la tabla
     const row = document.getElementById(`refrac-row-${id}`);
-    if(row) row.remove();
-    // Actualizar contador
-    const tbody = document.getElementById('refrac-body');
-    const remaining = tbody.querySelectorAll('tr[id^="refrac-row-"]').length;
+    if(row){
+      // Actualizar contador del mes
+      const tbl = row.closest('div[id^="refrac-tbl-"]');
+      if(tbl){
+        const key = tbl.id.replace('refrac-tbl-','');
+        row.remove();
+        const remaining = tbl.querySelectorAll('tr[id^="refrac-row-"]').length;
+        const cntEl = document.getElementById(`refrac-cnt-${key}`);
+        if(cntEl) cntEl.textContent = remaining ? `${remaining} pendientes` : '✅ Completo';
+      } else {
+        row.remove();
+      }
+    }
+    // Actualizar contador global
+    const total = document.querySelectorAll('tr[id^="refrac-row-"]').length;
     const count = document.getElementById('refrac-count');
-    if(count) count.textContent = remaining ? `${remaining} pendientes` : '';
-    if(!remaining) tbody.innerHTML='<tr><td colspan="6" class="empty">✅ Sin refractometrías pendientes.</td></tr>';
+    if(count) count.textContent = total ? `${total} pendientes` : '';
   } else {
     alert('Error al guardar. Intenta de nuevo.');
   }
