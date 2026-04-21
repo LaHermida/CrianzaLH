@@ -174,6 +174,7 @@
     <div class="nav-sep"></div>
     <button onclick="showTab('reg-partos',this)">🐄 Registro Partos</button>
     <button onclick="showTab('reg-pesajes',this)">📏 Registro Pesajes</button>
+    <button onclick="showTab('refractometria',this)">🧪 Refractometría</button>
     <div class="nav-sep"></div>
     <button onclick="showTab('clin-activas',this)">🏥 Clínica</button>
     <button onclick="showTab('clin-vacunas',this)">💉 Vacunación</button>
@@ -476,6 +477,22 @@
       </div>
     </div>
 
+
+    <!-- ===== REFRACTOMETRÍA ===== -->
+    <div id="tab-refractometria" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🧪 Refractometría Pendiente</span>
+        <span style="font-size:.82rem;color:var(--text-muted)" id="refrac-count"></span>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Arete</th><th>Fecha Parto</th><th>Raza</th><th>Partero</th><th>Refractometría</th><th>Acción</th>
+          </tr></thead>
+          <tbody id="refrac-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
 
     <!-- ===== CLINICA ACTIVAS ===== -->
     <div id="tab-clin-activas" class="hidden">
@@ -824,7 +841,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','reg-partos','reg-pesajes','inventario','clin-activas','clin-vacunas','clin-admin','corrales','ficha-animal'].forEach(t=>{
+  ['dashboard','dash-gdp','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','ficha-animal'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -836,6 +853,7 @@ function showTab(tab,btn){
   if(tab==='clin-vacunas') loadClinVacunas();
   if(tab==='clin-admin') loadClinAdmin();
   if(tab==='corrales') loadCorrales();
+  if(tab==='refractometria') loadRefractometria();
   if(tab==='dash-gdp'){
     const needPesajes=!window._pesajes||!window._pesajes.length;
     const needPartos=!window._partos||!window._partos.length;
@@ -3487,6 +3505,52 @@ async function editProtoDia(protocolo_id, proto_num){
     await sbClin('clin_protocolo_dias','POST',{protocolo_id, protocolo_num:proto_num, medicamento:med, dosis:dosis||null});
   }
   await loadClinAdmin();
+}
+
+// ==================== REFRACTOMETRÍA ====================
+async function loadRefractometria(){
+  const partos = await sbFetch('partos_crianza?sexo=eq.H&o1_refrac=is.null&order=fecha_parto.desc&limit=500&select=id,hembra,fecha_parto,raza,partero');
+  const tbody = document.getElementById('refrac-body');
+  const count = document.getElementById('refrac-count');
+  if(!partos||!partos.length){
+    tbody.innerHTML='<tr><td colspan="6" class="empty">✅ Sin refractometrías pendientes.</td></tr>';
+    if(count) count.textContent='';
+    return;
+  }
+  if(count) count.textContent=`${partos.length} pendientes`;
+  tbody.innerHTML = partos.map(p=>{
+    const dd=p.fecha_parto?p.fecha_parto.split('-').reverse().join('/'):'—';
+    return `<tr id="refrac-row-${p.id}">
+      <td class="mono" style="font-weight:600">${p.hembra}</td>
+      <td class="mono">${dd}</td>
+      <td class="mono">${p.raza||'—'}</td>
+      <td>${p.partero||'—'}</td>
+      <td><input type="number" id="refrac-val-${p.id}" step="0.1" min="0" max="30" placeholder="ej: 9.5"
+        style="width:90px;padding:.3rem .4rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"
+        onkeydown="if(event.key==='Enter') guardarRefrac(${p.id})"/></td>
+      <td><button class="btn btn-primary btn-sm" onclick="guardarRefrac(${p.id})">✓ Guardar</button></td>
+    </tr>`;
+  }).join('');
+}
+
+async function guardarRefrac(id){
+  const input = document.getElementById(`refrac-val-${id}`);
+  const val = parseFloat(input.value);
+  if(isNaN(val)||val<=0||val>30){alert('Valor inválido. Ingresa entre 0 y 30.');return;}
+  const res = await sbFetch(`partos_crianza?id=eq.${id}`,'PATCH',{o1_refrac:val});
+  if(res&&res.ok){
+    // Quitar la fila de la tabla
+    const row = document.getElementById(`refrac-row-${id}`);
+    if(row) row.remove();
+    // Actualizar contador
+    const tbody = document.getElementById('refrac-body');
+    const remaining = tbody.querySelectorAll('tr[id^="refrac-row-"]').length;
+    const count = document.getElementById('refrac-count');
+    if(count) count.textContent = remaining ? `${remaining} pendientes` : '';
+    if(!remaining) tbody.innerHTML='<tr><td colspan="6" class="empty">✅ Sin refractometrías pendientes.</td></tr>';
+  } else {
+    alert('Error al guardar. Intenta de nuevo.');
+  }
 }
 
 // ==================== CORRALES ====================
