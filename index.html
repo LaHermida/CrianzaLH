@@ -2107,10 +2107,12 @@ async function importSalidas(event){
   const file=event.target.files[0];if(!file)return;event.target.value='';
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
-  // Auto-detect format:
-  // Format A (simple): Col 0=hembra, 1=fecha_salida, 2=motivo
-  // Format B (full):   Col 1=hembra(Vaca), 5=edad, 7=fecha_salida, 8=fecha_nac, 9=ultimo_peso, 10=motivo
-  // Format C (Salidas_Para_Claude): Col 1=Vaca, 3=Edad, 5=Fecha Salida, 6=Fecha Nacimiento, 7=Razón
+
+  // Traer hembras que ya tienen salida registrada
+  const existentes = await sbFetch('salidas_crianza?select=hembra&limit=10000');
+  const yaExisten = new Set((existentes||[]).map(s=>String(s.hembra).trim()));
+
+  // Auto-detect format
   const firstRow=rows[0]?.__row||[];
   const isFormatC = firstRow.length >= 7 && firstRow.length <= 9 &&
                     rows.some(r=>{const p=r.__row||[]; return p[4]&&p[4].toString().includes('Nacimiento');});
@@ -2126,7 +2128,6 @@ async function importSalidas(event){
     
     if(isFormatC){
       hembra=toStr(g(1));
-      // Col 5=Fecha Nacimiento, Col 6=Fecha Salida (fixed)
       fecha_nacimiento=parseDateFlex(gRaw(5));
       fecha_salida=parseDateFlex(gRaw(6));
       edad_dias=g(3)?parseInt(g(3)):null;
@@ -2146,9 +2147,10 @@ async function importSalidas(event){
     }
     
     if(!hembra||!fecha_salida||!/^\d+$/.test(hembra.trim())) return null;
+    // Saltar si ya existe salida para esta hembra
+    if(yaExisten.has(hembra.trim())) return null;
+
     const motivo=clasificarMotivo(razon_original||'');
-    
-    // Calculate etapa from edad_dias
     let etapa=null;
     if(edad_dias!=null){
       const d=parseInt(edad_dias);
@@ -2158,10 +2160,14 @@ async function importSalidas(event){
       else if(d<=365) etapa='Etapa 4 - 5-11m (151-365d)';
       else etapa='Etapa 5 - 12m a Gestación';
     }
-    
     return {hembra, fecha_salida, fecha_nacimiento, edad_dias, ultimo_peso, razon_original, motivo, etapa};
   }).filter(r=>r);
-  if(!mapped.length){alert('Sin datos válidos.');return;}
+
+  if(!mapped.length){
+    alert('Sin salidas nuevas — todas las hembras del archivo ya están registradas.');
+    return;
+  }
+
   let ok=0,err=0;
   for(const r of mapped){
     try{
@@ -2169,7 +2175,7 @@ async function importSalidas(event){
       if(res.ok) ok++; else{const e=await res.json().catch(()=>({}));console.error('Salida error:',e,'Data:',r);err++;}
     }catch(e){console.error('Salida exception:',e);err++;}
   }
-  alert(`Importadas: ${ok} salidas${err?', Errores: '+err:''}`);
+  alert(`Nuevas salidas agregadas: ${ok}${err?', Errores: '+err:''}`);
   await loadInventario();
   document.getElementById('tab-inventario').scrollIntoView({behavior:'smooth', block:'start'});
 }
