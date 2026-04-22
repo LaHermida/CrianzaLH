@@ -2112,49 +2112,19 @@ async function importSalidas(event){
   const existentes = await sbFetch('salidas_crianza?select=hembra&limit=10000');
   const yaExisten = new Set((existentes||[]).map(s=>String(s.hembra).trim()));
 
-  // Auto-detect format
-  const firstRow=rows[0]?.__row||[];
-  // Format D: Col 0=Indice, 1=Vaca, 2=Patio, 3=Edad, 4=Estado, 5=Fecha Nac, 6=Fecha Salida, 7=Peso, 8=Razon
-  const isFormatD = rows.some(r=>{const p=r.__row||[]; return p[4]&&p[4].toString().includes('Nacimiento');}) &&
-                    rows.some(r=>{const p=r.__row||[]; return p[6]&&(p[6] instanceof Date || (typeof p[6]==='string'&&p[6].includes('/')));});
-  const isFormatC = !isFormatD && firstRow.length >= 7 && firstRow.length <= 9 &&
-                    rows.some(r=>{const p=r.__row||[]; return p[4]&&p[4].toString().includes('Nacimiento');});
-  const isFormatB = !isFormatD && !isFormatC && (firstRow.length >= 10 && (firstRow[6]||'').toString().includes('ginecol') ||
-                    rows.some(r=>{const p=r.__row||[]; return p[6]&&p[6].toString().includes('Nacimiento');}));
+  // Formato único: Col 0=Indice, 1=Vaca, 2=Patio, 3=Edad, 4=Estado, 5=Fecha Nac, 6=Fecha Salida, 7=Peso, 8=Razon
 
   const mapped=rows.map(row=>{
     const p=row.__row||[];
-    const raw=row.__raw||p;
     const g=i=>(p[i]!==undefined&&p[i]!==null&&String(p[i]).trim()!=='')?p[i]:null;
-    const gRaw=i=>(raw[i]!==undefined&&raw[i]!==null)?raw[i]:null;
     let hembra, fecha_salida, razon_original, fecha_nacimiento, edad_dias, ultimo_peso;
 
-    if(isFormatD){
-      hembra=toStr(g(1));
-      fecha_nacimiento=excelDateToISO(g(5));
-      fecha_salida=excelDateToISO(g(6));
-      edad_dias=g(3)?parseInt(g(3)):null;
-      ultimo_peso=g(7)?parseFloat(g(7)):null;
-      razon_original=toStr(g(8))||null;
-    } else if(isFormatC){
-      hembra=toStr(g(1));
-      fecha_nacimiento=parseDateFlex(gRaw(5));
-      fecha_salida=parseDateFlex(gRaw(6));
-      edad_dias=g(3)?parseInt(g(3)):null;
-      ultimo_peso=null;
-      razon_original=toStr(g(7))||null;
-    } else if(isFormatB){
-      hembra=toStr(g(1));
-      fecha_salida=excelDateToISO(g(7));
-      fecha_nacimiento=excelDateToISO(g(8));
-      edad_dias=g(5)?parseInt(g(5)):null;
-      ultimo_peso=g(9)?parseFloat(g(9)):null;
-      razon_original=toStr(g(10))||null;
-    } else {
-      hembra=toStr(g(0));
-      fecha_salida=excelDateToISO(g(1));
-      razon_original=toStr(g(2))||null;
-    }
+    hembra=toStr(g(1));
+    fecha_nacimiento=excelDateToISO(g(5));
+    fecha_salida=excelDateToISO(g(6));
+    edad_dias=g(3)?parseInt(g(3)):null;
+    ultimo_peso=g(7)?parseFloat(g(7)):null;
+    razon_original=toStr(g(8))||null;
     
     if(!hembra||!fecha_salida||!/^\d+$/.test(hembra.trim())) return null;
     // Saltar si ya existe salida para esta hembra
