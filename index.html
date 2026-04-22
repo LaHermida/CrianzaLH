@@ -170,6 +170,7 @@
   <nav id="mainNav">
     <button onclick="showTab('dashboard',this)">📊 Dashboard Partos</button>
     <button onclick="showTab('dash-gdp',this)">📈 Dashboard GDP</button>
+    <button onclick="showTab('dash-morbilidad',this)">🏥 Morbilidad</button>
     <button onclick="showTab('inventario',this)">🐮 Inventario</button>
     <div class="nav-sep"></div>
     <button onclick="showTab('reg-partos',this)">🐄 Registro Partos</button>
@@ -324,6 +325,47 @@
     </div>
 
     <!-- ===== DASH GDP ===== -->
+    <!-- ===== DASHBOARD MORBILIDAD ===== -->
+    <div id="tab-dash-morbilidad" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🏥 Dashboard Morbilidad</span>
+      </div>
+      <!-- KPIs globales -->
+      <div class="kpi-group-label">📊 Resumen General</div>
+      <div id="morb-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
+      <!-- Por enfermedad -->
+      <div class="kpi-group-label">🦠 Por Enfermedad</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem">
+        <table>
+          <thead><tr>
+            <th>Enfermedad</th><th>Casos Totales</th><th>Activos</th><th>Altas</th>
+            <th>% Recuperación</th><th>Días Prom. Trat.</th><th>Protocolo más usado</th>
+          </tr></thead>
+          <tbody id="morb-enf-body"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+      <!-- Por mes -->
+      <div class="kpi-group-label">📅 Casos por Mes</div>
+      <div class="table-wrap" style="margin-bottom:1.5rem">
+        <table>
+          <thead><tr>
+            <th>Mes</th><th>Casos</th><th>Diarrea</th><th>Neumonía</th><th>Ciega</th><th>Empacho</th><th>Otros</th>
+          </tr></thead>
+          <tbody id="morb-mes-body"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+      <!-- Por etapa -->
+      <div class="kpi-group-label">📋 Casos por Etapa</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Etapa</th><th>Casos</th><th>% del Total</th>
+          </tr></thead>
+          <tbody id="morb-etapa-body"><tr><td colspan="3" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <div id="tab-dash-gdp" class="hidden">
       <div class="section-header">
         <span class="section-title">📈 Dashboard GDP / Desarrollo</span>
@@ -836,13 +878,14 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','ficha-animal'].forEach(t=>{
+  ['dashboard','dash-gdp','dash-morbilidad','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','ficha-animal'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
   const el=document.getElementById('tab-'+tab);
   if(el) el.classList.remove('hidden');
   if(tab==='dashboard') renderDashboard();
+  if(tab==='dash-morbilidad') loadDashMorbilidad();
   if(tab==='inventario') loadInventario();
   if(tab==='clin-activas') loadClinActivas();
   if(tab==='clin-vacunas') loadClinVacunas();
@@ -3500,6 +3543,138 @@ async function editProtoDia(protocolo_id, proto_num){
     await sbClin('clin_protocolo_dias','POST',{protocolo_id, protocolo_num:proto_num, medicamento:med, dosis:dosis||null});
   }
   await loadClinAdmin();
+}
+
+// ==================== DASHBOARD MORBILIDAD ====================
+async function loadDashMorbilidad(){
+  const [eventos, protocolos, partos] = await Promise.all([
+    sbClin('clin_eventos?order=fecha_inicio.desc&limit=2000'),
+    sbClin('clin_protocolos?order=nombre.asc'),
+    sbFetch('partos_crianza?sexo=eq.H&order=fecha_parto.asc&limit=10000&select=hembra,fecha_parto,raza')
+  ]);
+
+  const hoy = new Date();
+  const protoMap = {};
+  (protocolos||[]).forEach(p=>{ protoMap[p.id]=p.nombre; });
+  const partoMap = {};
+  (partos||[]).forEach(p=>{ partoMap[p.hembra]=p; });
+
+  const evts = eventos||[];
+  const totalCasos = evts.length;
+  const activos = evts.filter(e=>!e.fecha_alta).length;
+  const altas = evts.filter(e=>e.fecha_alta).length;
+  const pctRecup = totalCasos ? Math.round(altas/totalCasos*100) : 0;
+
+  // Días promedio de tratamiento (solo cerrados)
+  const cerrados = evts.filter(e=>e.fecha_alta);
+  const diasProm = cerrados.length ? Math.round(
+    cerrados.reduce((s,e)=>{
+      const ini=new Date(e.fecha_inicio+'T00:00:00');
+      const alt=new Date(e.fecha_alta+'T00:00:00');
+      return s+Math.floor((alt-ini)/86400000)+1;
+    },0)/cerrados.length
+  ) : 0;
+
+  // Tasa morbilidad = casos únicos / total hembras activas
+  const hembrasSinSalida = (partos||[]).length;
+  const hembrasCon = new Set(evts.map(e=>e.hembra)).size;
+  const tasaMorb = hembrasSinSalida ? Math.round(hembrasCon/hembrasSinSalida*100) : 0;
+
+  // KPIs
+  document.getElementById('morb-kpis').innerHTML =
+    kpiCard('Casos Totales', totalCasos,'','','',false)+
+    kpiCard('Activos Ahora', activos,'','','',false)+
+    kpiCard('Altas', altas,'','','',false)+
+    kpiCard('% Recuperación', pctRecup+'%','','','',false)+
+    kpiCard('Días Prom. Trat.', diasProm+'d','','','',false)+
+    kpiCard('Tasa Morbilidad', tasaMorb+'%','','% becerras que enfermaron','',false);
+
+  // Por enfermedad
+  const porEnf = {};
+  evts.forEach(e=>{
+    const n = protoMap[e.protocolo_id]||'Otro';
+    if(!porEnf[n]) porEnf[n]={total:0,activos:0,altas:0,dias:[],protos:{}};
+    porEnf[n].total++;
+    if(e.fecha_alta){
+      porEnf[n].altas++;
+      const ini=new Date(e.fecha_inicio+'T00:00:00');
+      const alt=new Date(e.fecha_alta+'T00:00:00');
+      porEnf[n].dias.push(Math.floor((alt-ini)/86400000)+1);
+    } else {
+      porEnf[n].activos++;
+    }
+    const pn=`P${e.protocolo_num||1}`;
+    porEnf[n].protos[pn]=(porEnf[n].protos[pn]||0)+1;
+  });
+
+  document.getElementById('morb-enf-body').innerHTML = Object.entries(porEnf)
+    .sort((a,b)=>b[1].total-a[1].total)
+    .map(([enf,d])=>{
+      const pctR=d.total?Math.round(d.altas/d.total*100):0;
+      const dprom=d.dias.length?Math.round(d.dias.reduce((a,b)=>a+b,0)/d.dias.length):0;
+      const masUsado=Object.entries(d.protos).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';
+      return `<tr>
+        <td style="font-weight:600">${enf}</td>
+        <td class="mono" style="text-align:center">${d.total}</td>
+        <td class="mono" style="text-align:center;color:#c77800">${d.activos}</td>
+        <td class="mono" style="text-align:center;color:#2d6a4f">${d.altas}</td>
+        <td class="mono" style="text-align:center">${pctR}%</td>
+        <td class="mono" style="text-align:center">${dprom}d</td>
+        <td class="mono" style="text-align:center">${masUsado}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" class="empty">Sin datos.</td></tr>';
+
+  // Por mes
+  const MESES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const ENFS=['Diarrea','Neumonia','Ciega','Empacho'];
+  const porMes={};
+  evts.forEach(e=>{
+    const [yyyy,mm]=e.fecha_inicio.split('-');
+    const key=`${yyyy}-${mm}`;
+    if(!porMes[key]){porMes[key]={label:`${MESES[parseInt(mm)-1]} ${yyyy}`,total:0,enfs:{}};}
+    porMes[key].total++;
+    const n=protoMap[e.protocolo_id]||'Otro';
+    porMes[key].enfs[n]=(porMes[key].enfs[n]||0)+1;
+  });
+
+  document.getElementById('morb-mes-body').innerHTML = Object.entries(porMes)
+    .sort((a,b)=>b[0].localeCompare(a[0]))
+    .map(([key,d])=>`<tr>
+      <td style="font-weight:600">${d.label}</td>
+      <td class="mono" style="text-align:center;font-weight:600">${d.total}</td>
+      ${ENFS.map(e=>`<td class="mono" style="text-align:center">${d.enfs[e]||'—'}</td>`).join('')}
+      <td class="mono" style="text-align:center">${Object.entries(d.enfs).filter(([k])=>!ENFS.includes(k)).reduce((s,[,v])=>s+v,0)||'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="7" class="empty">Sin datos.</td></tr>';
+
+  // Por etapa (basado en edad al inicio del evento)
+  const etapasDef=[
+    {n:'Etapa 1 - Leche (0-65d)',min:0,max:65},
+    {n:'Etapa 2 - Jaulas (66-90d)',min:66,max:90},
+    {n:'Etapa 3 - AYC (91-150d)',min:91,max:150},
+    {n:'Etapa 4 - 5-11m (151-365d)',min:151,max:365},
+    {n:'Etapa 5 - 12m+',min:366,max:99999}
+  ];
+  const porEtapa={};
+  etapasDef.forEach(e=>{ porEtapa[e.n]=0; });
+  evts.forEach(e=>{
+    const p=partoMap[e.hembra];
+    if(!p||!p.fecha_parto) return;
+    const ini=new Date(e.fecha_inicio+'T00:00:00');
+    const nac=new Date(p.fecha_parto+'T00:00:00');
+    const edad=Math.floor((ini-nac)/86400000);
+    const et=etapasDef.find(d=>edad>=d.min&&edad<=d.max);
+    if(et) porEtapa[et.n]=(porEtapa[et.n]||0)+1;
+  });
+
+  document.getElementById('morb-etapa-body').innerHTML = etapasDef.map(et=>{
+    const c=porEtapa[et.n]||0;
+    const pct=totalCasos?Math.round(c/totalCasos*100):0;
+    return `<tr>
+      <td>${et.n}</td>
+      <td class="mono" style="text-align:center;font-weight:600">${c}</td>
+      <td class="mono" style="text-align:center">${pct}%</td>
+    </tr>`;
+  }).join('');
 }
 
 // ==================== REFRACTOMETRÍA ====================
