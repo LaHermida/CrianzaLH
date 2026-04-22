@@ -2149,13 +2149,22 @@ async function importSalidas(event){
   }
 
   let ok=0,err=0;
+  const errores=[];
   for(const r of mapped){
     try{
       const res=await sbFetch('salidas_crianza','POST',r);
-      if(res.ok) ok++; else{const e=await res.json().catch(()=>({}));console.error('Salida error:',e,'Data:',r);err++;}
-    }catch(e){console.error('Salida exception:',e);err++;}
+      if(res.ok) ok++;
+      else{
+        const e=await res.json().catch(()=>({}));
+        errores.push(`Hembra ${r.hembra}: ${e.message||e.hint||JSON.stringify(e)}`);
+        err++;
+      }
+    }catch(e){errores.push(`Hembra ${r.hembra}: ${e.message}`);err++;}
   }
-  alert(`Nuevas salidas agregadas: ${ok}${err?', Errores: '+err:''}`);
+  let msg=`Nuevas salidas agregadas: ${ok}`;
+  if(err) msg+=`\nErrores: ${err}`;
+  if(errores.length) msg+=`\n\nPrimeros errores:\n${errores.slice(0,3).join('\n')}`;
+  alert(msg);
   await loadInventario();
   document.getElementById('tab-inventario').scrollIntoView({behavior:'smooth', block:'start'});
 }
@@ -2299,6 +2308,12 @@ function parseDateFlex(val){
 }
 function excelDateToISO(val){
   if(!val) return null;
+  // Si es objeto Date de JS (viene de XLSX con cellDates:true)
+  if(val instanceof Date){
+    if(isNaN(val)) return null;
+    const y=val.getFullYear(), m=String(val.getMonth()+1).padStart(2,'0'), d=String(val.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
   const s=String(val).trim();
   if(!s) return null;
   if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
