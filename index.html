@@ -2167,7 +2167,8 @@ async function importSalidas(event){
   if(errores.length) msg+=`\n\nPrimeros errores:\n${errores.slice(0,3).join('\n')}`;
   alert(msg);
   await loadInventario();
-  document.getElementById('tab-inventario').scrollIntoView({behavior:'smooth', block:'start'});
+  const invBtn=document.querySelector('#mainNav button[onclick*="inventario"]');
+  if(invBtn) showTab('inventario',invBtn);
 }
 
 function downloadTemplateSalidas(){
