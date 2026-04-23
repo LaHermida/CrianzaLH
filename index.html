@@ -864,7 +864,7 @@ async function sbFetch(path,method='GET',body=null){
   const headers={
     'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,
     'Content-Type':'application/json',
-    'Prefer':method==='POST'?'return=representation':'return=minimal'
+    'Prefer':'return=minimal'
   };
   if(method==='GET') headers['Range']='0-19999';
   const opts={method,headers};
@@ -2150,6 +2150,7 @@ async function importSalidas(event){
 
   let ok=0,err=0;
   const errores=[];
+  if(mapped.length) console.log('Primer registro a insertar:', JSON.stringify(mapped[0]));
   for(const r of mapped){
     try{
       const res=await sbFetch('salidas_crianza','POST',r);
@@ -2267,9 +2268,9 @@ async function readFile(file){
     }).filter(r=>r.__row.some(v=>v));
   }
   const data=await file.arrayBuffer();
-  const wb=XLSX.read(data,{type:'array',cellDates:false});
+  const wb=XLSX.read(data,{type:'array',cellDates:true});
   const ws=wb.Sheets[wb.SheetNames[0]];
-  const arrays=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:false});
+  const arrays=XLSX.utils.sheet_to_json(ws,{header:1,defval:null,raw:true});
   if(!arrays.length) return [];
   // Build raw values directly from worksheet cells (v = raw value, no formatting)
   const range=XLSX.utils.decode_range(ws['!ref']||'A1');
@@ -2311,23 +2312,20 @@ function excelDateToISO(val){
   // Si es objeto Date de JS (viene de XLSX con cellDates:true)
   if(val instanceof Date){
     if(isNaN(val)) return null;
-    const y=val.getFullYear(), m=String(val.getMonth()+1).padStart(2,'0'), d=String(val.getDate()).padStart(2,'0');
+    const y=val.getUTCFullYear(), m=String(val.getUTCMonth()+1).padStart(2,'0'), d=String(val.getUTCDate()).padStart(2,'0');
     return `${y}-${m}-${d}`;
   }
   const s=String(val).trim();
   if(!s) return null;
   if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
-  // DD/MM/YYYY or D/M/YYYY
   let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
-  // D/M/YY (2-digit year)
   m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2})$/);
   if(m){ const y=parseInt(m[3]); const full=y>=50?1900+y:2000+y; return `${full}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
   m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if(m) return `${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
   m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{2})$/);
   if(m){ const y=parseInt(m[3]); const full=y>=50?1900+y:2000+y; return `${full}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`; }
-  // Excel serial number
   if(/^\d{4,5}$/.test(s)||/^\d+\.\d+$/.test(s)){const n=parseFloat(s);if(n>30000&&n<60000){const d=new Date((n-25569)*86400000);if(!isNaN(d))return d.toISOString().slice(0,10);}}
   const d=new Date(s);
   if(!isNaN(d)) return d.toISOString().slice(0,10);
