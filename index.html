@@ -2786,7 +2786,8 @@ function renderClinActivas(){
   (window._clinProtocolos||[]).forEach(p=>{ protoMap[p.id]=p; });
   const DIAS_PROTOCOLO = 3;
 
-  const activas = (window._clinEventos||[]).filter(e=>!e.fecha_alta);
+  const activas = (window._clinEventos||[]).filter(e=>!e.fecha_alta)
+    .sort((a,b)=>a.fecha_inicio.localeCompare(b.fecha_inicio)||parseInt(a.hembra)-parseInt(b.hembra));
   const altas = (window._clinEventos||[]).filter(e=>e.fecha_alta).slice(0,20);
 
   // Activas
@@ -2918,7 +2919,7 @@ function renderVacLotes(){
       return dias>=cal.dias_min;
     }).map(p=>({...p, dias:Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000), adelantada:false}));
 
-    if(!elegiblesReales.length) return; // sin elegibles, no mostrar card
+    // Mostrar card aunque no haya elegibles (para visibilidad total)
 
     let lote=[];
 
@@ -2959,7 +2960,19 @@ function renderVacLotes(){
       lote=lote.filter(p=>{if(seen.has(p.hembra))return false;seen.add(p.hembra);return true;});
     }
 
-    if(!lote.length) return;
+    if(!lote.length){
+      // Mostrar card vacía con 0 elegibles
+      anyLote=true;
+      const btnId='vlote-btn-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+      const tblId='vlote-tbl-'+vacuna.replace(/[^a-z0-9]/gi,'_');
+      html+=`<div style="border:1px solid #ddd;border-radius:8px;margin-bottom:.8rem;opacity:.6">
+        <div style="background:#f5f5f5;border-radius:6px;padding:.65rem 1rem;display:flex;justify-content:space-between;align-items:center;font-size:.9rem">
+          <span style="font-weight:700;color:#888">${vacuna}</span>
+          <span style="color:#aaa;font-size:.82rem">✅ 0 elegibles</span>
+        </div>
+      </div>`;
+      return;
+    }
     anyLote=true;
 
     lote.sort((a,b)=>{
