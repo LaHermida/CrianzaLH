@@ -2112,7 +2112,11 @@ async function importSalidas(event){
   const existentes = await sbFetch('salidas_crianza?select=hembra&limit=10000');
   const yaExisten = new Set((existentes||[]).map(s=>String(s.hembra).trim()));
 
-  // Formato único: Col 0=Indice, 1=Vaca, 2=Patio, 3=Edad, 4=Estado, 5=Fecha Nac, 6=Fecha Salida, 7=Peso, 8=Razon
+  // Detectar formato por número de columnas
+  // Formato 7 cols: Col 0=Indice, 1=Vaca, 2=Patio, 3=Edad, 4=Fecha Nac, 5=Fecha Salida, 6=Razon
+  // Formato 9 cols: Col 0=Indice, 1=Vaca, 2=Patio, 3=Edad, 4=Estado, 5=Fecha Nac, 6=Fecha Salida, 7=Peso, 8=Razon
+  const ncols = (rows[0]?.__row||[]).filter(v=>v!==null&&v!==undefined).length;
+  const is7cols = ncols <= 7;
 
   const mapped=rows.map(row=>{
     const p=row.__row||[];
@@ -2120,11 +2124,19 @@ async function importSalidas(event){
     let hembra, fecha_salida, razon_original, fecha_nacimiento, edad_dias, ultimo_peso;
 
     hembra=toStr(g(1));
-    fecha_nacimiento=excelDateToISO(g(5));
-    fecha_salida=excelDateToISO(g(6));
-    edad_dias=g(3)?parseInt(g(3)):null;
-    ultimo_peso=g(7)?parseFloat(g(7)):null;
-    razon_original=toStr(g(8))||null;
+    if(is7cols){
+      fecha_nacimiento=excelDateToISO(g(4));
+      fecha_salida=excelDateToISO(g(5));
+      edad_dias=g(3)?parseInt(g(3)):null;
+      ultimo_peso=null;
+      razon_original=toStr(g(6))||null;
+    } else {
+      fecha_nacimiento=excelDateToISO(g(5));
+      fecha_salida=excelDateToISO(g(6));
+      edad_dias=g(3)?parseInt(g(3)):null;
+      ultimo_peso=g(7)?parseFloat(g(7)):null;
+      razon_original=toStr(g(8))||null;
+    }
     
     if(!hembra||!fecha_salida||!/^\d+$/.test(hembra.trim())) return null;
     // Saltar si ya existe salida para esta hembra
