@@ -3806,17 +3806,18 @@ async function importCorrales(event){
   const file=event.target.files[0];if(!file)return;event.target.value='';
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
-  let ok=0,err=0;
+  console.log('Primera fila corrales:', JSON.stringify(rows[0]));
+  let ok=0,err=0,skip=0;
   for(const row of rows){
-    const p=row.__row||[];
-    const g=i=>(p[i]!==undefined&&p[i]!==null&&String(p[i]).trim()!=='')?p[i]:null;
-    const hembra=toStr(g(0));
-    const corral=g(1)?parseInt(g(1)):null;
-    if(!hembra||!/^\d+$/.test(hembra)||!corral||isNaN(corral)) continue;
+    const p=row.__row||row;
+    const vals=Array.isArray(p)?p:Object.values(p);
+    const hembra=vals[1]!=null?String(vals[1]).trim():'';
+    const corral=vals[2]!=null?parseInt(String(vals[2]).trim()):null;
+    if(!hembra||!/^\d+$/.test(hembra)||!corral||isNaN(corral)){skip++;continue;}
     const res=await sbFetch(`partos_crianza?hembra=eq.${hembra}`,'PATCH',{corral});
     if(res&&res.ok) ok++; else err++;
   }
-  alert(`Corrales actualizados: ${ok}${err?', Errores: '+err:''}`);
+  alert(`Corrales actualizados: ${ok}${err?', Errores: '+err:''}${skip?', Saltadas: '+skip:''}`);
   await loadCorrales();
 }
 async function loadCorrales(){
