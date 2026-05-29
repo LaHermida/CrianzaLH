@@ -3809,10 +3809,9 @@ async function importCorrales(event){
   console.log('Primera fila corrales:', JSON.stringify(rows[0]));
   let ok=0,err=0,skip=0;
   for(const row of rows){
-    const p=row.__row||row;
-    const vals=Array.isArray(p)?p:Object.values(p);
-    const hembra=vals[1]!=null?String(vals[1]).trim():'';
-    const corral=vals[2]!=null?parseInt(String(vals[2]).trim()):null;
+    const p=row.__row||[];
+    const hembra=p[1]!=null?String(p[1]).trim():'';
+    const corral=p[2]!=null?parseInt(String(p[2]).trim()):null;
     if(!hembra||!/^\d+$/.test(hembra)||!corral||isNaN(corral)){skip++;continue;}
     const res=await sbFetch(`partos_crianza?hembra=eq.${hembra}`,'PATCH',{corral});
     if(res&&res.ok) ok++; else err++;
