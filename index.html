@@ -648,7 +648,11 @@
     <div id="tab-corrales" class="hidden">
       <div class="section-header">
         <span class="section-title">🏠 Corrales</span>
-        <span id="corrales-resumen" style="font-size:.85rem;color:var(--text-muted)"></span>
+        <div style="display:flex;gap:.5rem;align-items:center">
+          <span id="corrales-resumen" style="font-size:.85rem;color:var(--text-muted)"></span>
+          <button class="btn btn-secondary" onclick="document.getElementById('importCorralesFile').click()">📥 Actualizar Corrales</button>
+          <input type="file" id="importCorralesFile" accept=".csv,.xlsx,.xls" class="hidden" onchange="importCorrales(event)"/>
+        </div>
       </div>
       <div id="corrales-container">
         <p style="color:var(--text-muted);padding:1rem">Cargando...</p>
@@ -2112,11 +2116,7 @@ async function importSalidas(event){
   const existentes = await sbFetch('salidas_crianza?select=hembra&limit=10000');
   const yaExisten = new Set((existentes||[]).map(s=>String(s.hembra).trim()));
 
-  // Detectar formato por número de columnas
-  // Formato 7 cols: Col 0=Indice, 1=Vaca, 2=Patio, 3=Edad, 4=Fecha Nac, 5=Fecha Salida, 6=Razon
-  // Formato 9 cols: Col 0=Indice, 1=Vaca, 2=Patio, 3=Edad, 4=Estado, 5=Fecha Nac, 6=Fecha Salida, 7=Peso, 8=Razon
-  const ncols = (rows[0]?.__row||[]).filter(v=>v!==null&&v!==undefined).length;
-  const is7cols = ncols <= 7;
+  // Formato único: Col 0=Indice, 1=Vaca, 2=Patio, 3=Edad, 4=Estado, 5=Fecha Nac, 6=Fecha Salida, 7=Peso, 8=Razon
 
   const mapped=rows.map(row=>{
     const p=row.__row||[];
@@ -2124,19 +2124,11 @@ async function importSalidas(event){
     let hembra, fecha_salida, razon_original, fecha_nacimiento, edad_dias, ultimo_peso;
 
     hembra=toStr(g(1));
-    if(is7cols){
-      fecha_nacimiento=excelDateToISO(g(4));
-      fecha_salida=excelDateToISO(g(5));
-      edad_dias=g(3)?parseInt(g(3)):null;
-      ultimo_peso=null;
-      razon_original=toStr(g(6))||null;
-    } else {
-      fecha_nacimiento=excelDateToISO(g(5));
-      fecha_salida=excelDateToISO(g(6));
-      edad_dias=g(3)?parseInt(g(3)):null;
-      ultimo_peso=g(7)?parseFloat(g(7)):null;
-      razon_original=toStr(g(8))||null;
-    }
+    fecha_nacimiento=excelDateToISO(g(5));
+    fecha_salida=excelDateToISO(g(6));
+    edad_dias=g(3)?parseInt(g(3)):null;
+    ultimo_peso=g(7)?parseFloat(g(7)):null;
+    razon_original=toStr(g(8))||null;
     
     if(!hembra||!fecha_salida||!/^\d+$/.test(hembra.trim())) return null;
     // Saltar si ya existe salida para esta hembra
@@ -3809,6 +3801,24 @@ async function guardarRefrac(id){
 }
 
 // ==================== CORRALES ====================
+async function importCorrales(event){
+  if(!await checkPass()){alert('Contraseña incorrecta');event.target.value='';return;}
+  const file=event.target.files[0];if(!file)return;event.target.value='';
+  const rows=await readFile(file);
+  if(!rows.length){alert('Archivo vacío.');return;}
+  let ok=0,err=0;
+  for(const row of rows){
+    const p=row.__row||[];
+    const g=i=>(p[i]!==undefined&&p[i]!==null&&String(p[i]).trim()!=='')?p[i]:null;
+    const hembra=toStr(g(0));
+    const corral=g(1)?parseInt(g(1)):null;
+    if(!hembra||!/^\d+$/.test(hembra)||!corral||isNaN(corral)) continue;
+    const res=await sbFetch(`partos_crianza?hembra=eq.${hembra}`,'PATCH',{corral});
+    if(res&&res.ok) ok++; else err++;
+  }
+  alert(`Corrales actualizados: ${ok}${err?', Errores: '+err:''}`);
+  await loadCorrales();
+}
 async function loadCorrales(){
   const [partos, salidas] = await Promise.all([
     sbFetch('partos_crianza?sexo=eq.H&select=hembra,raza,fecha_parto,corral&limit=10000'),
