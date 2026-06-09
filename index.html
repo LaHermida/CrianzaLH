@@ -2998,7 +2998,7 @@ function renderVacLotes(){
       const colorEstado = p.adelantada ? '#888' : '#c77800';
       const estado = p.adelantada ? '⬜ Adelantada' : '⏰ Elegible';
       return `<tr style="background:${bg}">
-        <td style="padding:.3rem .4rem"><input type="checkbox" class="vplan-check" data-hembra="${p.hembra}" data-vacuna="${vacuna}" ${p.adelantada?'':'checked'} onchange="updateVplanCount()"/></td>
+        <td style="padding:.3rem .4rem"><input type="checkbox" class="vplan-check" data-hembra="${p.hembra}" data-vacuna="${vacuna}" data-corral="${p.corral!=null?String(p.corral):'Sin corral'}" ${p.adelantada?'':'checked'} onchange="updateVplanCount()"/></td>
         <td class="mono" style="font-weight:600">${p.hembra}</td>
         <td class="mono">${p.raza||'—'}</td>
         <td class="mono">${p.dias}d</td>
@@ -3006,6 +3006,14 @@ function renderVacLotes(){
         <td style="color:${colorEstado};font-size:.8rem;font-weight:600">${estado}</td>
       </tr>`;
     }).join('');
+
+    // Obtener corrales únicos en este lote
+    const corralesUnicos=[...new Set(lote.map(p=>p.corral!=null?String(p.corral):'Sin corral'))].sort((a,b)=>{
+      if(a==='Sin corral') return 1; if(b==='Sin corral') return -1;
+      return parseInt(a)-parseInt(b);
+    });
+    const vacunaId=vacuna.replace(/[^a-z0-9]/gi,'_');
+    const corralOpts=corralesUnicos.map(c=>`<option value="${c}">Corral ${c}</option>`).join('');
 
     html+=`<div style="border:2px solid #f9a825;border-radius:8px;margin-bottom:.8rem">
       <div style="background:#fff8e1;border-radius:6px 6px 0 0;padding:.65rem 1rem;display:flex;justify-content:space-between;align-items:center">
@@ -3021,7 +3029,13 @@ function renderVacLotes(){
         <div style="padding:.4rem .6rem;background:#fffbf0;border-bottom:1px solid #f9a825;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" onclick="vplanSelVacuna('${vacuna}',true)">☑ Todos</button>
           <button class="btn btn-secondary btn-sm" onclick="vplanSelVacuna('${vacuna}',false)">☐ Ninguno</button>
-          <span style="font-size:.8rem;color:var(--text-muted)">🟡 Amarillo = elegible por edad &nbsp; ⬜ Gris = adelantada por corral/lote</span>
+          <select id="corral-sel-${vacunaId}" style="padding:.25rem .4rem;border:1px solid var(--border);border-radius:6px;font-size:.82rem">
+            <option value="">— Sel. por corral —</option>
+            ${corralOpts}
+          </select>
+          <button class="btn btn-secondary btn-sm" onclick="vplanSelCorral('${vacuna}','${vacunaId}',true)">☑</button>
+          <button class="btn btn-secondary btn-sm" onclick="vplanSelCorral('${vacuna}','${vacunaId}',false)">☐</button>
+          <span style="font-size:.8rem;color:var(--text-muted)">🟡 Elegible &nbsp; ⬜ Adelantada</span>
         </div>
         <table style="width:100%;font-size:.83rem">
           <thead><tr style="background:#f9a825;color:#000">
@@ -3048,6 +3062,14 @@ function renderVacLotes(){
 
 function vplanSelVacuna(vacuna, val){
   document.querySelectorAll(`.vplan-check[data-vacuna="${vacuna}"]`).forEach(c=>c.checked=val);
+  updateVplanCount();
+}
+
+function vplanSelCorral(vacuna, vacunaId, val){
+  const sel=document.getElementById(`corral-sel-${vacunaId}`);
+  if(!sel||!sel.value) return;
+  const corral=sel.value;
+  document.querySelectorAll(`.vplan-check[data-vacuna="${vacuna}"][data-corral="${corral}"]`).forEach(c=>c.checked=val);
   updateVplanCount();
 }
 
