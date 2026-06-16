@@ -2116,22 +2116,25 @@ async function importSalidas(event){
   const existentes = await sbFetch('salidas_crianza?select=hembra&limit=10000');
   const yaExisten = new Set((existentes||[]).map(s=>String(s.hembra).trim()));
 
-  // Formato único: Col 0=Indice, 1=Vaca, 2=Patio, 3=Edad, 4=Estado, 5=Fecha Nac, 6=Fecha Salida, 7=Peso, 8=Razon
+  // Este Excel tiene doble header (fila 1=títulos, fila 2=subtítulos)
+  // Col: 1=Vaca, 3=Edad, 4=Fecha Nac, 5=Fecha Salida, 6=Razon
+  // Detectar doble header: si la primera fila no tiene número en col 1
+  const primeraFila = rows[0]?.__row||[];
+  const tieneDobleHeader = !primeraFila[1] || !/^\d+$/.test(String(primeraFila[1]).trim());
+  const dataRows = tieneDobleHeader ? rows.slice(1) : rows;
 
-  const mapped=rows.map(row=>{
+  const mapped=dataRows.map(row=>{
     const p=row.__row||[];
     const g=i=>(p[i]!==undefined&&p[i]!==null&&String(p[i]).trim()!=='')?p[i]:null;
-    let hembra, fecha_salida, razon_original, fecha_nacimiento, edad_dias, ultimo_peso;
+    let hembra, fecha_salida, razon_original, fecha_nacimiento, edad_dias;
 
     hembra=toStr(g(1));
-    fecha_nacimiento=excelDateToISO(g(5));
-    fecha_salida=excelDateToISO(g(6));
     edad_dias=g(3)?parseInt(g(3)):null;
-    ultimo_peso=g(7)?parseFloat(g(7)):null;
-    razon_original=toStr(g(8))||null;
-    
+    fecha_nacimiento=excelDateToISO(g(4));
+    fecha_salida=excelDateToISO(g(5));
+    razon_original=toStr(g(6))||null;
+
     if(!hembra||!fecha_salida||!/^\d+$/.test(hembra.trim())) return null;
-    // Saltar si ya existe salida para esta hembra
     if(yaExisten.has(hembra.trim())) return null;
 
     const motivo=clasificarMotivo(razon_original||'');
