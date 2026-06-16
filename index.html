@@ -2147,7 +2147,7 @@ async function importSalidas(event){
       else if(d<=365) etapa='Etapa 4 - 5-11m (151-365d)';
       else etapa='Etapa 5 - 12m a Gestación';
     }
-    return {hembra, fecha_salida, fecha_nacimiento, edad_dias, ultimo_peso, razon_original, motivo, etapa};
+    return {hembra, fecha_salida, fecha_nacimiento, edad_dias, razon_original, motivo, etapa};
   }).filter(r=>r);
 
   if(!mapped.length){
