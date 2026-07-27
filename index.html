@@ -329,10 +329,22 @@
     <!-- ===== RESUMEN SEMANAL ===== -->
     <div id="tab-resumen-semanal" class="hidden">
       <div class="section-header">
-        <span class="section-title">📋 Resumen Semanal</span>
-        <div style="display:flex;gap:.5rem;align-items:center">
-          <span id="rs-semana-label" style="font-size:.85rem;color:var(--text-muted)"></span>
+        <span class="section-title">📋 Resumen Operativo</span>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
           <button class="btn btn-secondary" onclick="window.print()">🖨️ Imprimir / PDF</button>
+        </div>
+      </div>
+      <!-- Selector de período -->
+      <div style="display:flex;gap:.75rem;align-items:center;flex-wrap:wrap;margin-bottom:1.25rem;padding:.75rem 1rem;background:#f5f5f5;border-radius:8px">
+        <div style="display:flex;gap:.4rem">
+          <button id="rs-modo-semana" class="btn btn-primary btn-sm" onclick="setRsModo('semana')">📅 Semana</button>
+          <button id="rs-modo-mes" class="btn btn-secondary btn-sm" onclick="setRsModo('mes')">🗓️ Mes</button>
+        </div>
+        <div id="rs-sel-semana" style="display:flex;gap:.4rem;align-items:center">
+          <button class="btn btn-secondary btn-sm" onclick="rsNavegar(-1)">◀</button>
+          <span id="rs-periodo-label" style="font-size:.88rem;font-weight:600;min-width:180px;text-align:center"></span>
+          <button class="btn btn-secondary btn-sm" onclick="rsNavegar(1)">▶</button>
+          <button class="btn btn-secondary btn-sm" onclick="rsIrHoy()">Hoy</button>
         </div>
       </div>
       <div id="rs-container">
@@ -3605,24 +3617,88 @@ async function editProtoDia(protocolo_id, proto_num){
 }
 
 // ==================== RESUMEN SEMANAL ====================
-async function loadResumenSemanal(){
+let _rsModo = 'semana'; // 'semana' | 'mes'
+let _rsOffset = 0; // semanas/meses de offset desde hoy
+
+function setRsModo(modo){
+  _rsModo = modo;
+  _rsOffset = 0;
+  document.getElementById('rs-modo-semana').className = modo==='semana'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+  document.getElementById('rs-modo-mes').className = modo==='mes'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+  loadResumenSemanal();
+}
+
+function rsNavegar(dir){
+  _rsOffset += dir;
+  loadResumenSemanal();
+}
+
+function rsIrHoy(){
+  _rsOffset = 0;
+  loadResumenSemanal();
+}
+
+function getRsPeriodo(){
   const hoy = new Date();
-  // Semana: lunes a domingo
-  const dow = hoy.getDay(); // 0=dom
-  const lunes = new Date(hoy); lunes.setDate(hoy.getDate() - (dow===0?6:dow-1));
-  const domingo = new Date(lunes); domingo.setDate(lunes.getDate()+6);
-  const lunesISO = lunes.toISOString().slice(0,10);
-  const domingoISO = domingo.toISOString().slice(0,10);
-  const semanaAnteriorLunes = new Date(lunes); semanaAnteriorLunes.setDate(lunes.getDate()-7);
-  const semanaAnteriorISO = semanaAnteriorLunes.toISOString().slice(0,10);
+  if(_rsModo==='semana'){
+    const base = new Date(hoy);
+    base.setDate(hoy.getDate() + _rsOffset*7);
+    const dow = base.getDay();
+    const lunes = new Date(base); lunes.setDate(base.getDate()-(dow===0?6:dow-1));
+    const domingo = new Date(lunes); domingo.setDate(lunes.getDate()+6);
+    return {desde: lunes.toISOString().slice(0,10), hasta: domingo.toISOString().slice(0,10), lunes, domingo};
+  } else {
+    const base = new Date(hoy.getFullYear(), hoy.getMonth()+_rsOffset, 1);
+    const desde = base.toISOString().slice(0,10);
+    const hasta = new Date(base.getFullYear(), base.getMonth()+1, 0).toISOString().slice(0,10);
+    return {desde, hasta, lunes: new Date(desde), domingo: new Date(hasta)};
+  }
+}
 
-  const fmt = d => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
-  document.getElementById('rs-semana-label').textContent = `Semana ${fmt(lunes)} — ${fmt(domingo)}`;
+// ==================== RESUMEN SEMANAL ====================
+let _rsModo = 'semana';
+let _rsOffset = 0;
 
-  // Cargar todos los datos
+function setRsModo(modo){
+  _rsModo=modo; _rsOffset=0;
+  document.getElementById('rs-modo-semana').className=modo==='semana'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+  document.getElementById('rs-modo-mes').className=modo==='mes'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+  loadResumenSemanal();
+}
+function rsNavegar(dir){ _rsOffset+=dir; loadResumenSemanal(); }
+function rsIrHoy(){ _rsOffset=0; loadResumenSemanal(); }
+
+function getRsPeriodo(){
+  const hoy=new Date();
+  if(_rsModo==='semana'){
+    const base=new Date(hoy); base.setDate(hoy.getDate()+_rsOffset*7);
+    const dow=base.getDay();
+    const lunes=new Date(base); lunes.setDate(base.getDate()-(dow===0?6:dow-1));
+    const domingo=new Date(lunes); domingo.setDate(lunes.getDate()+6);
+    return {desde:lunes.toISOString().slice(0,10), hasta:domingo.toISOString().slice(0,10), inicio:lunes, fin:domingo};
+  } else {
+    const base=new Date(hoy.getFullYear(), hoy.getMonth()+_rsOffset, 1);
+    const fin=new Date(base.getFullYear(), base.getMonth()+1, 0);
+    return {desde:base.toISOString().slice(0,10), hasta:fin.toISOString().slice(0,10), inicio:base, fin};
+  }
+}
+
+async function loadResumenSemanal(){
+  const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const fmt=d=>`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
+  const {desde, hasta, inicio, fin}=getRsPeriodo();
+  const label=_rsModo==='semana'?`Semana ${fmt(inicio)} — ${fmt(fin)}`:`${MESES[inicio.getMonth()]} ${inicio.getFullYear()}`;
+  document.getElementById('rs-periodo-label').textContent=label;
+  document.getElementById('rs-container').innerHTML='<p style="color:var(--text-muted);padding:1rem">Cargando...</p>';
+
+  const hoy=new Date();
+  const antDesde=_rsModo==='semana'
+    ? new Date(new Date(desde).setDate(new Date(desde).getDate()-7)).toISOString().slice(0,10)
+    : new Date(inicio.getFullYear(), inicio.getMonth()-1, 1).toISOString().slice(0,10);
+
   const [partos, salidas, pesajes, eventos, protocolos, vacAplicadas, calendario] = await Promise.all([
-    sbFetch('partos_crianza?order=fecha_parto.desc&limit=5000&select=hembra,sexo,fecha_parto,raza,o1_refrac,partero'),
-    sbFetch('salidas_crianza?order=fecha_salida.desc&limit=5000&select=hembra,fecha_salida,motivo,etapa'),
+    sbFetch('partos_crianza?order=fecha_parto.desc&limit=5000&select=hembra,sexo,fecha_parto,raza,o1_refrac'),
+    sbFetch('salidas_crianza?order=fecha_salida.desc&limit=5000&select=hembra,fecha_salida,motivo'),
     sbFetch('pesajes_crianza?order=fecha.desc&limit=5000&select=hembra,fecha,peso'),
     sbClin('clin_eventos?order=fecha_inicio.desc&limit=1000'),
     sbClin('clin_protocolos?order=nombre.asc'),
@@ -3630,141 +3706,79 @@ async function loadResumenSemanal(){
     sbClin('clin_vacunas_calendario?order=dias_min.asc'),
   ]);
 
-  const salidaSet = new Set((salidas||[]).map(s=>String(s.hembra)));
-  const protoMap = {}; (protocolos||[]).forEach(p=>protoMap[p.id]=p.nombre);
-
-  // ---- PARTOS esta semana ----
-  const partosEstaSemana = (partos||[]).filter(p=>p.fecha_parto>=lunesISO&&p.fecha_parto<=domingoISO);
-  const partosSemAnt = (partos||[]).filter(p=>p.fecha_parto>=semanaAnteriorISO&&p.fecha_parto<lunesISO);
-  const hembrasEsta = partosEstaSemana.filter(p=>p.sexo==='H').length;
-  const machosEsta = partosEstaSemana.filter(p=>p.sexo==='M').length;
-  const mtaEsta = partosEstaSemana.filter(p=>p.sexo==='MTA').length;
-  const refracPend = (partos||[]).filter(p=>p.sexo==='H'&&!p.o1_refrac&&!salidaSet.has(String(p.hembra))).length;
-
-  // ---- INVENTARIO ----
-  const totalHembras = (partos||[]).filter(p=>p.sexo==='H').length;
-  const activas = totalHembras - salidaSet.size;
-  const salidasEstaSemana = (salidas||[]).filter(s=>s.fecha_salida>=lunesISO&&s.fecha_salida<=domingoISO);
-  const supervivencia = totalHembras ? Math.round(activas/totalHembras*100) : 0;
-
-  // ---- VACUNACIÓN pendientes ----
-  const aplicadasMap = {};
-  (vacAplicadas||[]).forEach(v=>{
-    if(!aplicadasMap[v.hembra]) aplicadasMap[v.hembra]={};
-    aplicadasMap[v.hembra][v.vacuna]=true;
-  });
-  const vacAplicadasEstaSemana = (vacAplicadas||[]).filter(v=>v.fecha&&v.fecha>=lunesISO&&v.fecha<=domingoISO).length;
-  const madresSet = new Set((partos||[]).filter(p=>p.sexo!=='H').map(p=>String(p.hembra)));
-  const partosActivas = (partos||[]).filter(p=>p.sexo==='H'&&!salidaSet.has(String(p.hembra))&&!madresSet.has(String(p.hembra)));
-  let totalPendVac = 0;
-  const pendPorVac = {};
-  (calendario||[]).forEach(cal=>{
-    let pend=0;
-    partosActivas.forEach(p=>{
-      const dias=Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000);
-      if(dias>=cal.dias_min&&!(aplicadasMap[p.hembra]&&aplicadasMap[p.hembra][cal.vacuna])) pend++;
-    });
-    if(pend>0){pendPorVac[cal.vacuna]=pend; totalPendVac+=pend;}
-  });
-
-  // ---- CLÍNICA ----
-  const activosClinica = (eventos||[]).filter(e=>!e.fecha_alta);
-  const altasEstaSemana = (eventos||[]).filter(e=>e.fecha_alta&&e.fecha_alta>=lunesISO&&e.fecha_alta<=domingoISO);
-  const nuevosEstaSemana = (eventos||[]).filter(e=>e.fecha_inicio>=lunesISO&&e.fecha_inicio<=domingoISO);
-  const porEnf = {};
-  activosClinica.forEach(e=>{ const n=protoMap[e.protocolo_id]||'Otro'; porEnf[n]=(porEnf[n]||0)+1; });
-
-  // ---- GDP ----
-  const gdpData = {};
-  (partos||[]).filter(p=>p.sexo==='H'&&!salidaSet.has(String(p.hembra))).forEach(p=>{
-    const pesos = (pesajes||[]).filter(x=>String(x.hembra)===String(p.hembra)).sort((a,b)=>a.fecha.localeCompare(b.fecha));
-    if(!pesos.length) return;
-    const ultimo = pesos[pesos.length-1];
-    const nac = new Date(p.fecha_parto+'T12:00:00');
-    const fechaPeso = new Date(ultimo.fecha+'T12:00:00');
-    const dias = Math.floor((fechaPeso-nac)/86400000);
-    if(dias<=0) return;
-    const gdp = (parseFloat(ultimo.peso)/dias);
-    const etapa = dias<=65?'E1':dias<=90?'E2':dias<=150?'E3':dias<=365?'E4':'E5';
-    if(!gdpData[etapa]) gdpData[etapa]={sum:0,n:0};
-    gdpData[etapa].sum+=gdp; gdpData[etapa].n++;
-  });
-
-  // ---- RENDER ----
-  const secStyle = 'margin-bottom:1.5rem;border:1px solid var(--border);border-radius:10px;overflow:hidden';
-  const secHead = (icon,title,color='var(--accent)') =>
-    `<div style="background:${color};color:white;padding:.6rem 1rem;font-weight:700;font-size:.95rem">${icon} ${title}</div>`;
-  const kpiRow = (items) =>
-    `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.75rem;padding:.75rem 1rem">${
-      items.map(([label,val,color])=>`<div style="text-align:center;padding:.5rem;background:#f9f9f9;border-radius:8px">
-        <div style="font-size:1.5rem;font-weight:700;color:${color||'var(--accent)'}">${val}</div>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-top:.2rem">${label}</div>
-      </div>`).join('')
-    }</div>`;
-
-  let html = '';
+  const salidaSet=new Set((salidas||[]).map(s=>String(s.hembra)));
+  const protoMap={}; (protocolos||[]).forEach(p=>protoMap[p.id]=p.nombre);
 
   // Partos
-  html += `<div style="${secStyle}">${secHead('🐄','Partos')}${kpiRow([
-    ['Esta semana', partosEstaSemana.length, '#2d6a4f'],
-    ['Semana anterior', partosSemAnt.length, '#555'],
-    ['Hembras', hembrasEsta, '#2d6a4f'],
-    ['Machos', machosEsta, '#888'],
-    ['MTA/Abortos', mtaEsta, '#c62828'],
-    ['Refrac. pendientes', refracPend, refracPend>0?'#c77800':'#2d6a4f'],
-  ])}</div>`;
+  const partosEste=(partos||[]).filter(p=>p.fecha_parto>=desde&&p.fecha_parto<=hasta);
+  const partosAnt=(partos||[]).filter(p=>p.fecha_parto>=antDesde&&p.fecha_parto<desde);
+  const hembrasEste=partosEste.filter(p=>p.sexo==='H').length;
+  const machosEste=partosEste.filter(p=>p.sexo==='M').length;
+  const mtaEste=partosEste.filter(p=>!['H','M'].includes(p.sexo)).length;
+  const refracPend=(partos||[]).filter(p=>p.sexo==='H'&&!p.o1_refrac&&!salidaSet.has(String(p.hembra))).length;
 
   // Inventario
-  html += `<div style="${secStyle}">${secHead('🐮','Inventario & Supervivencia','#1565c0')}${kpiRow([
-    ['Activas', activas, '#1565c0'],
-    ['Salidas esta semana', salidasEstaSemana.length, salidasEstaSemana.length>0?'#c62828':'#2d6a4f'],
-    ['% Supervivencia', supervivencia+'%', supervivencia>=85?'#2d6a4f':'#c77800'],
-    ['Total nacidas', totalHembras, '#555'],
-  ])}`;
-  // Motivos de salida esta semana
-  if(salidasEstaSemana.length){
-    const motivoMap={};
-    salidasEstaSemana.forEach(s=>{const m=s.motivo||'Otro';motivoMap[m]=(motivoMap[m]||0)+1;});
-    html+=`<div style="padding:.5rem 1rem .75rem;display:flex;flex-wrap:wrap;gap:.5rem">
-      ${Object.entries(motivoMap).map(([m,n])=>`<span style="background:#f0f4ff;border-radius:20px;padding:.2rem .7rem;font-size:.8rem"><b>${n}</b> ${m}</span>`).join('')}
-    </div>`;
-  }
-  html += `</div>`;
+  const totalHembras=(partos||[]).filter(p=>p.sexo==='H').length;
+  const activas=totalHembras-salidaSet.size;
+  const salidasEste=(salidas||[]).filter(s=>s.fecha_salida>=desde&&s.fecha_salida<=hasta);
+  const supervivencia=totalHembras?Math.round(activas/totalHembras*100):0;
 
   // Vacunación
-  html += `<div style="${secStyle}">${secHead('💉','Vacunación','#6a1b9a')}${kpiRow([
-    ['Aplicadas esta semana', vacAplicadasEstaSemana, '#6a1b9a'],
-    ['Dosis pendientes total', totalPendVac, totalPendVac>50?'#c62828':totalPendVac>20?'#c77800':'#2d6a4f'],
-  ])}`;
-  if(Object.keys(pendPorVac).length){
-    html+=`<div style="padding:.25rem 1rem .75rem;display:flex;flex-wrap:wrap;gap:.5rem">
-      ${Object.entries(pendPorVac).map(([v,n])=>`<span style="background:#f5e6ff;border-radius:20px;padding:.2rem .7rem;font-size:.8rem"><b>${n}</b> ${v}</span>`).join('')}
-    </div>`;
-  }
-  html += `</div>`;
+  const aplicadasMap={};
+  (vacAplicadas||[]).forEach(v=>{ if(!aplicadasMap[v.hembra])aplicadasMap[v.hembra]={}; aplicadasMap[v.hembra][v.vacuna]=true; });
+  const vacEste=(vacAplicadas||[]).filter(v=>v.fecha&&v.fecha>=desde&&v.fecha<=hasta).length;
+  const partosActivas=(partos||[]).filter(p=>p.sexo==='H'&&!salidaSet.has(String(p.hembra)));
+  let totalPendVac=0; const pendPorVac={};
+  (calendario||[]).forEach(cal=>{
+    let pend=0;
+    partosActivas.forEach(p=>{ const dias=Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000); if(dias>=cal.dias_min&&!(aplicadasMap[p.hembra]&&aplicadasMap[p.hembra][cal.vacuna]))pend++; });
+    if(pend>0){pendPorVac[cal.vacuna]=pend;totalPendVac+=pend;}
+  });
 
   // Clínica
-  html += `<div style="${secStyle}">${secHead('🏥','Clínica / Morbilidad','#b71c1c')}${kpiRow([
-    ['En tratamiento', activosClinica.length, activosClinica.length>5?'#c62828':'#c77800'],
-    ['Nuevos esta semana', nuevosEstaSemana.length, nuevosEstaSemana.length>3?'#c62828':'#555'],
-    ['Altas esta semana', altasEstaSemana.length, '#2d6a4f'],
-    ['Tasa morbilidad', activas?(Math.round(new Set((eventos||[]).map(e=>e.hembra)).size/activas*100))+'%':'—', '#555'],
-  ])}`;
-  if(Object.keys(porEnf).length){
-    html+=`<div style="padding:.25rem 1rem .75rem;display:flex;flex-wrap:wrap;gap:.5rem">
-      <span style="font-size:.8rem;color:var(--text-muted);width:100%">Activos por enfermedad:</span>
-      ${Object.entries(porEnf).map(([e,n])=>`<span style="background:#ffeaea;border-radius:20px;padding:.2rem .7rem;font-size:.8rem"><b>${n}</b> ${e}</span>`).join('')}
-    </div>`;
-  }
-  html += `</div>`;
+  const activosClinica=(eventos||[]).filter(e=>!e.fecha_alta);
+  const altasEste=(eventos||[]).filter(e=>e.fecha_alta&&e.fecha_alta>=desde&&e.fecha_alta<=hasta);
+  const nuevosEste=(eventos||[]).filter(e=>e.fecha_inicio>=desde&&e.fecha_inicio<=hasta);
+  const porEnf={};
+  activosClinica.forEach(e=>{ const n=protoMap[e.protocolo_id]||'Otro'; porEnf[n]=(porEnf[n]||0)+1; });
 
   // GDP
-  const etapaNombres = {E1:'Leche (0-65d)',E2:'Jaulas (66-90d)',E3:'AYC (91-150d)',E4:'5-11m (151-365d)',E5:'12m+'};
-  html += `<div style="${secStyle}">${secHead('⚖️','Ganancia Diaria de Peso (GDP)','#e65100')}${kpiRow(
-    Object.entries(gdpData).sort().map(([e,d])=>[etapaNombres[e]||e, (d.sum/d.n).toFixed(3)+' kg/d', d.sum/d.n>=0.8?'#2d6a4f':d.sum/d.n>=0.6?'#c77800':'#c62828'])
-  )}</div>`;
+  const gdpData={};
+  partosActivas.forEach(p=>{
+    const pesos=(pesajes||[]).filter(x=>String(x.hembra)===String(p.hembra)).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    if(!pesos.length)return;
+    const ultimo=pesos[pesos.length-1];
+    const dias=Math.floor((new Date(ultimo.fecha+'T12:00:00')-new Date(p.fecha_parto+'T12:00:00'))/86400000);
+    if(dias<=0)return;
+    const gdp=parseFloat(ultimo.peso)/dias;
+    const e=dias<=65?'E1':dias<=90?'E2':dias<=150?'E3':dias<=365?'E4':'E5';
+    if(!gdpData[e])gdpData[e]={sum:0,n:0};
+    gdpData[e].sum+=gdp;gdpData[e].n++;
+  });
 
-  document.getElementById('rs-container').innerHTML = html;
+  // Render
+  const ss='margin-bottom:1.2rem;border:1px solid var(--border);border-radius:10px;overflow:hidden';
+  const sh=(icon,title,color='var(--accent)')=>`<div style="background:${color};color:white;padding:.6rem 1rem;font-weight:700;font-size:.95rem">${icon} ${title}</div>`;
+  const kr=items=>`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;padding:.75rem 1rem">${
+    items.map(([l,v,c])=>`<div style="text-align:center;padding:.5rem;background:#f9f9f9;border-radius:8px"><div style="font-size:1.4rem;font-weight:700;color:${c||'var(--accent)'}">${v}</div><div style="font-size:.73rem;color:var(--text-muted);margin-top:.2rem">${l}</div></div>`).join('')
+  }</div>`;
+  const chips=(items,bg)=>items.length?`<div style="padding:.25rem 1rem .75rem;display:flex;flex-wrap:wrap;gap:.4rem">${items.map(([l])=>`<span style="background:${bg};border-radius:20px;padding:.2rem .7rem;font-size:.8rem">${l}</span>`).join('')}</div>`:'';
+  const pl=_rsModo==='semana'?'esta semana':'este mes';
+
+  let html='';
+  html+=`<div style="${ss}">${sh('🐄','Partos')}${kr([['Nacimientos '+pl,partosEste.length,'#2d6a4f'],['Período anterior',partosAnt.length,'#888'],['Hembras',hembrasEste,'#2d6a4f'],['Machos',machosEste,'#888'],['MTA/Abortos',mtaEste,'#c62828'],['Refrac. pendientes',refracPend,refracPend>0?'#c77800':'#2d6a4f']])}</div>`;
+
+  const motivosEste=salidasEste.reduce((m,s)=>{const k=s.motivo||'Otro';m[k]=(m[k]||0)+1;return m;},{});
+  html+=`<div style="${ss}">${sh('🐮','Inventario & Supervivencia','#1565c0')}${kr([['Activas ahora',activas,'#1565c0'],['Salidas '+pl,salidasEste.length,salidasEste.length>0?'#c62828':'#2d6a4f'],['% Supervivencia',supervivencia+'%',supervivencia>=85?'#2d6a4f':'#c77800'],['Total nacidas',totalHembras,'#555']])}${chips(Object.entries(motivosEste).map(([m,n])=>[`<b>${n}</b> ${m}`]),'#e8f0fe')}</div>`;
+
+  html+=`<div style="${ss}">${sh('💉','Vacunación','#6a1b9a')}${kr([['Aplicadas '+pl,vacEste,'#6a1b9a'],['Dosis pendientes',totalPendVac,totalPendVac>50?'#c62828':totalPendVac>20?'#c77800':'#2d6a4f']])}${chips(Object.entries(pendPorVac).map(([v,n])=>[`<b>${n}</b> ${v}`]),'#f5e6ff')}</div>`;
+
+  html+=`<div style="${ss}">${sh('🏥','Clínica / Morbilidad','#b71c1c')}${kr([['En tratamiento',activosClinica.length,activosClinica.length>5?'#c62828':'#c77800'],['Nuevos '+pl,nuevosEste.length,nuevosEste.length>3?'#c62828':'#555'],['Altas '+pl,altasEste.length,'#2d6a4f'],['Tasa morbilidad',activas?(Math.round(new Set((eventos||[]).map(e=>e.hembra)).size/activas*100))+'%':'—','#555']])}${chips(Object.entries(porEnf).map(([e,n])=>[`<b>${n}</b> ${e}`]),'#ffeaea')}</div>`;
+
+  const en={E1:'Leche (0-65d)',E2:'Jaulas (66-90d)',E3:'AYC (91-150d)',E4:'5-11m (151-365d)',E5:'12m+'};
+  html+=`<div style="${ss}">${sh('⚖️','GDP Promedio por Etapa','#e65100')}${kr(Object.entries(gdpData).sort().map(([e,d])=>[en[e]||e,(d.sum/d.n).toFixed(3)+' kg/d',d.sum/d.n>=0.8?'#2d6a4f':d.sum/d.n>=0.6?'#c77800':'#c62828']))}</div>`;
+
+  document.getElementById('rs-container').innerHTML=html;
 }
 
 // ==================== DASHBOARD MORBILIDAD ====================
