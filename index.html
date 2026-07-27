@@ -3684,6 +3684,7 @@ function getRsPeriodo(){
 }
 
 async function loadResumenSemanal(){
+  try {
   const MESES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const fmt=d=>`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`;
   const {desde, hasta, inicio, fin}=getRsPeriodo();
@@ -3779,6 +3780,10 @@ async function loadResumenSemanal(){
   html+=`<div style="${ss}">${sh('⚖️','GDP Promedio por Etapa','#e65100')}${kr(Object.entries(gdpData).sort().map(([e,d])=>[en[e]||e,(d.sum/d.n).toFixed(3)+' kg/d',d.sum/d.n>=0.8?'#2d6a4f':d.sum/d.n>=0.6?'#c77800':'#c62828']))}</div>`;
 
   document.getElementById('rs-container').innerHTML=html;
+  } catch(e){
+    console.error('Error loadResumenSemanal:', e);
+    document.getElementById('rs-container').innerHTML=`<p style="color:red;padding:1rem">Error: ${e.message}</p>`;
+  }
 }
 
 // ==================== DASHBOARD MORBILIDAD ====================
