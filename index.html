@@ -3617,45 +3617,6 @@ async function editProtoDia(protocolo_id, proto_num){
 }
 
 // ==================== RESUMEN SEMANAL ====================
-let _rsModo = 'semana'; // 'semana' | 'mes'
-let _rsOffset = 0; // semanas/meses de offset desde hoy
-
-function setRsModo(modo){
-  _rsModo = modo;
-  _rsOffset = 0;
-  document.getElementById('rs-modo-semana').className = modo==='semana'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
-  document.getElementById('rs-modo-mes').className = modo==='mes'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
-  loadResumenSemanal();
-}
-
-function rsNavegar(dir){
-  _rsOffset += dir;
-  loadResumenSemanal();
-}
-
-function rsIrHoy(){
-  _rsOffset = 0;
-  loadResumenSemanal();
-}
-
-function getRsPeriodo(){
-  const hoy = new Date();
-  if(_rsModo==='semana'){
-    const base = new Date(hoy);
-    base.setDate(hoy.getDate() + _rsOffset*7);
-    const dow = base.getDay();
-    const lunes = new Date(base); lunes.setDate(base.getDate()-(dow===0?6:dow-1));
-    const domingo = new Date(lunes); domingo.setDate(lunes.getDate()+6);
-    return {desde: lunes.toISOString().slice(0,10), hasta: domingo.toISOString().slice(0,10), lunes, domingo};
-  } else {
-    const base = new Date(hoy.getFullYear(), hoy.getMonth()+_rsOffset, 1);
-    const desde = base.toISOString().slice(0,10);
-    const hasta = new Date(base.getFullYear(), base.getMonth()+1, 0).toISOString().slice(0,10);
-    return {desde, hasta, lunes: new Date(desde), domingo: new Date(hasta)};
-  }
-}
-
-// ==================== RESUMEN SEMANAL ====================
 let _rsModo = 'semana';
 let _rsOffset = 0;
 
