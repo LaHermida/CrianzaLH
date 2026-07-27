@@ -3697,13 +3697,15 @@ async function loadResumenSemanal(){
     ? new Date(new Date(desde).setDate(new Date(desde).getDate()-7)).toISOString().slice(0,10)
     : new Date(inicio.getFullYear(), inicio.getMonth()-1, 1).toISOString().slice(0,10);
 
-  const [partos, salidas, pesajes, eventos, protocolos, vacAplicadas, calendario] = await Promise.all([
-    sbFetch('partos_crianza?order=fecha_parto.desc&limit=5000&select=hembra,sexo,fecha_parto,raza,o1_refrac'),
-    sbFetch('salidas_crianza?order=fecha_salida.desc&limit=5000&select=hembra,fecha_salida,motivo'),
-    sbFetch('pesajes_crianza?order=fecha.desc&limit=5000&select=hembra,fecha,peso'),
-    sbClin('clin_eventos?order=fecha_inicio.desc&limit=1000'),
+  const [partos, salidas, pesajes] = await Promise.all([
+    sbFetch('partos_crianza?order=fecha_parto.desc&limit=2000&select=hembra,sexo,fecha_parto,raza,o1_refrac'),
+    sbFetch('salidas_crianza?order=fecha_salida.desc&limit=2000&select=hembra,fecha_salida,motivo'),
+    sbFetch('pesajes_crianza?order=fecha.desc&limit=2000&select=hembra,fecha,peso'),
+  ]);
+  const [eventos, protocolos, vacAplicadas, calendario] = await Promise.all([
+    sbClin('clin_eventos?order=fecha_inicio.desc&limit=500'),
     sbClin('clin_protocolos?order=nombre.asc'),
-    sbClin('clin_vacunas_aplicadas?select=hembra,vacuna,fecha&order=fecha.desc&limit=5000'),
+    sbClin('clin_vacunas_aplicadas?select=hembra,vacuna,fecha&limit=3000'),
     sbClin('clin_vacunas_calendario?order=dias_min.asc'),
   ]);
 
