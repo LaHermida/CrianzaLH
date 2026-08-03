@@ -171,6 +171,7 @@
     <button onclick="showTab('dashboard',this)">📊 Dashboard Partos</button>
     <button onclick="showTab('dash-gdp',this)">📈 Dashboard GDP</button>
     <button onclick="showTab('dash-morbilidad',this)">🏥 Morbilidad</button>
+    <button onclick="showTab('dash-leche',this)">🥛 KPIs Leche</button>
     <button onclick="showTab('resumen-semanal',this)">📋 Resumen Semanal</button>
     <button onclick="showTab('inventario',this)">🐮 Inventario</button>
     <div class="nav-sep"></div>
@@ -352,6 +353,14 @@
       <div id="rs-container">
         <p style="color:var(--text-muted);padding:1rem">Cargando...</p>
       </div>
+    </div>
+
+    <!-- ===== KPIs LECHE ===== -->
+    <div id="tab-dash-leche" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🥛 KPIs Leche</span>
+      </div>
+      <div id="leche-kpis-container"><p style="color:var(--text-muted);padding:1rem">Cargando...</p></div>
     </div>
 
     <!-- ===== DASHBOARD MORBILIDAD ===== -->
@@ -704,7 +713,6 @@
       <div style="display:flex;gap:.5rem;margin-bottom:1rem;border-bottom:2px solid var(--border);padding-bottom:.75rem">
         <button id="leche-btn-calf" class="btn btn-primary btn-sm" onclick="setLecheTab('calf')">🤖 CalfExpert</button>
         <button id="leche-btn-jaulas" class="btn btn-secondary btn-sm" onclick="setLecheTab('jaulas')">🏠 Jaulas Fierro</button>
-        <button id="leche-btn-kpis" class="btn btn-secondary btn-sm" onclick="setLecheTab('kpis')">📊 KPIs</button>
       </div>
 
       <!-- PANEL CALFEXPERT -->
@@ -754,10 +762,6 @@
         </div>
       </div>
 
-      <!-- PANEL KPIs -->
-      <div id="leche-panel-kpis" style="display:none">
-        <div id="leche-kpis-container"><p style="color:var(--text-muted);padding:1rem">Cargando...</p></div>
-      </div>
     </div>
 
     <!-- ===== FICHA ANIMAL ===== -->
@@ -983,7 +987,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','dash-morbilidad','resumen-semanal','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','leche','ficha-animal'].forEach(t=>{
+  ['dashboard','dash-gdp','dash-morbilidad','dash-leche','resumen-semanal','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','leche','ficha-animal'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -991,6 +995,7 @@ function showTab(tab,btn){
   if(el) el.classList.remove('hidden');
   if(tab==='dashboard') renderDashboard();
   if(tab==='dash-morbilidad') loadDashMorbilidad();
+  if(tab==='dash-leche') loadLecheKpis();
   if(tab==='resumen-semanal') loadResumenSemanal();
   if(tab==='inventario') loadInventario();
   if(tab==='clin-activas') loadClinActivas();
@@ -4060,11 +4065,10 @@ async function guardarRefrac(id){
 
 // ==================== LECHE ====================
 function setLecheTab(tab){
-  ['calf','jaulas','kpis'].forEach(t=>{
+  ['calf','jaulas'].forEach(t=>{
     document.getElementById('leche-panel-'+t).style.display=t===tab?'':'none';
     document.getElementById('leche-btn-'+t).className=t===tab?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
   });
-  if(tab==='kpis') loadLecheKpis();
 }
 
 async function loadLeche(){
