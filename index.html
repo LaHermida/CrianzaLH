@@ -700,28 +700,28 @@
         <button id="leche-btn-jaulas" class="btn btn-secondary btn-sm" onclick="setLecheTab('jaulas')">🏠 Jaulas Fierro (1-10)</button>
       </div>
 
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem;border-bottom:2px solid var(--border);padding-bottom:.75rem">
+        <button id="leche-btn-calf" class="btn btn-primary btn-sm" onclick="setLecheTab('calf')">🤖 CalfExpert</button>
+        <button id="leche-btn-jaulas" class="btn btn-secondary btn-sm" onclick="setLecheTab('jaulas')">🏠 Jaulas Fierro</button>
+        <button id="leche-btn-kpis" class="btn btn-secondary btn-sm" onclick="setLecheTab('kpis')">📊 KPIs</button>
+      </div>
+
       <!-- PANEL CALFEXPERT -->
       <div id="leche-panel-calf">
-        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
-          <input type="date" id="leche-calf-fecha" style="padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/>
-          <input type="number" id="leche-calf-solidos" placeholder="% Sólidos" step="0.1" min="0" max="30" style="width:120px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/>
-          <button class="btn btn-secondary" onclick="verCalfFecha()">🔍 Ver día</button>
-          <button class="btn btn-secondary" onclick="document.getElementById('importCalfFile').click()">📥 Importar CalfExpert</button>
-          <input type="file" id="importCalfFile" accept=".xlsx,.xls" class="hidden" onchange="importCalfExpert(event)"/>
+        <!-- Importar -->
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem;padding:.75rem;background:#f5f5f5;border-radius:8px">
+          <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Fecha del reporte</label>
+            <input type="date" id="leche-calf-fecha" style="padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
+          <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">% Sólidos del día</label>
+            <input type="number" id="leche-calf-solidos" placeholder="ej: 12.5" step="0.1" min="0" max="30" style="width:120px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
+          <div style="align-self:flex-end">
+            <button class="btn btn-primary" onclick="document.getElementById('importCalfFile').click()">📥 Importar CalfExpert</button>
+            <input type="file" id="importCalfFile" accept=".xlsx,.xls" class="hidden" onchange="importCalfExpert(event)"/>
+          </div>
         </div>
-        <!-- KPIs resumen -->
-        <div id="leche-calf-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
-        <!-- Tabla -->
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>Arete</th><th>Corral</th><th>Programado (ml)</th><th>Consumido (ml)</th>
-              <th>% Consumo</th><th>CMR (g)</th><th>Vel. Bebida (ml/min)</th>
-              <th>Visitas Abortadas</th><th>Alerta</th>
-            </tr></thead>
-            <tbody id="leche-calf-body"><tr><td colspan="9" class="empty">Importa el reporte CalfExpert del día.</td></tr></tbody>
-          </table>
-        </div>
+        <!-- Lista de días -->
+        <div id="leche-calf-dias"></div>
       </div>
 
       <!-- PANEL JAULAS -->
@@ -729,6 +729,11 @@
         <div style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem;padding:1rem;background:#f5f5f5;border-radius:8px">
           <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Fecha</label>
             <input type="date" id="jaulas-fecha" style="padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
+          <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Servida</label>
+            <select id="jaulas-servida" style="padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem">
+              <option value="1">1ª Servida</option>
+              <option value="2">2ª Servida</option>
+            </select></div>
           <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Temperatura (°C)</label>
             <input type="number" id="jaulas-temp" step="0.1" placeholder="ej: 38.5" style="width:110px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
           <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">% Sólidos</label>
@@ -736,18 +741,22 @@
           <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Litros preparados</label>
             <input type="number" id="jaulas-litros" step="0.1" placeholder="ej: 45" style="width:120px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
           <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Notas</label>
-            <input type="text" id="jaulas-notas" placeholder="Opcional" style="width:160px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
-          <button class="btn btn-primary" onclick="guardarJaulas()">✓ Guardar</button>
+            <input type="text" id="jaulas-notas" placeholder="Opcional" style="width:150px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
+          <button class="btn btn-primary" style="align-self:flex-end" onclick="guardarJaulas()">✓ Guardar</button>
         </div>
-        <!-- Historial -->
         <div class="table-wrap">
           <table>
             <thead><tr>
-              <th>Fecha</th><th>Temperatura (°C)</th><th>% Sólidos</th><th>Litros preparados</th><th>Notas</th><th>Acción</th>
+              <th>Fecha</th><th>Servida</th><th>Temperatura (°C)</th><th>% Sólidos</th><th>Litros</th><th>Notas</th><th>Acción</th>
             </tr></thead>
-            <tbody id="leche-jaulas-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+            <tbody id="leche-jaulas-body"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
           </table>
         </div>
+      </div>
+
+      <!-- PANEL KPIs -->
+      <div id="leche-panel-kpis" style="display:none">
+        <div id="leche-kpis-container"><p style="color:var(--text-muted);padding:1rem">Cargando...</p></div>
       </div>
     </div>
 
@@ -4051,11 +4060,236 @@ async function guardarRefrac(id){
 
 // ==================== LECHE ====================
 function setLecheTab(tab){
-  document.getElementById('leche-panel-calf').style.display = tab==='calf'?'':'none';
-  document.getElementById('leche-panel-jaulas').style.display = tab==='jaulas'?'':'none';
-  document.getElementById('leche-btn-calf').className = tab==='calf'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
-  document.getElementById('leche-btn-jaulas').className = tab==='jaulas'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+  ['calf','jaulas','kpis'].forEach(t=>{
+    document.getElementById('leche-panel-'+t).style.display=t===tab?'':'none';
+    document.getElementById('leche-btn-'+t).className=t===tab?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+  });
+  if(tab==='kpis') loadLecheKpis();
 }
+
+async function loadLeche(){
+  const hoy=new Date().toISOString().slice(0,10);
+  const fi=document.getElementById('leche-calf-fecha'); if(fi&&!fi.value) fi.value=hoy;
+  const fj=document.getElementById('jaulas-fecha'); if(fj&&!fj.value) fj.value=hoy;
+  await loadCalfDias();
+  await loadJaulasHistorial();
+}
+
+// ---- CALFEXPERT ----
+async function loadCalfDias(){
+  const data=await sbFetch('leche_calf_expert?select=fecha,solidos_pct&order=fecha.desc&limit=1000');
+  const container=document.getElementById('leche-calf-dias');
+  if(!data||!data.length){container.innerHTML='<p style="color:var(--text-muted);padding:.5rem">Sin datos importados aún.</p>';return;}
+  // Agrupar fechas únicas
+  const dias={};
+  data.forEach(r=>{
+    if(!dias[r.fecha]) dias[r.fecha]={fecha:r.fecha,solidos:r.solidos_pct,count:0};
+    dias[r.fecha].count++;
+  });
+  container.innerHTML=Object.values(dias).map(d=>{
+    const fmt=d.fecha.split('-').reverse().join('/');
+    const btnId='calf-day-'+d.fecha.replace(/-/g,'');
+    return `<div style="border:1px solid var(--border);border-radius:8px;margin-bottom:.6rem">
+      <div style="background:#f5f5f5;padding:.6rem 1rem;display:flex;justify-content:space-between;align-items:center;border-radius:6px 6px 0 0">
+        <span style="font-weight:600;cursor:pointer" onclick="toggleCalfDia('${d.fecha}','${btnId}')">${fmt}</span>
+        <div style="display:flex;gap:.75rem;align-items:center;font-size:.85rem">
+          <span style="color:var(--text-muted)">${d.count} becerras</span>
+          ${d.solidos!=null?`<span style="color:#6a1b9a;font-weight:600">Sólidos: ${d.solidos}%</span>`:'<span style="color:#c77800">Sin sólidos</span>'}
+          <button class="btn btn-secondary btn-sm" onclick="editCalfSolidos('${d.fecha}',${d.solidos||''})" style="font-size:.75rem;padding:.15rem .4rem">✏️ Sólidos</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteCalfDia('${d.fecha}')" style="font-size:.75rem;padding:.15rem .4rem">🗑</button>
+          <span style="cursor:pointer" onclick="toggleCalfDia('${d.fecha}','${btnId}')" id="${btnId}">▼</span>
+        </div>
+      </div>
+      <div id="calf-detail-${d.fecha.replace(/-/g,'')}" style="display:none"></div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleCalfDia(fecha, btnId){
+  const detailId='calf-detail-'+fecha.replace(/-/g,'');
+  const detail=document.getElementById(detailId);
+  const btn=document.getElementById(btnId);
+  if(detail.style.display!=='none'){detail.style.display='none';if(btn)btn.textContent='▼';return;}
+  detail.innerHTML='<p style="padding:.5rem 1rem;color:var(--text-muted)">Cargando...</p>';
+  detail.style.display='';
+  if(btn)btn.textContent='▲';
+  const data=await sbFetch(`leche_calf_expert?fecha=eq.${fecha}&order=percent_consumption.asc&limit=200`);
+  if(!data||!data.length){detail.innerHTML='<p style="padding:.5rem 1rem;color:var(--text-muted)">Sin datos.</p>';return;}
+  detail.innerHTML=`<table style="width:100%;font-size:.83rem">
+    <thead><tr style="background:var(--accent);color:#fff">
+      <th style="padding:.35rem .5rem">Arete</th><th>Corral</th><th>Progr. (L)</th><th>Cons. (L)</th>
+      <th>% Consumo</th><th>CMR (g)</th><th>Vel. (ml/min)</th><th>Vis. Abort.</th><th>Alerta</th>
+    </tr></thead><tbody>`+
+    data.map(r=>{
+      const pct=r.percent_consumption||0;
+      const pc=pct>=80?'#2d6a4f':pct>=60?'#c77800':'#c62828';
+      const al=r.calf_alert&&r.calf_alert!=='0'&&r.calf_alert!==''?`<span style="color:#c62828;font-weight:600">⚠️ ${r.calf_alert}</span>`:'—';
+      return `<tr><td class="mono" style="font-weight:600;padding:.3rem .5rem">${r.hembra}</td>
+        <td class="mono">${r.calf_pen||'—'}</td>
+        <td class="mono">${r.daily_quantity_ml!=null?(r.daily_quantity_ml/1000).toFixed(1):'—'}</td>
+        <td class="mono">${r.daily_consumption_ml!=null?(r.daily_consumption_ml/1000).toFixed(1):'—'}</td>
+        <td class="mono" style="color:${pc};font-weight:600">${pct}%</td>
+        <td class="mono">${r.cmr_consumption_g||'—'}</td>
+        <td class="mono">${r.drinking_speed_ml_min||'—'}</td>
+        <td class="mono" style="color:${r.aborted_visits>3?'#c62828':'inherit'}">${r.aborted_visits!=null?r.aborted_visits:'—'}</td>
+        <td>${al}</td></tr>`;
+    }).join('')+
+    '</tbody></table>';
+}
+
+async function editCalfSolidos(fecha, solidosActual){
+  const nuevo=prompt(`% Sólidos para ${fecha.split('-').reverse().join('/')}:`, solidosActual||'');
+  if(nuevo===null) return;
+  const val=parseFloat(nuevo);
+  if(isNaN(val)){alert('Valor inválido');return;}
+  await sbFetch(`leche_calf_expert?fecha=eq.${fecha}`,'PATCH',{solidos_pct:val});
+  await loadCalfDias();
+}
+
+async function deleteCalfDia(fecha){
+  if(!confirm(`¿Eliminar TODOS los registros del ${fecha.split('-').reverse().join('/')}?`)) return;
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  await sbFetch(`leche_calf_expert?fecha=eq.${fecha}`,'DELETE');
+  await loadCalfDias();
+}
+
+async function importCalfExpert(event){
+  const file=event.target.files[0];if(!file)return;event.target.value='';
+  const fecha=document.getElementById('leche-calf-fecha').value;
+  if(!fecha){alert('Selecciona una fecha antes de importar.');return;}
+  const solidos=parseFloat(document.getElementById('leche-calf-solidos').value)||null;
+  const rows=await readFile(file);
+  if(!rows.length){alert('Archivo vacío');return;}
+  let ok=0,err=0;
+  for(const row of rows){
+    const p=row.__row||[];
+    const g=i=>(p[i]!==undefined&&p[i]!==null&&String(p[i]).trim()!=='')?p[i]:null;
+    const hembra=g(1)?String(Math.round(parseFloat(g(1)))):null;
+    if(!hembra||!/^\d+$/.test(hembra)) continue;
+    const rec={fecha,hembra,
+      feeder_num:g(5)?parseInt(g(5)):null,calf_pen:g(6)?parseInt(g(6)):null,
+      daily_quantity_ml:g(8)?parseInt(g(8)):null,daily_consumption_ml:g(9)?parseInt(g(9)):null,
+      percent_consumption:g(10)?parseInt(g(10)):null,cmr_consumption_g:g(11)?parseFloat(g(11)):null,
+      calf_alert:g(19)?String(g(19)).trim():null,drinking_speed_ml_min:g(21)?parseFloat(g(21)):null,
+      aborted_visits:g(23)?parseInt(g(23)):null,solidos_pct:solidos};
+    const res=await sbFetch('leche_calf_expert','POST',rec);
+    if(res&&res.ok)ok++;else err++;
+  }
+  alert(`CalfExpert importado: ${ok}${err?', Errores: '+err:''}`);
+  await loadCalfDias();
+}
+
+// ---- JAULAS ----
+async function loadJaulasHistorial(){
+  const data=await sbFetch('leche_jaulas?order=fecha.desc,servida.asc&limit=60');
+  const tbody=document.getElementById('leche-jaulas-body');
+  if(!data||!data.length){tbody.innerHTML='<tr><td colspan="7" class="empty">Sin registros.</td></tr>';return;}
+  tbody.innerHTML=data.map(r=>`<tr>
+    <td class="mono">${r.fecha?r.fecha.split('-').reverse().join('/'):'—'}</td>
+    <td class="mono" style="text-align:center">${r.servida||1}ª</td>
+    <td class="mono">${r.temperatura!=null?r.temperatura+'°C':'—'}</td>
+    <td class="mono">${r.solidos_pct!=null?r.solidos_pct+'%':'—'}</td>
+    <td class="mono">${r.litros_preparados!=null?r.litros_preparados+' L':'—'}</td>
+    <td>${r.notas||'—'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteJaulas(${r.id})">🗑</button></td>
+  </tr>`).join('');
+}
+
+async function guardarJaulas(){
+  const fecha=document.getElementById('jaulas-fecha').value;
+  const servida=parseInt(document.getElementById('jaulas-servida').value)||1;
+  const temperatura=parseFloat(document.getElementById('jaulas-temp').value)||null;
+  const solidos_pct=parseFloat(document.getElementById('jaulas-solidos').value)||null;
+  const litros_preparados=parseFloat(document.getElementById('jaulas-litros').value)||null;
+  const notas=document.getElementById('jaulas-notas').value.trim()||null;
+  if(!fecha){alert('Selecciona una fecha');return;}
+  const res=await sbFetch('leche_jaulas','POST',{fecha,servida,temperatura,solidos_pct,litros_preparados,notas});
+  if(res&&res.ok){
+    ['jaulas-temp','jaulas-solidos','jaulas-litros','jaulas-notas'].forEach(id=>document.getElementById(id).value='');
+    await loadJaulasHistorial();
+  } else {alert('Error al guardar');}
+}
+
+async function deleteJaulas(id){
+  if(!confirm('¿Eliminar este registro?'))return;
+  await sbFetch(`leche_jaulas?id=eq.${id}`,'DELETE');
+  await loadJaulasHistorial();
+}
+
+// ---- KPIs ----
+async function loadLecheKpis(){
+  const container=document.getElementById('leche-kpis-container');
+  container.innerHTML='<p style="color:var(--text-muted);padding:1rem">Cargando...</p>';
+  const [calfData, jaulasData]=await Promise.all([
+    sbFetch('leche_calf_expert?order=fecha.desc&limit=2000'),
+    sbFetch('leche_jaulas?order=fecha.desc&limit=200'),
+  ]);
+  if(!calfData||!calfData.length){container.innerHTML='<p style="color:var(--text-muted);padding:1rem">Sin datos CalfExpert aún.</p>';return;}
+
+  // Por fecha
+  const porFecha={};
+  calfData.forEach(r=>{
+    if(!porFecha[r.fecha])porFecha[r.fecha]={fecha:r.fecha,becerras:[],solidos:r.solidos_pct};
+    porFecha[r.fecha].becerras.push(r);
+  });
+  const dias=Object.values(porFecha).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,14);
+
+  // KPIs globales últimos 7 días
+  const ultimos7=dias.slice(0,7);
+  const todasBecerras=ultimos7.flatMap(d=>d.becerras);
+  const pctProm=todasBecerras.length?Math.round(todasBecerras.reduce((s,r)=>s+(r.percent_consumption||0),0)/todasBecerras.length):0;
+  const alertasTotal=todasBecerras.filter(r=>r.calf_alert&&r.calf_alert!=='0'&&r.calf_alert!=='').length;
+  const totalProg=todasBecerras.reduce((s,r)=>s+(r.daily_quantity_ml||0),0);
+  const totalCons=todasBecerras.reduce((s,r)=>s+(r.daily_consumption_ml||0),0);
+
+  const ss='margin-bottom:1.2rem;border:1px solid var(--border);border-radius:10px;overflow:hidden';
+  const sh=(icon,title,color='var(--accent)')=>`<div style="background:${color};color:white;padding:.6rem 1rem;font-weight:700;font-size:.95rem">${icon} ${title}</div>`;
+
+  let html=`<div style="${ss}">${sh('📊','Resumen últimos 7 días','#1565c0')}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:.6rem;padding:.75rem 1rem">
+    ${[['% Consumo prom.',pctProm+'%',pctProm>=75?'#2d6a4f':pctProm>=60?'#c77800':'#c62828'],
+       ['Programado total',(totalProg/1000).toFixed(0)+' L','#1565c0'],
+       ['Consumido total',(totalCons/1000).toFixed(0)+' L','#2d6a4f'],
+       ['Alertas',alertasTotal,alertasTotal>5?'#c62828':alertasTotal>0?'#c77800':'#2d6a4f'],
+    ].map(([l,v,c])=>`<div style="text-align:center;padding:.5rem;background:#f9f9f9;border-radius:8px"><div style="font-size:1.4rem;font-weight:700;color:${c}">${v}</div><div style="font-size:.73rem;color:var(--text-muted)">${l}</div></div>`).join('')}
+  </div></div>`;
+
+  // Tabla por día
+  html+=`<div style="${ss}">${sh('📅','Historial por Día')}<table style="width:100%;font-size:.83rem">
+    <thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Fecha</th><th>Becerras</th><th>% Consumo</th><th>Programado</th><th>Consumido</th><th>% Sólidos</th><th>Alertas</th></tr></thead><tbody>`+
+    dias.map(d=>{
+      const pct=d.becerras.length?Math.round(d.becerras.reduce((s,r)=>s+(r.percent_consumption||0),0)/d.becerras.length):0;
+      const prog=d.becerras.reduce((s,r)=>s+(r.daily_quantity_ml||0),0);
+      const cons=d.becerras.reduce((s,r)=>s+(r.daily_consumption_ml||0),0);
+      const al=d.becerras.filter(r=>r.calf_alert&&r.calf_alert!=='0'&&r.calf_alert!=='').length;
+      const pc=pct>=80?'#2d6a4f':pct>=60?'#c77800':'#c62828';
+      return `<tr><td class="mono" style="padding:.35rem .5rem">${d.fecha.split('-').reverse().join('/')}</td>
+        <td class="mono" style="text-align:center">${d.becerras.length}</td>
+        <td class="mono" style="text-align:center;color:${pc};font-weight:600">${pct}%</td>
+        <td class="mono">${(prog/1000).toFixed(1)} L</td>
+        <td class="mono">${(cons/1000).toFixed(1)} L</td>
+        <td class="mono" style="color:#6a1b9a">${d.solidos!=null?d.solidos+'%':'—'}</td>
+        <td class="mono" style="color:${al>0?'#c62828':'inherit'}">${al||'—'}</td></tr>`;
+    }).join('')+
+    '</tbody></table></div>';
+
+  // Jaulas
+  if(jaulasData&&jaulasData.length){
+    html+=`<div style="${ss}">${sh('🏠','Jaulas de Fierro — Últimos registros','#e65100')}<table style="width:100%;font-size:.83rem">
+      <thead><tr style="background:#e65100;color:#fff"><th style="padding:.4rem">Fecha</th><th>Servida</th><th>Temp (°C)</th><th>% Sólidos</th><th>Litros</th><th>Notas</th></tr></thead><tbody>`+
+      jaulasData.slice(0,20).map(r=>`<tr>
+        <td class="mono" style="padding:.35rem .5rem">${r.fecha?r.fecha.split('-').reverse().join('/'):'—'}</td>
+        <td class="mono" style="text-align:center">${r.servida||1}ª</td>
+        <td class="mono">${r.temperatura!=null?r.temperatura+'°C':'—'}</td>
+        <td class="mono" style="color:#6a1b9a">${r.solidos_pct!=null?r.solidos_pct+'%':'—'}</td>
+        <td class="mono">${r.litros_preparados!=null?r.litros_preparados+' L':'—'}</td>
+        <td>${r.notas||'—'}</td></tr>`).join('')+
+      '</tbody></table></div>';
+  }
+
+  container.innerHTML=html;
+}
+
+
 
 async function loadLeche(){
   // Fecha default hoy
