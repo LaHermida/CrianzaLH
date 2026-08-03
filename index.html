@@ -4245,6 +4245,9 @@ async function loadLecheKpis(){
   const alertasTotal=todasBecerras.filter(r=>r.calf_alert&&r.calf_alert!=='0'&&r.calf_alert!=='').length;
   const totalProg=todasBecerras.reduce((s,r)=>s+(r.daily_quantity_ml||0),0);
   const totalCons=todasBecerras.reduce((s,r)=>s+(r.daily_consumption_ml||0),0);
+  const kgPromBecerra=todasBecerras.length?(totalCons/todasBecerras.length/1000).toFixed(2):0;
+  const velArr=todasBecerras.filter(r=>r.drinking_speed_ml_min>0);
+  const velProm=velArr.length?(velArr.reduce((s,r)=>s+(r.drinking_speed_ml_min||0),0)/velArr.length).toFixed(0):'—';
 
   const ss='margin-bottom:1.2rem;border:1px solid var(--border);border-radius:10px;overflow:hidden';
   const sh=(icon,title,color='var(--accent)')=>`<div style="background:${color};color:white;padding:.6rem 1rem;font-weight:700;font-size:.95rem">${icon} ${title}</div>`;
@@ -4253,17 +4256,22 @@ async function loadLecheKpis(){
     ${[['% Consumo prom.',pctProm+'%',pctProm>=75?'#2d6a4f':pctProm>=60?'#c77800':'#c62828'],
        ['Programado total',(totalProg/1000).toFixed(0)+' L','#1565c0'],
        ['Consumido total',(totalCons/1000).toFixed(0)+' L','#2d6a4f'],
+       ['Kg cons./becerra',kgPromBecerra+' kg','#2d6a4f'],
+       ['Vel. prom.',velProm+' ml/min','#e65100'],
        ['Alertas',alertasTotal,alertasTotal>5?'#c62828':alertasTotal>0?'#c77800':'#2d6a4f'],
     ].map(([l,v,c])=>`<div style="text-align:center;padding:.5rem;background:#f9f9f9;border-radius:8px"><div style="font-size:1.4rem;font-weight:700;color:${c}">${v}</div><div style="font-size:.73rem;color:var(--text-muted)">${l}</div></div>`).join('')}
   </div></div>`;
 
   // Tabla por día
   html+=`<div style="${ss}">${sh('📅','Historial por Día')}<table style="width:100%;font-size:.83rem">
-    <thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Fecha</th><th>Becerras</th><th>% Consumo</th><th>Programado</th><th>Consumido</th><th>% Sólidos</th><th>Alertas</th></tr></thead><tbody>`+
+    <thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Fecha</th><th>Becerras</th><th>% Consumo</th><th>Programado</th><th>Consumido</th><th>Kg/becerra</th><th>Vel. (ml/min)</th><th>% Sólidos</th><th>Alertas</th></tr></thead><tbody>`+
     dias.map(d=>{
       const pct=d.becerras.length?Math.round(d.becerras.reduce((s,r)=>s+(r.percent_consumption||0),0)/d.becerras.length):0;
       const prog=d.becerras.reduce((s,r)=>s+(r.daily_quantity_ml||0),0);
       const cons=d.becerras.reduce((s,r)=>s+(r.daily_consumption_ml||0),0);
+      const kgPorBec=d.becerras.length?(cons/d.becerras.length/1000).toFixed(2):'—';
+      const vArr=d.becerras.filter(r=>r.drinking_speed_ml_min>0);
+      const vel=vArr.length?(vArr.reduce((s,r)=>s+(r.drinking_speed_ml_min||0),0)/vArr.length).toFixed(0):'—';
       const al=d.becerras.filter(r=>r.calf_alert&&r.calf_alert!=='0'&&r.calf_alert!=='').length;
       const pc=pct>=80?'#2d6a4f':pct>=60?'#c77800':'#c62828';
       return `<tr><td class="mono" style="padding:.35rem .5rem">${d.fecha.split('-').reverse().join('/')}</td>
@@ -4271,6 +4279,8 @@ async function loadLecheKpis(){
         <td class="mono" style="text-align:center;color:${pc};font-weight:600">${pct}%</td>
         <td class="mono">${(prog/1000).toFixed(1)} L</td>
         <td class="mono">${(cons/1000).toFixed(1)} L</td>
+        <td class="mono">${kgPorBec} kg</td>
+        <td class="mono">${vel} ml/min</td>
         <td class="mono" style="color:#6a1b9a">${d.solidos!=null?d.solidos+'%':'—'}</td>
         <td class="mono" style="color:${al>0?'#c62828':'inherit'}">${al||'—'}</td></tr>`;
     }).join('')+
