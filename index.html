@@ -183,6 +183,8 @@
     <button onclick="showTab('clin-admin',this)">⚙️ Admin Clínico</button>
     <button onclick="showTab('corrales',this)">🏠 Corrales</button>
     <div class="nav-sep"></div>
+    <button onclick="showTab('leche',this)">🥛 Leche</button>
+    <div class="nav-sep"></div>
     <button onclick="showTab('ficha-animal',this)">🔍 Ficha Animal</button>
   </nav>
   <main>
@@ -686,6 +688,69 @@
       </div>
     </div>
 
+    <!-- ===== LECHE ===== -->
+    <div id="tab-leche" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🥛 Monitoreo de Leche</span>
+      </div>
+
+      <!-- Sub-tabs -->
+      <div style="display:flex;gap:.5rem;margin-bottom:1rem;border-bottom:2px solid var(--border);padding-bottom:.75rem">
+        <button id="leche-btn-calf" class="btn btn-primary btn-sm" onclick="setLecheTab('calf')">🤖 CalfExpert (11-70)</button>
+        <button id="leche-btn-jaulas" class="btn btn-secondary btn-sm" onclick="setLecheTab('jaulas')">🏠 Jaulas Fierro (1-10)</button>
+      </div>
+
+      <!-- PANEL CALFEXPERT -->
+      <div id="leche-panel-calf">
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:1rem">
+          <input type="date" id="leche-calf-fecha" style="padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/>
+          <input type="number" id="leche-calf-solidos" placeholder="% Sólidos" step="0.1" min="0" max="30" style="width:120px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/>
+          <button class="btn btn-secondary" onclick="verCalfFecha()">🔍 Ver día</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('importCalfFile').click()">📥 Importar CalfExpert</button>
+          <input type="file" id="importCalfFile" accept=".xlsx,.xls" class="hidden" onchange="importCalfExpert(event)"/>
+        </div>
+        <!-- KPIs resumen -->
+        <div id="leche-calf-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
+        <!-- Tabla -->
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Arete</th><th>Corral</th><th>Programado (ml)</th><th>Consumido (ml)</th>
+              <th>% Consumo</th><th>CMR (g)</th><th>Vel. Bebida (ml/min)</th>
+              <th>Visitas Abortadas</th><th>Alerta</th>
+            </tr></thead>
+            <tbody id="leche-calf-body"><tr><td colspan="9" class="empty">Importa el reporte CalfExpert del día.</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- PANEL JAULAS -->
+      <div id="leche-panel-jaulas" style="display:none">
+        <div style="display:flex;gap:.5rem;align-items:flex-end;flex-wrap:wrap;margin-bottom:1rem;padding:1rem;background:#f5f5f5;border-radius:8px">
+          <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Fecha</label>
+            <input type="date" id="jaulas-fecha" style="padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
+          <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Temperatura (°C)</label>
+            <input type="number" id="jaulas-temp" step="0.1" placeholder="ej: 38.5" style="width:110px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
+          <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">% Sólidos</label>
+            <input type="number" id="jaulas-solidos" step="0.1" placeholder="ej: 12.5" style="width:110px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
+          <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Litros preparados</label>
+            <input type="number" id="jaulas-litros" step="0.1" placeholder="ej: 45" style="width:120px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
+          <div><label style="font-size:.8rem;font-weight:600;display:block;margin-bottom:.2rem">Notas</label>
+            <input type="text" id="jaulas-notas" placeholder="Opcional" style="width:160px;padding:.35rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.88rem"/></div>
+          <button class="btn btn-primary" onclick="guardarJaulas()">✓ Guardar</button>
+        </div>
+        <!-- Historial -->
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Fecha</th><th>Temperatura (°C)</th><th>% Sólidos</th><th>Litros preparados</th><th>Notas</th><th>Acción</th>
+            </tr></thead>
+            <tbody id="leche-jaulas-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <!-- ===== FICHA ANIMAL ===== -->
     <div id="tab-ficha-animal" class="hidden">
       <div class="section-header">
@@ -909,7 +974,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','dash-morbilidad','resumen-semanal','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','ficha-animal'].forEach(t=>{
+  ['dashboard','dash-gdp','dash-morbilidad','resumen-semanal','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','leche','ficha-animal'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -923,6 +988,7 @@ function showTab(tab,btn){
   if(tab==='clin-vacunas') loadClinVacunas();
   if(tab==='clin-admin') loadClinAdmin();
   if(tab==='corrales') loadCorrales();
+  if(tab==='leche') loadLeche();
   if(tab==='refractometria') loadRefractometria();
   if(tab==='dash-gdp'){
     const needPesajes=!window._pesajes||!window._pesajes.length;
@@ -3981,6 +4047,153 @@ async function guardarRefrac(id){
   } else {
     alert('Error al guardar. Intenta de nuevo.');
   }
+}
+
+// ==================== LECHE ====================
+function setLecheTab(tab){
+  document.getElementById('leche-panel-calf').style.display = tab==='calf'?'':'none';
+  document.getElementById('leche-panel-jaulas').style.display = tab==='jaulas'?'':'none';
+  document.getElementById('leche-btn-calf').className = tab==='calf'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+  document.getElementById('leche-btn-jaulas').className = tab==='jaulas'?'btn btn-primary btn-sm':'btn btn-secondary btn-sm';
+}
+
+async function loadLeche(){
+  // Fecha default hoy
+  const hoy = new Date().toISOString().slice(0,10);
+  const fechaInput = document.getElementById('leche-calf-fecha');
+  if(fechaInput && !fechaInput.value) fechaInput.value = hoy;
+  const jaulasFecha = document.getElementById('jaulas-fecha');
+  if(jaulasFecha && !jaulasFecha.value) jaulasFecha.value = hoy;
+  await loadJaulasHistorial();
+}
+
+async function verCalfFecha(){
+  const fecha = document.getElementById('leche-calf-fecha').value;
+  if(!fecha){alert('Selecciona una fecha');return;}
+  const data = await sbFetch(`leche_calf_expert?fecha=eq.${fecha}&order=percent_consumption.asc&limit=200`);
+  if(!data||!data.length){
+    document.getElementById('leche-calf-body').innerHTML='<tr><td colspan="9" class="empty">Sin datos para esta fecha.</td></tr>';
+    document.getElementById('leche-calf-kpis').innerHTML='';
+    return;
+  }
+  renderCalfTable(data);
+  renderCalfKpis(data);
+}
+
+async function importCalfExpert(event){
+  const file = event.target.files[0]; if(!file)return; event.target.value='';
+  const fecha = document.getElementById('leche-calf-fecha').value;
+  if(!fecha){alert('Selecciona una fecha antes de importar.');return;}
+  const solidos = parseFloat(document.getElementById('leche-calf-solidos').value)||null;
+  const rows = await readFile(file);
+  if(!rows.length){alert('Archivo vacío');return;}
+
+  let ok=0, err=0;
+  const tableRows = [];
+
+  for(const row of rows){
+    const p = row.__row||[];
+    const g = i => (p[i]!==undefined&&p[i]!==null&&String(p[i]).trim()!=='')?p[i]:null;
+    const hembra = g(1) ? String(Math.round(parseFloat(g(1)))) : null;
+    if(!hembra||!/^\d+$/.test(hembra)) continue;
+
+    const rec = {
+      fecha, hembra,
+      feeder_num: g(5)?parseInt(g(5)):null,
+      calf_pen: g(6)?parseInt(g(6)):null,
+      daily_quantity_ml: g(8)?parseInt(g(8)):null,
+      daily_consumption_ml: g(9)?parseInt(g(9)):null,
+      percent_consumption: g(10)?parseInt(g(10)):null,
+      cmr_consumption_g: g(11)?parseFloat(g(11)):null,
+      calf_alert: g(19)?String(g(19)).trim():null,
+      drinking_speed_ml_min: g(21)?parseFloat(g(21)):null,
+      aborted_visits: g(23)?parseInt(g(23)):null,
+      solidos_pct: solidos,
+    };
+    const res = await sbFetch('leche_calf_expert','POST',rec);
+    if(res&&res.ok){ ok++; tableRows.push(rec); } else err++;
+  }
+
+  alert(`CalfExpert importado: ${ok}${err?', Errores: '+err:''}`);
+  renderCalfTable(tableRows);
+  renderCalfKpis(tableRows);
+}
+
+function renderCalfTable(rows){
+  const tbody = document.getElementById('leche-calf-body');
+  if(!rows.length){ tbody.innerHTML='<tr><td colspan="9" class="empty">Sin datos.</td></tr>'; return; }
+  const sorted = [...rows].sort((a,b)=>{
+    if(b.percent_consumption!==a.percent_consumption) return (a.percent_consumption||0)-(b.percent_consumption||0);
+    return parseInt(a.hembra)-parseInt(b.hembra);
+  });
+  tbody.innerHTML = sorted.map(r=>{
+    const pct = r.percent_consumption||0;
+    const pctColor = pct>=80?'#2d6a4f':pct>=60?'#c77800':'#c62828';
+    const alerta = r.calf_alert&&r.calf_alert!=='0'&&r.calf_alert!==''?`<span style="color:#c62828;font-weight:600">⚠️ ${r.calf_alert}</span>`:'—';
+    return `<tr>
+      <td class="mono" style="font-weight:600">${r.hembra}</td>
+      <td class="mono">${r.calf_pen||'—'}</td>
+      <td class="mono">${r.daily_quantity_ml!=null?(r.daily_quantity_ml/1000).toFixed(1)+' L':'—'}</td>
+      <td class="mono">${r.daily_consumption_ml!=null?(r.daily_consumption_ml/1000).toFixed(1)+' L':'—'}</td>
+      <td class="mono" style="color:${pctColor};font-weight:600">${pct}%</td>
+      <td class="mono">${r.cmr_consumption_g||'—'}</td>
+      <td class="mono">${r.drinking_speed_ml_min||'—'}</td>
+      <td class="mono" style="color:${r.aborted_visits>3?'#c62828':'inherit'}">${r.aborted_visits!=null?r.aborted_visits:'—'}</td>
+      <td>${alerta}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderCalfKpis(rows){
+  if(!rows.length) return;
+  const totalProg = rows.reduce((s,r)=>s+(r.daily_quantity_ml||0),0);
+  const totalCons = rows.reduce((s,r)=>s+(r.daily_consumption_ml||0),0);
+  const pctProm = totalProg ? Math.round(totalCons/totalProg*100) : 0;
+  const alertas = rows.filter(r=>r.calf_alert&&r.calf_alert!=='0'&&r.calf_alert!=='').length;
+  const solidos = rows[0]?.solidos_pct;
+  document.getElementById('leche-calf-kpis').innerHTML =
+    kpiCard('Programado total', (totalProg/1000).toFixed(1)+' L','','','',false)+
+    kpiCard('Consumido total', (totalCons/1000).toFixed(1)+' L','','','',false)+
+    kpiCard('% Consumo prom.', pctProm+'%','','','',false)+
+    kpiCard('Becerras con alerta', alertas,'','','',false)+
+    (solidos!=null?kpiCard('% Sólidos', solidos+'%','','','',false):'');
+}
+
+async function loadJaulasHistorial(){
+  const data = await sbFetch('leche_jaulas?order=fecha.desc&limit=30');
+  const tbody = document.getElementById('leche-jaulas-body');
+  if(!data||!data.length){ tbody.innerHTML='<tr><td colspan="6" class="empty">Sin registros.</td></tr>'; return; }
+  tbody.innerHTML = data.map(r=>`<tr>
+    <td class="mono">${r.fecha?r.fecha.split('-').reverse().join('/'):'—'}</td>
+    <td class="mono">${r.temperatura!=null?r.temperatura+'°C':'—'}</td>
+    <td class="mono">${r.solidos_pct!=null?r.solidos_pct+'%':'—'}</td>
+    <td class="mono">${r.litros_preparados!=null?r.litros_preparados+' L':'—'}</td>
+    <td>${r.notas||'—'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deleteJaulas(${r.id})">🗑</button></td>
+  </tr>`).join('');
+}
+
+async function guardarJaulas(){
+  const fecha = document.getElementById('jaulas-fecha').value;
+  const temperatura = parseFloat(document.getElementById('jaulas-temp').value)||null;
+  const solidos_pct = parseFloat(document.getElementById('jaulas-solidos').value)||null;
+  const litros_preparados = parseFloat(document.getElementById('jaulas-litros').value)||null;
+  const notas = document.getElementById('jaulas-notas').value.trim()||null;
+  if(!fecha){alert('Selecciona una fecha');return;}
+  const res = await sbFetch('leche_jaulas','POST',{fecha,temperatura,solidos_pct,litros_preparados,notas});
+  if(res&&res.ok){
+    document.getElementById('jaulas-temp').value='';
+    document.getElementById('jaulas-solidos').value='';
+    document.getElementById('jaulas-litros').value='';
+    document.getElementById('jaulas-notas').value='';
+    await loadJaulasHistorial();
+  } else { alert('Error al guardar'); }
+}
+
+async function deleteJaulas(id){
+  if(!confirm('¿Eliminar este registro?')) return;
+  await sbFetch(`leche_jaulas?id=eq.${id}`,'DELETE');
+  await loadJaulasHistorial();
 }
 
 // ==================== CORRALES ====================
