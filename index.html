@@ -361,6 +361,18 @@
         <span class="section-title">🥛 KPIs Leche</span>
       </div>
       <div id="leche-kpis-container"><p style="color:var(--text-muted);padding:1rem">Cargando...</p></div>
+      <div style="margin-top:1.5rem">
+        <div class="kpi-group-label" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🐄 Desglose por Becerra</span>
+          <div style="display:flex;gap:.5rem;align-items:center">
+            <input type="date" id="leche-desglose-fecha" style="padding:.3rem .5rem;border:1px solid var(--border);border-radius:6px;font-size:.85rem"/>
+            <button class="btn btn-primary btn-sm" onclick="loadLecheDesglose()">🔍 Ver</button>
+          </div>
+        </div>
+        <div id="leche-desglose-container" style="margin-top:.5rem">
+          <p style="color:var(--text-muted);font-size:.85rem">Selecciona una fecha para ver el desglose.</p>
+        </div>
+      </div>
     </div>
 
     <!-- ===== DASHBOARD MORBILIDAD ===== -->
@@ -4221,6 +4233,68 @@ async function deleteJaulas(id){
 }
 
 // ---- KPIs ----
+async function loadLecheDesglose(){
+  const fecha = document.getElementById('leche-desglose-fecha').value;
+  if(!fecha){alert('Selecciona una fecha');return;}
+  const container = document.getElementById('leche-desglose-container');
+  container.innerHTML='<p style="color:var(--text-muted);padding:.5rem">Cargando...</p>';
+  const data = await sbFetch(`leche_calf_expert?fecha=eq.${fecha}&order=percent_consumption.asc&limit=200`);
+  if(!data||!data.length){
+    container.innerHTML='<p style="color:var(--text-muted)">Sin datos para esta fecha.</p>';
+    return;
+  }
+  const fmt = fecha.split('-').reverse().join('/');
+  const solidos = data[0]?.solidos_pct;
+  // KPIs del día
+  const totalProg=data.reduce((s,r)=>s+(r.daily_quantity_ml||0),0);
+  const totalCons=data.reduce((s,r)=>s+(r.daily_consumption_ml||0),0);
+  const pctProm=data.length?Math.round(data.reduce((s,r)=>s+(r.percent_consumption||0),0)/data.length):0;
+  const cmrArr=data.filter(r=>r.cmr_consumption_g>0);
+  const cmrProm=cmrArr.length?(cmrArr.reduce((s,r)=>s+(r.cmr_consumption_g||0),0)/cmrArr.length).toFixed(0):0;
+  const velArr=data.filter(r=>r.drinking_speed_ml_min>0);
+  const velProm=velArr.length?(velArr.reduce((s,r)=>s+(r.drinking_speed_ml_min||0),0)/velArr.length).toFixed(0):'—';
+  const alertas=data.filter(r=>r.calf_alert&&r.calf_alert!=='0'&&r.calf_alert!=='').length;
+  const pc=pctProm>=80?'#2d6a4f':pctProm>=60?'#c77800':'#c62828';
+
+  container.innerHTML=`
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.75rem">
+      ${[['Becerras',data.length,'#555'],['Programado',(totalProg/1000).toFixed(1)+' L','#1565c0'],
+         ['Consumido',(totalCons/1000).toFixed(1)+' L','#2d6a4f'],['% Consumo prom.',pctProm+'%',pc],
+         ['CMR prom.',cmrProm+'g','#6a1b9a'],['Vel. prom.',velProm+' ml/min','#e65100'],
+         ['Alertas',alertas,alertas>0?'#c62828':'#2d6a4f'],
+         ...(solidos!=null?[['% Sólidos',solidos+'%','#6a1b9a']]:[])
+      ].map(([l,v,c])=>`<div style="text-align:center;padding:.4rem .6rem;background:#f9f9f9;border-radius:8px;min-width:100px">
+        <div style="font-size:1.2rem;font-weight:700;color:${c}">${v}</div>
+        <div style="font-size:.72rem;color:var(--text-muted)">${l}</div>
+      </div>`).join('')}
+    </div>
+    <div class="table-wrap">
+      <table style="font-size:.83rem">
+        <thead><tr style="background:var(--accent);color:#fff">
+          <th style="padding:.35rem .5rem">Arete</th><th>Corral</th>
+          <th>Progr. (L)</th><th>Cons. (L)</th><th>% Consumo</th>
+          <th>CMR (g)</th><th>Vel. (ml/min)</th><th>Vis. Abort.</th><th>Alerta</th>
+        </tr></thead>
+        <tbody>${data.map(r=>{
+          const pct=r.percent_consumption||0;
+          const pc2=pct>=80?'#2d6a4f':pct>=60?'#c77800':'#c62828';
+          const al=r.calf_alert&&r.calf_alert!=='0'&&r.calf_alert!==''?`<span style="color:#c62828;font-weight:600">⚠️ ${r.calf_alert}</span>`:'—';
+          return `<tr>
+            <td class="mono" style="font-weight:600;padding:.3rem .5rem">${r.hembra}</td>
+            <td class="mono">${r.calf_pen||'—'}</td>
+            <td class="mono">${r.daily_quantity_ml!=null?(r.daily_quantity_ml/1000).toFixed(1):'—'}</td>
+            <td class="mono">${r.daily_consumption_ml!=null?(r.daily_consumption_ml/1000).toFixed(1):'—'}</td>
+            <td class="mono" style="color:${pc2};font-weight:600">${pct}%</td>
+            <td class="mono">${r.cmr_consumption_g||'—'}</td>
+            <td class="mono">${r.drinking_speed_ml_min||'—'}</td>
+            <td class="mono" style="color:${r.aborted_visits>3?'#c62828':'inherit'}">${r.aborted_visits!=null?r.aborted_visits:'—'}</td>
+            <td>${al}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>`;
+}
+
 async function loadLecheKpis(){
   const container=document.getElementById('leche-kpis-container');
   container.innerHTML='<p style="color:var(--text-muted);padding:1rem">Cargando...</p>';
