@@ -592,14 +592,18 @@
           <button class="btn btn-primary" onclick="openClinEventoModal()">+ Nueva Enfermedad</button>
         </div>
       </div>
-      <div class="kpi-group-label">📊 En Tratamiento Activo</div>
+      <div class="kpi-group-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>📊 En Tratamiento Activo</span>
+        <button class="btn btn-primary btn-sm" onclick="altaMasiva()">✅ Alta Seleccionadas</button>
+      </div>
       <div class="table-wrap" style="margin-bottom:1.5rem">
         <table>
           <thead><tr>
+            <th style="width:30px"><input type="checkbox" onclick="selAllActivas(this)"/></th>
             <th>Hembra</th><th>Raza</th><th>Edad</th><th>Enfermedad</th>
             <th>Protocolo</th><th>Inicio</th><th>Día</th><th>Medicamentos Hoy</th><th>Comentario</th><th>Acciones</th>
           </tr></thead>
-          <tbody id="clin-activas-body"><tr><td colspan="10" class="empty">Cargando...</td></tr></tbody>
+          <tbody id="clin-activas-body"><tr><td colspan="11" class="empty">Cargando...</td></tr></tbody>
         </table>
       </div>
       <div class="kpi-group-label">✅ Altas Recientes</div>
@@ -2182,7 +2186,7 @@ function checkPass(){
 function submitPass(){
   const val=document.getElementById('passInput').value;
   document.getElementById('passModal').classList.remove('open');
-  if(window._passResolve){ window._passResolve(val==='017451'); window._passResolve=null; }
+  if(window._passResolve){ window._passResolve(val==='017451'||val==='817'); window._passResolve=null; }
 }
 function cancelPass(){
   document.getElementById('passModal').classList.remove('open');
@@ -2921,7 +2925,7 @@ function renderClinActivas(){
   // Activas
   const activasBody = document.getElementById('clin-activas-body');
   if(!activas.length){
-    activasBody.innerHTML='<tr><td colspan="10" class="empty">Sin becerras en tratamiento.</td></tr>';
+    activasBody.innerHTML='<tr><td colspan="11" class="empty">Sin becerras en tratamiento.</td></tr>';
   } else {
     activasBody.innerHTML = activas.map(e=>{
       const parto = partoMap[e.hembra];
@@ -2944,6 +2948,7 @@ function renderClinActivas(){
         : `Día ${diaEnProtocolo} / ${DIAS_PROTOCOLO}`;
       const bgRow = protocoloTerminado ? 'background:#fff8e1' : '';
       return `<tr style="${bgRow}">
+        <td style="padding:.3rem .4rem"><input type="checkbox" class="clin-activa-check" data-id="${e.id}"/></td>
         <td class="mono" style="font-weight:600">${e.hembra}</td>
         <td class="mono">${parto?.raza||'—'}</td>
         <td class="mono">${edad}d</td>
@@ -3464,9 +3469,19 @@ function renderAdminProtocolos(){
     const maxProto = pDias.length ? Math.max(...pDias.map(d=>d.protocolo_num||d.dia)) : 0;
     let diasHtml = '';
     for(let i=1;i<=maxProto;i++){
-      const meds = pDias.filter(d=>(d.protocolo_num||d.dia)===i).map(d=>`${d.medicamento} ${d.dosis||''}`).join(', ');
-      diasHtml += `<tr><td style="padding:.3rem .5rem;font-weight:600">Protocolo ${i}</td><td style="padding:.3rem .5rem">${meds||'—'}</td>
-        <td style="padding:.3rem .5rem"><button class="btn btn-secondary btn-sm" onclick="editProtoDia(${p.id},${i})">Editar</button></td></tr>`;
+      const medsDelProto = pDias.filter(d=>(d.protocolo_num||d.dia)===i);
+      const medsHtml = medsDelProto.map(d=>`
+        <div style="display:flex;gap:.4rem;align-items:center;margin-bottom:.3rem">
+          <input type="text" value="${d.medicamento||''}" id="med-nom-${d.id}" style="flex:1;padding:.25rem .4rem;border:1px solid var(--border);border-radius:4px;font-size:.83rem"/>
+          <input type="text" value="${d.dosis||''}" id="med-dos-${d.id}" placeholder="Dosis" style="width:90px;padding:.25rem .4rem;border:1px solid var(--border);border-radius:4px;font-size:.83rem"/>
+          <button class="btn btn-primary btn-sm" onclick="saveMedInline(${d.id})" style="font-size:.75rem;padding:.2rem .4rem">💾</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteMedInline(${d.id})" style="font-size:.75rem;padding:.2rem .4rem">🗑</button>
+        </div>`).join('');
+      diasHtml += `<tr><td style="padding:.4rem .5rem;font-weight:600;vertical-align:top;width:100px">P${i}</td>
+        <td style="padding:.3rem .5rem">
+          ${medsHtml}
+          <button class="btn btn-secondary btn-sm" onclick="addMedInline(${p.id},${i})" style="font-size:.75rem;margin-top:.2rem">+ Med</button>
+        </td></tr>`;
     }
     return `<div style="border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;max-width:700px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
@@ -3480,6 +3495,28 @@ function renderAdminProtocolos(){
       <table style="width:100%;font-size:.85rem"><tbody>${diasHtml}</tbody></table>
     </div>`;
   }).join('');
+}
+
+async function saveMedInline(id){
+  const med=document.getElementById('med-nom-'+id)?.value.trim();
+  const dos=document.getElementById('med-dos-'+id)?.value.trim()||null;
+  if(!med){alert('El nombre del medicamento es requerido');return;}
+  await sbClin(`clin_protocolo_dias?id=eq.${id}`,'PATCH',{medicamento:med, dosis:dos});
+  await loadClinAdmin();
+}
+
+async function deleteMedInline(id){
+  if(!confirm('¿Eliminar este medicamento?'))return;
+  await sbClin(`clin_protocolo_dias?id=eq.${id}`,'DELETE');
+  await loadClinAdmin();
+}
+
+async function addMedInline(protocolo_id, proto_num){
+  const med=prompt(`Medicamento para Protocolo ${proto_num}:`);
+  if(!med)return;
+  const dosis=prompt('Dosis (opcional):')||null;
+  await sbClin('clin_protocolo_dias','POST',{protocolo_id, protocolo_num:proto_num, medicamento:med, dosis});
+  await loadClinAdmin();
 }
 
 function renderAdminMeds(){
@@ -3508,6 +3545,25 @@ function renderAdminCalVac(){
 }
 
 // ---- ACTIONS ----
+function selAllActivas(cb){
+  document.querySelectorAll('.clin-activa-check').forEach(c=>c.checked=cb.checked);
+}
+
+async function altaMasiva(){
+  const checks=[...document.querySelectorAll('.clin-activa-check:checked')];
+  if(!checks.length){alert('Selecciona al menos una becerra.');return;}
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  const fechaAlta=new Date().toISOString().slice(0,10);
+  let ok=0,err=0;
+  for(const c of checks){
+    const id=c.dataset.id;
+    const res=await sbClin(`clin_eventos?id=eq.${id}`,'PATCH',{fecha_alta:fechaAlta});
+    if(res&&res.ok)ok++;else err++;
+  }
+  alert(`Altas registradas: ${ok}${err?', Errores: '+err:''}`);
+  await loadClinActivas();
+}
+
 async function darAlta(id){
   if(!await checkPass()){alert('Contraseña incorrecta');return;}
   const fecha = prompt('Fecha de alta (DD/MM/YYYY):');
