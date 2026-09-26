@@ -2916,7 +2916,7 @@ function renderClinActivas(){
   (window._clinPartos||[]).forEach(p=>{ if(p.hembra) partoMap[p.hembra]=p; });
   const protoMap = {};
   (window._clinProtocolos||[]).forEach(p=>{ protoMap[p.id]=p; });
-  const DIAS_PROTOCOLO = 3;
+  const DIAS_PROTOCOLO_DEFAULT = 3;
 
   const activas = (window._clinEventos||[]).filter(e=>!e.fecha_alta)
     .sort((a,b)=>a.fecha_inicio.localeCompare(b.fecha_inicio)||parseInt(a.hembra)-parseInt(b.hembra));
@@ -2935,7 +2935,9 @@ function renderClinActivas(){
       const inicio = new Date(e.fecha_inicio+'T00:00:00');
       const hoyFecha = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
       const protocoloNum = e.protocolo_num || 1;
-      // Día dentro del protocolo actual (1-3)
+      const diaCfg = (window._clinProtocoloDias||[]).find(d=>d.protocolo_id===e.protocolo_id && d.protocolo_num===protocoloNum && d.dias!=null);
+      const DIAS_PROTOCOLO = diaCfg ? diaCfg.dias : DIAS_PROTOCOLO_DEFAULT;
+      // Día dentro del protocolo actual (según días configurados para esa etapa)
       const diaEnProtocolo = Math.min(Math.floor((hoyFecha-inicio)/86400000)+1, DIAS_PROTOCOLO);
       const protocoloTerminado = Math.floor((hoyFecha-inicio)/86400000)+1 > DIAS_PROTOCOLO;
       // Medicamentos del día actual dentro del protocolo actual
@@ -3477,7 +3479,14 @@ function renderAdminProtocolos(){
           <button class="btn btn-primary btn-sm" onclick="saveMedInline(${d.id})" style="font-size:.75rem;padding:.2rem .4rem">💾</button>
           <button class="btn btn-danger btn-sm" onclick="deleteMedInline(${d.id})" style="font-size:.75rem;padding:.2rem .4rem">🗑</button>
         </div>`).join('');
-      diasHtml += `<tr><td style="padding:.4rem .5rem;font-weight:600;vertical-align:top;width:100px">P${i}</td>
+      const diasVal = medsDelProto.find(d=>d.dias!=null)?.dias ?? '';
+      diasHtml += `<tr><td style="padding:.4rem .5rem;font-weight:600;vertical-align:top;width:100px">P${i}
+          <div style="font-weight:400;font-size:.72rem;margin-top:.35rem;display:flex;align-items:center;gap:.25rem;color:var(--text-muted)">
+            <span>Días:</span>
+            <input type="number" min="1" value="${diasVal}" id="dias-p${p.id}-${i}" style="width:46px;padding:.15rem .3rem;border:1px solid var(--border);border-radius:4px;font-size:.78rem"/>
+            <button class="btn btn-secondary btn-sm" onclick="saveDiasProtocolo(${p.id},${i})" style="font-size:.68rem;padding:.1rem .3rem">💾</button>
+          </div>
+        </td>
         <td style="padding:.3rem .5rem">
           ${medsHtml}
           <button class="btn btn-secondary btn-sm" onclick="addMedInline(${p.id},${i})" style="font-size:.75rem;margin-top:.2rem">+ Med</button>
@@ -3515,7 +3524,17 @@ async function addMedInline(protocolo_id, proto_num){
   const med=prompt(`Medicamento para Protocolo ${proto_num}:`);
   if(!med)return;
   const dosis=prompt('Dosis (opcional):')||null;
-  await sbClin('clin_protocolo_dias','POST',{protocolo_id, protocolo_num:proto_num, medicamento:med, dosis});
+  const existing=(window._clinProtocoloDias||[]).filter(d=>d.protocolo_id===protocolo_id&&d.protocolo_num===proto_num);
+  const dias=existing.find(d=>d.dias!=null)?.dias ?? null;
+  await sbClin('clin_protocolo_dias','POST',{protocolo_id, protocolo_num:proto_num, dias, medicamento:med, dosis});
+  await loadClinAdmin();
+}
+
+async function saveDiasProtocolo(protocolo_id, proto_num){
+  const val=document.getElementById(`dias-p${protocolo_id}-${proto_num}`)?.value;
+  const dias=val?parseInt(val):null;
+  if(!dias){alert('Ingresa un número de días válido');return;}
+  await sbClin(`clin_protocolo_dias?protocolo_id=eq.${protocolo_id}&protocolo_num=eq.${proto_num}`,'PATCH',{dias});
   await loadClinAdmin();
 }
 
@@ -3599,7 +3618,12 @@ async function deleteProtocolo(id){
   if(!await checkPass()){alert('Contraseña incorrecta');return;}
   if(!confirm('¿Eliminar protocolo y todos sus días?')) return;
   await sbClin(`clin_protocolo_dias?protocolo_id=eq.${id}`,'DELETE');
-  await sbClin(`clin_protocolos?id=eq.${id}`,'DELETE');
+  const res = await sbClin(`clin_protocolos?id=eq.${id}`,'DELETE');
+  if(!res.ok){
+    const err = await res.text();
+    alert('No se pudo eliminar el protocolo:\n'+err);
+    return;
+  }
   await loadClinAdmin();
 }
 
@@ -3741,11 +3765,12 @@ async function saveVacuna(){
 async function addProtoDia(protocolo_id){
   const proto_num = prompt('¿Número de protocolo? (1, 2, 3, 4...)');
   if(!proto_num) return;
+  const dias = prompt('¿Cuántos días dura este protocolo?','3');
   const med = prompt('Medicamento:');
   if(!med) return;
   const dosis = prompt('Dosis:');
   const via = prompt('Vía (opcional):');
-  await sbClin('clin_protocolo_dias','POST',{protocolo_id, protocolo_num:parseInt(proto_num), medicamento:med, dosis:dosis||null, via:via||null});
+  await sbClin('clin_protocolo_dias','POST',{protocolo_id, protocolo_num:parseInt(proto_num), dias:dias?parseInt(dias):null, medicamento:med, dosis:dosis||null, via:via||null});
   await loadClinAdmin();
 }
 
