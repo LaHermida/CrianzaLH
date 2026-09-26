@@ -963,7 +963,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   const saved=sessionStorage.getItem('clh_user');
   if(saved&&USERS[saved]){ document.getElementById('loginUser').value=saved; launchApp(saved); }
 });
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&document.getElementById('loginView').style.display!=='none')doLogin();});
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&!document.getElementById('loginView').classList.contains('hidden'))doLogin();});
 
 // ==================== SUPABASE ====================
 const SUPABASE_CLIN_URL = 'https://glxbmcwpxlgqxudovsdj.supabase.co';
