@@ -3467,6 +3467,7 @@ function renderAdminProtocolos(){
     return;
   }
   container.innerHTML = protocolos.map(p=>{
+    const inactivo = p.activo===false;
     const pDias = dias.filter(d=>d.protocolo_id===p.id).sort((a,b)=>(a.protocolo_num||a.dia)-(b.protocolo_num||b.dia));
     const maxProto = pDias.length ? Math.max(...pDias.map(d=>d.protocolo_num||d.dia)) : 0;
     let diasHtml = '';
@@ -3492,12 +3493,14 @@ function renderAdminProtocolos(){
           <button class="btn btn-secondary btn-sm" onclick="addMedInline(${p.id},${i})" style="font-size:.75rem;margin-top:.2rem">+ Med</button>
         </td></tr>`;
     }
-    return `<div style="border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;max-width:700px">
+    return `<div style="border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;max-width:700px;${inactivo?'opacity:.55;background:#f5f5f5':''}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
-        <strong style="font-size:1rem">${p.nombre}</strong>
+        <strong style="font-size:1rem">${p.nombre}${inactivo?' <span style="font-size:.75rem;font-weight:400;color:var(--text-muted)">(inactivo)</span>':''}</strong>
         <div style="display:flex;gap:.5rem">
-          <button class="btn btn-primary btn-sm" onclick="addProtoDia(${p.id})">+ Protocolo</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteProtocolo(${p.id})">🗑</button>
+          ${inactivo
+            ? `<button class="btn btn-secondary btn-sm" onclick="reactivarProtocolo(${p.id})">↩️ Reactivar</button>`
+            : `<button class="btn btn-primary btn-sm" onclick="addProtoDia(${p.id})">+ Protocolo</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProtocolo(${p.id})">🗑</button>`}
         </div>
       </div>
       ${p.descripcion?`<p style="font-size:.85rem;color:var(--text-muted);margin-bottom:.5rem">${p.descripcion}</p>`:''}
@@ -3534,7 +3537,8 @@ async function saveDiasProtocolo(protocolo_id, proto_num){
   const val=document.getElementById(`dias-p${protocolo_id}-${proto_num}`)?.value;
   const dias=val?parseInt(val):null;
   if(!dias){alert('Ingresa un número de días válido');return;}
-  await sbClin(`clin_protocolo_dias?protocolo_id=eq.${protocolo_id}&protocolo_num=eq.${proto_num}`,'PATCH',{dias});
+  const res=await sbClin(`clin_protocolo_dias?protocolo_id=eq.${protocolo_id}&protocolo_num=eq.${proto_num}`,'PATCH',{dias});
+  if(!res.ok){ alert('No se pudo guardar los días:\n'+await res.text()); return; }
   await loadClinAdmin();
 }
 
@@ -3616,6 +3620,14 @@ async function aplicarVacunaRapida(hembra, vacuna){
 
 async function deleteProtocolo(id){
   if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  const eventos = await sbClin(`clin_eventos?protocolo_id=eq.${id}&select=id`);
+  if(eventos && eventos.length){
+    if(!confirm(`Este protocolo tiene ${eventos.length} registro(s) de becerras (activos o históricos) y no se puede borrar sin perder ese historial.\n\n¿Deseas ocultarlo en su lugar? Ya no aparecerá para nuevos registros, pero el historial existente se conserva intacto.`)) return;
+    const res = await sbClin(`clin_protocolos?id=eq.${id}`,'PATCH',{activo:false});
+    if(!res.ok){ alert('No se pudo ocultar el protocolo:\n'+await res.text()); return; }
+    await loadClinAdmin();
+    return;
+  }
   if(!confirm('¿Eliminar protocolo y todos sus días?')) return;
   await sbClin(`clin_protocolo_dias?protocolo_id=eq.${id}`,'DELETE');
   const res = await sbClin(`clin_protocolos?id=eq.${id}`,'DELETE');
@@ -3624,6 +3636,12 @@ async function deleteProtocolo(id){
     alert('No se pudo eliminar el protocolo:\n'+err);
     return;
   }
+  await loadClinAdmin();
+}
+
+async function reactivarProtocolo(id){
+  const res = await sbClin(`clin_protocolos?id=eq.${id}`,'PATCH',{activo:true});
+  if(!res.ok){ alert('No se pudo reactivar:\n'+await res.text()); return; }
   await loadClinAdmin();
 }
 
@@ -3641,7 +3659,7 @@ async function deleteCalVac(id){
 
 // ---- MODALS ----
 function openClinEventoModal(){
-  const protos = window._clinProtocolos||[];
+  const protos = (window._clinProtocolos||[]).filter(p=>p.activo!==false);
   const sel = document.getElementById('clin-evento-proto');
   sel.innerHTML = '<option value="">-- Seleccionar --</option>' +
     protos.map(p=>`<option value="${p.id}">${p.nombre}</option>`).join('');
