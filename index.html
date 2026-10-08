@@ -185,6 +185,7 @@
     <button onclick="showTab('corrales',this)">🏠 Corrales</button>
     <div class="nav-sep"></div>
     <button onclick="showTab('leche',this)">🥛 Leche</button>
+    <button onclick="showTab('calfexpert',this)">🤖 CalfExpert en vivo</button>
     <div class="nav-sep"></div>
     <button onclick="showTab('ficha-animal',this)">🔍 Ficha Animal</button>
   </nav>
@@ -780,6 +781,47 @@
 
     </div>
 
+    <!-- ===== CALFEXPERT EN VIVO ===== -->
+    <div id="tab-calfexpert" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🤖 CalfExpert en vivo</span>
+        <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap">
+          <span id="cx-sync" style="font-size:.8rem;color:var(--text-muted)"></span>
+          <button class="btn btn-secondary btn-sm" onclick="loadCalfExpertVivo()">🔄 Actualizar</button>
+        </div>
+      </div>
+      <div id="cx-msg"></div>
+      <div id="cx-kpis" class="kpi-grid"></div>
+
+      <div class="kpi-group-label">🔎 Becerras a revisar hoy <span style="font-weight:400;text-transform:none;letter-spacing:0">— alarma del CalfExpert, tomó &lt;70% ayer o &gt;12 h sin visitar · pícale a una para ver sus 14 días</span></div>
+      <div class="table-wrap" style="margin-bottom:1.5rem">
+        <table>
+          <thead><tr><th>Becerra</th><th>Edad</th><th>Estación</th><th>Hoy (L)</th><th>Ayer % crédito</th><th>Velocidad</th><th>Última visita</th><th>Motivo</th><th>Clínica</th></tr></thead>
+          <tbody id="cx-body"><tr><td colspan="9" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="chart-grid" style="margin-bottom:1.5rem">
+        <div class="chart-card"><h4>% de consumo diario (días cerrados)</h4><canvas id="cx-ch-cons"></canvas></div>
+      </div>
+
+      <div class="kpi-group-label">🚰 Por estación (ayer)</div>
+      <div class="table-wrap" style="max-width:760px;margin-bottom:1.5rem">
+        <table>
+          <thead><tr><th>Estación</th><th>Becerras</th><th>% consumo</th><th>Velocidad</th><th>Visitas</th><th>Neumonías 30 d</th></tr></thead>
+          <tbody id="cx-est-body"><tr><td colspan="6" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="kpi-group-label">⏰ ¿El CalfExpert avisó antes? <span id="cx-aviso" style="font-weight:400;text-transform:none;letter-spacing:0"></span></div>
+      <div class="table-wrap" style="max-width:760px">
+        <table>
+          <thead><tr><th>Becerra</th><th>Inicio neumonía</th><th>Alarma 1–3 días antes</th><th>Detalle</th></tr></thead>
+          <tbody id="cx-aviso-body"><tr><td colspan="4" class="empty">Cargando...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- ===== FICHA ANIMAL ===== -->
     <div id="tab-ficha-animal" class="hidden">
       <div class="section-header">
@@ -793,6 +835,14 @@
     </div>
 
   </main>
+</div>
+
+<!-- MODAL CALFEXPERT 14 DIAS -->
+<div class="modal-overlay" id="cxModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal" style="max-width:880px">
+    <div class="modal-header"><h2 id="cx-modal-title">Becerra</h2><button class="modal-close" onclick="document.getElementById('cxModal').classList.remove('open')">×</button></div>
+    <div class="modal-body" id="cx-modal-body"></div>
+  </div>
 </div>
 
 <!-- MODAL CONTRASEÑA -->
@@ -1003,7 +1053,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','dash-morbilidad','dash-leche','resumen-semanal','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','leche','ficha-animal'].forEach(t=>{
+  ['dashboard','dash-gdp','dash-morbilidad','dash-leche','resumen-semanal','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','leche','calfexpert','ficha-animal'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -1020,6 +1070,7 @@ function showTab(tab,btn){
   if(tab==='corrales') loadCorrales();
   if(tab==='leche') loadLeche();
   if(tab==='refractometria') loadRefractometria();
+  if(tab==='calfexpert') loadCalfExpertVivo();
   if(tab==='dash-gdp'){
     const needPesajes=!window._pesajes||!window._pesajes.length;
     const needPartos=!window._partos||!window._partos.length;
@@ -4929,5 +4980,189 @@ async function buscarFicha(){
     console.error('Ficha error:',e);
     container.innerHTML=`<p style="color:var(--red)">Error al buscar: ${e.message}</p>`;
   }
+}
+</script>
+
+<script>
+// ==================== CALFEXPERT EN VIVO ====================
+// Lee lo que la función calfexpert-sync guarda cada hora: cx_becerros_dia, cx_estadisticas_dia, cx_sync.
+const CX={};
+const cxIso=d=>d.toISOString().slice(0,10);
+const cxMenosDias=(f,n)=>{const d=new Date(f+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-n);return cxIso(d);};
+const cxDDMM=f=>f?f.split('-').reverse().join('/'):'—';
+const cxEsNeumonia=n=>/neumon/i.test(String(n||'').normalize('NFD').replace(/[̀-ͯ]/g,''));
+const cxPct=r=>r&&r.credito_ml>0&&r.consumido_ml!=null?Math.round(r.consumido_ml/r.credito_ml*100):null;
+const cxColor=p=>p==null?'':p>=80?'gdp-ok':p>=70?'gdp-warn':'gdp-bad';
+
+async function cxTodo(path){
+  let out=[],off=0;
+  while(true){
+    const url=`${SUPABASE_URL}/rest/v1/${path}`;
+    const res=await fetch(url,{headers:{apikey:SUPABASE_KEY,Authorization:`Bearer ${SUPABASE_KEY}`,Range:`${off}-${off+999}`}});
+    if(!res.ok){ const t=await res.text(); throw new Error(t.includes('does not exist')||res.status===404?'FALTAN_TABLAS':t); }
+    const b=await res.json();
+    out=out.concat(b);
+    if(b.length<1000||off>=50000) break;
+    off+=1000;
+  }
+  return out;
+}
+
+async function loadCalfExpertVivo(){
+  const msg=document.getElementById('cx-msg');
+  msg.innerHTML='<p style="color:var(--text-muted);padding:.5rem 0">Cargando...</p>';
+  try{
+    const desde=cxMenosDias(cxIso(new Date()),45);
+    const [filas,stats,sync,eventos,protos]=await Promise.all([
+      cxTodo(`cx_becerros_dia?fecha=gte.${desde}&order=fecha.asc,numero.asc`),
+      cxTodo(`cx_estadisticas_dia?fecha=gte.${desde}&order=fecha.asc`),
+      sbFetch('cx_sync?order=corrido.desc&limit=1'),
+      sbClin('clin_eventos?order=fecha_inicio.desc&limit=2000'),
+      sbClin('clin_protocolos?select=id,nombre')
+    ]);
+    CX.filas=filas; CX.stats=stats; CX.eventos=Array.isArray(eventos)?eventos:[];
+    CX.protos={}; (protos||[]).forEach(p=>CX.protos[p.id]=p.nombre);
+    msg.innerHTML='';
+    renderSyncCx(Array.isArray(sync)?sync[0]:null);
+    if(!filas.length){
+      msg.innerHTML='<p style="color:var(--text-muted);padding:.5rem 0">Todavía no hay datos del CalfExpert. Se llenan solos cada hora.</p>';
+      return;
+    }
+    renderCalfExpertVivo();
+  }catch(e){
+    console.error('CalfExpert:',e);
+    msg.innerHTML=e.message==='FALTAN_TABLAS'
+      ?'<p style="color:var(--red);padding:.5rem 0">Faltan las tablas del CalfExpert en Supabase.</p>'
+      :`<p style="color:var(--red);padding:.5rem 0">Error: ${e.message}</p>`;
+  }
+}
+
+function renderSyncCx(s){
+  const el=document.getElementById('cx-sync');
+  if(!s){el.textContent='Sin sincronizaciones todavía';return;}
+  const d=new Date(s.corrido);
+  const hh=`${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  const f=`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  el.innerHTML=s.ok
+    ?`<span style="color:var(--green)">●</span> Última sincronización ${f} ${hh} · ${s.becerros} becerras`
+    :`<span style="color:var(--red)">●</span> Falló la sincronización ${f} ${hh}: ${s.mensaje||''}`;
+}
+
+function renderCalfExpertVivo(){
+  const fechas=[...new Set(CX.filas.map(r=>r.fecha))].sort();
+  const hoy=fechas[fechas.length-1];
+  const ayer=fechas.length>1?fechas[fechas.length-2]:null;
+  CX.hoy=hoy;
+  const porDia={}; CX.filas.forEach(r=>{(porDia[r.fecha]=porDia[r.fecha]||{})[r.numero||r.iso]=r;});
+  const hoyR=Object.values(porDia[hoy]||{});
+  const ayerMap=ayer?porDia[ayer]:{};
+  const ahora=Date.now();
+
+  // Clínica
+  const enTrat=new Set(CX.eventos.filter(e=>!e.fecha_alta).map(e=>String(e.hembra)));
+  const neumonias=CX.eventos.filter(e=>cxEsNeumonia(CX.protos[e.protocolo_id]));
+  const hace30=cxMenosDias(hoy,30);
+  const neu30=neumonias.filter(e=>e.fecha_inicio>=hace30);
+
+  // A revisar
+  const revisar=[];
+  hoyR.forEach(r=>{
+    const k=r.numero||r.iso;
+    const ra=ayerMap[k];
+    const pa=cxPct(ra);
+    const horas=r.ultima_visita?(ahora-new Date(r.ultima_visita).getTime())/3600000:null;
+    const mot=[];
+    if(r.en_alarma) mot.push('Alarma CalfExpert');
+    if(pa!=null&&pa<70) mot.push(`Ayer ${pa}%`);
+    if(horas!=null&&horas>12) mot.push(`${Math.floor(horas)} h sin visitar`);
+    if(mot.length) revisar.push({r,pa,horas,mot,trat:enTrat.has(String(r.numero))});
+  });
+  revisar.sort((a,b)=>(parseInt(a.r.numero)||0)-(parseInt(b.r.numero)||0));
+
+  // KPIs
+  const ayerR=Object.values(ayerMap||{});
+  const cred=ayerR.reduce((s,r)=>s+(r.credito_ml||0),0), cons=ayerR.reduce((s,r)=>s+(r.consumido_ml||0),0);
+  const pctAyer=cred?Math.round(cons/cred*100):null;
+  const vels=hoyR.map(r=>r.velocidad_ml_min).filter(v=>v>0);
+  const velProm=vels.length?Math.round(avg(vels)):null;
+  document.getElementById('cx-kpis').innerHTML=
+    kpiCard('Becerras en el automático',hoyR.length,'',`día ${cxDDMM(hoy)}`,'',false)+
+    kpiCard('Con alarma ahora',hoyR.filter(r=>r.en_alarma).length,'','','',false)+
+    kpiCard('A revisar hoy',revisar.length,'','','',false)+
+    kpiCard('% consumo ayer',pctAyer!=null?pctAyer+'%':'—','',ayer?cxDDMM(ayer):'','',false)+
+    kpiCard('Velocidad prom.',velProm!=null?velProm+' ml/min':'—','','','',false)+
+    kpiCard('Neumonías 30 días',neu30.length,'','Clínica','',false);
+
+  // Tabla a revisar
+  const tb=document.getElementById('cx-body');
+  tb.innerHTML=revisar.length?revisar.map(x=>{
+    const r=x.r;
+    const uv=r.ultima_visita?new Date(r.ultima_visita):null;
+    const esHoy=uv&&uv.toDateString()===new Date().toDateString();
+    const uvTxt=uv?`${esHoy?'':String(uv.getDate()).padStart(2,'0')+'/'+String(uv.getMonth()+1).padStart(2,'0')+' '}${String(uv.getHours()).padStart(2,'0')}:${String(uv.getMinutes()).padStart(2,'0')}`:'—';
+    return `<tr style="cursor:pointer" onclick="cxVerBecerra('${r.numero||r.iso}')">
+      <td class="mono" style="font-weight:600">${r.numero||r.iso}</td>
+      <td class="mono">${r.edad!=null?r.edad+'d':'—'}</td>
+      <td class="mono">${r.estacion??'—'}</td>
+      <td class="mono">${r.consumido_ml!=null?(r.consumido_ml/1000).toFixed(1):'—'} / ${r.credito_ml!=null?(r.credito_ml/1000).toFixed(1):'—'}</td>
+      <td class="mono ${cxColor(x.pa)}">${x.pa!=null?x.pa+'%':'—'}</td>
+      <td class="mono">${r.velocidad_ml_min??'—'}</td>
+      <td class="mono">${uvTxt}</td>
+      <td style="color:var(--red);font-weight:600;font-size:.8rem">${x.mot.join(' · ')}</td>
+      <td>${x.trat?'<span class="badge badge-dif">En tratamiento</span>':'—'}</td>
+    </tr>`;}).join('')
+    :'<tr><td colspan="9" class="empty">✅ Ninguna becerra para revisar.</td></tr>';
+
+  // Gráfica % consumo diario (sin el día en curso)
+  const cerr=fechas.filter(f=>f<hoy).slice(-30);
+  const serie=cerr.map(f=>{
+    const t=CX.stats.find(s=>s.fecha===f&&s.nivel==='total');
+    let c1=t?.credito_ml, c2=t?.consumido_ml;
+    if(!(c1>0)){const rs=Object.values(porDia[f]||{});c1=rs.reduce((s,r)=>s+(r.credito_ml||0),0);c2=rs.reduce((s,r)=>s+(r.consumido_ml||0),0);}
+    return c1>0?Math.round(c2/c1*100):null;
+  });
+  mkChart('cx-ch-cons','line',cerr.map(cxDDMM),[{label:'% consumo',data:serie,borderColor:'#2d6a4f',backgroundColor:'rgba(45,106,79,.1)',tension:.3,fill:true}],{plugins:{legend:{display:false}},scales:{y:{suggestedMin:60,suggestedMax:100,ticks:{font:{size:10}}},x:{ticks:{font:{size:10}}}}});
+
+  // Por estación (ayer)
+  const estDe={}; // última estación conocida de cada becerra
+  fechas.forEach(f=>Object.values(porDia[f]).forEach(r=>{if(r.estacion!=null&&r.numero) estDe[r.numero]=r.estacion;}));
+  const neuEst={}; neu30.forEach(e=>{const s=estDe[String(e.hembra)];if(s!=null) neuEst[s]=(neuEst[s]||0)+1;});
+  const base=ayer?ayerR:hoyR;
+  const grupos={}; base.forEach(r=>{const s=r.estacion??'—';(grupos[s]=grupos[s]||[]).push(r);});
+  const estStats={}; CX.stats.filter(s=>s.fecha===(ayer||hoy)&&s.nivel==='estacion').forEach(s=>estStats[s.clave]=s);
+  const estKeys=[...new Set([...Object.keys(grupos),...Object.keys(estStats)])].sort((a,b)=>(parseInt(a)||99)-(parseInt(b)||99));
+  document.getElementById('cx-est-body').innerHTML=estKeys.length?estKeys.map(k=>{
+    const rs=grupos[k]||[]; const st=estStats[k]||{};
+    const c1=rs.reduce((s,r)=>s+(r.credito_ml||0),0)||st.credito_ml||0, c2=rs.reduce((s,r)=>s+(r.consumido_ml||0),0)||st.consumido_ml||0;
+    const p=c1?Math.round(c2/c1*100):null;
+    const v=st.velocidad_ml_min||(rs.filter(r=>r.velocidad_ml_min>0).length?Math.round(avg(rs.filter(r=>r.velocidad_ml_min>0).map(r=>r.velocidad_ml_min))):null);
+    return `<tr><td style="font-weight:600">Estación ${k}</td><td class="mono">${rs.length||st.becerros||'—'}</td><td class="mono ${cxColor(p)}">${p!=null?p+'%':'—'}</td><td class="mono">${v?v+' ml/min':'—'}</td><td class="mono">${st.visitas??'—'}</td><td class="mono" style="${neuEst[k]?'color:var(--red);font-weight:600':''}">${neuEst[k]||0}</td></tr>`;
+  }).join(''):'<tr><td colspan="6" class="empty">Sin datos.</td></tr>';
+
+  // ¿Avisó antes?
+  const primerDia=fechas[0];
+  const evaluables=neumonias.filter(e=>e.fecha_inicio>cxMenosDias(primerDia,-3)).sort((a,b)=>b.fecha_inicio.localeCompare(a.fecha_inicio));
+  let si=0;
+  const filasAv=evaluables.map(e=>{
+    const h=String(e.hembra);
+    const previos=[1,2,3].map(n=>{const f=cxMenosDias(e.fecha_inicio,n);return {f,r:porDia[f]?.[h]};});
+    const conDato=previos.filter(x=>x.r);
+    const aviso=previos.filter(x=>x.r&&(x.r.en_alarma||(cxPct(x.r)!=null&&cxPct(x.r)<70)));
+    if(aviso.length) si++;
+    const det=conDato.length?previos.map(x=>x.r?`${cxDDMM(x.f).slice(0,5)}: ${x.r.en_alarma?'⚠️':''}${cxPct(x.r)!=null?cxPct(x.r)+'%':'—'}`:'').filter(Boolean).join(' · '):'No estaba en el automático';
+    return `<tr><td class="mono" style="font-weight:600">${h}</td><td class="mono">${cxDDMM(e.fecha_inicio)}</td><td>${!conDato.length?'—':aviso.length?'<span class="badge badge-nor">Sí avisó</span>':'<span class="badge badge-dif">No avisó</span>'}</td><td style="font-size:.8rem">${det}</td></tr>`;
+  });
+  document.getElementById('cx-aviso').textContent=evaluables.length?`— ${si} de ${evaluables.length} neumonías tuvieron alarma o bajo consumo 1–3 días antes`:'';
+  document.getElementById('cx-aviso-body').innerHTML=filasAv.length?filasAv.join(''):'<tr><td colspan="4" class="empty">Todavía no hay neumonías desde que se prendió la sincronización.</td></tr>';
+}
+
+function cxVerBecerra(num){
+  const rs=CX.filas.filter(r=>(r.numero||r.iso)===num).sort((a,b)=>b.fecha.localeCompare(a.fecha)).slice(0,14);
+  document.getElementById('cx-modal-title').textContent=`Becerra ${num} — últimos ${rs.length} días`;
+  document.getElementById('cx-modal-body').innerHTML=`<div class="table-wrap"><table>
+    <thead><tr><th>Día</th><th>Edad</th><th>Est.</th><th>Crédito (L)</th><th>Tomó (L)</th><th>%</th><th>Velocidad</th><th>Interrup.</th><th>Alarma</th></tr></thead>
+    <tbody>${rs.map(r=>{const p=cxPct(r);return `<tr><td class="mono">${cxDDMM(r.fecha)}${r.fecha===CX.hoy?' (hoy)':''}</td><td class="mono">${r.edad??'—'}</td><td class="mono">${r.estacion??'—'}</td><td class="mono">${r.credito_ml!=null?(r.credito_ml/1000).toFixed(1):'—'}</td><td class="mono">${r.consumido_ml!=null?(r.consumido_ml/1000).toFixed(1):'—'}</td><td class="mono ${r.fecha===CX.hoy?'':cxColor(p)}">${p!=null?p+'%':'—'}</td><td class="mono">${r.velocidad_ml_min??'—'}</td><td class="mono">${r.interrupciones??'—'}</td><td>${r.en_alarma?'<span style="color:var(--red);font-weight:600">⚠️ Sí</span>':'—'}</td></tr>`;}).join('')}</tbody>
+  </table></div>`;
+  document.getElementById('cxModal').classList.add('open');
 }
 </script>
