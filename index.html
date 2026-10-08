@@ -3280,7 +3280,7 @@ function imprimirTodosLotes(){
 
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vacunas Seleccionadas</title>
-  <style>body{font-family:Arial,sans-serif;font-size:10px;margin:12px}h1{font-size:13px;margin-bottom:2px}h2{font-size:11px;background:#fff8e1;padding:4px 8px;border-left:3px solid #f9a825;margin:12px 0 4px}.cnt{color:#c77800;font-weight:normal}.meta{color:#555;font-size:10px;margin-bottom:6px}.seccion{page-break-inside:avoid;margin-bottom:14px}.res-table{border-collapse:collapse;margin-bottom:12px}.res-table th{background:#2d6a4f;color:white;padding:2px 8px}.res-table td{padding:2px 8px;border-bottom:1px solid #ddd}@media print{body{margin:6px}}</style>
+  <style>body{font-family:Arial,sans-serif;font-size:10px;margin:12px}h1{font-size:13px;margin-bottom:2px}h2{font-size:11px;background:#fff8e1;padding:4px 8px;border-left:3px solid #f9a825;margin:12px 0 4px}.cnt{color:#c77800;font-weight:normal}.meta{color:#555;font-size:10px;margin-bottom:6px}.seccion{margin-bottom:8px}.res-table{border-collapse:collapse;margin-bottom:12px}.res-table th{background:#2d6a4f;color:white;padding:2px 8px}.res-table td{padding:2px 8px;border-bottom:1px solid #ddd}@page{size:letter portrait;margin:7mm}@media print{body{margin:0}}</style>
   </head><body>
   <h1>💉 Vacunas Seleccionadas — CrianzaLH</h1>
   <div class="meta">Generado: ${dd}/${mm}/${yyyy}</div>
@@ -3289,34 +3289,49 @@ function imprimirTodosLotes(){
   win.document.close();win.print();
 }
 
-// Una columna por corral (corrales de menor a mayor), aretes de MAYOR a MENOR dentro de cada corral
+// Columnas por corral tipo periódico: corrales de menor a mayor, aretes de MAYOR a MENOR.
+// Si un corral no cabe en su columna, continúa en la columna de al lado con "(cont.)".
+// Hoja vertical: ROWS filas por columna, COLS columnas por hoja.
 function tablaPorCorral(lista){
-  const grupos = {};
+  const ROWS=58, COLS=9;
+  const grupos={};
   lista.forEach(p=>{
-    const c = p.corral!=null ? String(p.corral) : 'Sin corral';
+    const c=p.corral!=null?String(p.corral):'Sin corral';
     if(!grupos[c]) grupos[c]=[];
     grupos[c].push(p);
   });
-  const corrales = Object.keys(grupos).sort((a,b)=>{
+  const corrales=Object.keys(grupos).sort((a,b)=>{
     if(a==='Sin corral') return 1; if(b==='Sin corral') return -1;
     return parseInt(a)-parseInt(b);
   });
-  const cols = corrales.map(c=>{
-    const animales = grupos[c].sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra));
-    const filas = animales.map(p=>`<tr><td style="padding:1px 4px;border-bottom:1px solid #eee;font-weight:600${p.adelantada?';color:#777':''}">${p.hembra}${p.adelantada?'*':''}</td><td style="width:14px;border-bottom:1px solid #eee;border-left:1px solid #eee"></td></tr>`).join('');
-    return `<div class="corral-col">
-      <table style="border-collapse:collapse;font-size:10px;width:100%">
-        <thead>
-          <tr style="background:#2d6a4f;color:white"><th colspan="2" style="padding:2px 4px;text-align:left;white-space:nowrap">Corral ${c}</th></tr>
-          <tr style="background:#e8f5e9"><th colspan="2" style="padding:1px 4px;text-align:left;font-weight:normal;color:#2d6a4f">${animales.length} dosis</th></tr>
-        </thead>
-        <tbody>${filas}</tbody>
-      </table>
-    </div>`;
-  }).join('');
-  return `<style>.corral-wrap{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}.corral-col{width:78px;border:1px solid #ccc;break-inside:avoid;page-break-inside:avoid}</style>
-  <div class="corral-wrap">${cols}</div>
-  ${lista.some(p=>p.adelantada)?'<div style="font-size:9px;color:#777;margin-top:3px">* adelantada</div>':''}`;
+  // Armar columnas
+  const columnas=[]; let col=[];
+  const nuevaCol=()=>{ if(col.length) columnas.push(col); col=[]; };
+  corrales.forEach(c=>{
+    const animales=grupos[c].sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra));
+    // Si no caben al menos encabezado + 3 aretes, empezar en columna nueva
+    if(col.length && ROWS-col.length<4) nuevaCol();
+    col.push({tipo:'h',corral:c,n:animales.length,cont:false});
+    animales.forEach(p=>{
+      if(col.length>=ROWS){ nuevaCol(); col.push({tipo:'h',corral:c,n:animales.length,cont:true}); }
+      col.push({tipo:'a',p});
+    });
+  });
+  nuevaCol();
+  // Render celdas
+  const celda=it=>{
+    if(it.tipo==='h') return `<tr><td colspan="2" style="background:${it.cont?'#cfe5d6':'#2d6a4f'};color:${it.cont?'#1b4332':'#fff'};font-weight:700;padding:1px 3px;white-space:nowrap">C${it.corral}${it.cont?' (cont.)':' · '+it.n}</td></tr>`;
+    const p=it.p;
+    return `<tr><td style="padding:0 3px;border-bottom:1px solid #e5e5e5;font-weight:600${p.adelantada?';color:#888':''}">${p.hembra}${p.adelantada?'*':''}</td><td style="width:11px;border:1px solid #bbb"></td></tr>`;
+  };
+  const colHtml=c=>`<td style="vertical-align:top;padding:0 2px"><table style="border-collapse:collapse;width:100%;font-size:9px;line-height:12px">${c.map(celda).join('')}</table></td>`;
+  let html='';
+  for(let i=0;i<columnas.length;i+=COLS){
+    const grupo=columnas.slice(i,i+COLS);
+    while(grupo.length<COLS) grupo.push([]);
+    html+=`<table class="hoja-corrales" style="width:100%;table-layout:fixed;border-collapse:collapse;${i>0?'page-break-before:always;':''}"><tr>${grupo.map(colHtml).join('')}</tr></table>`;
+  }
+  return html+(lista.some(p=>p.adelantada)?'<div style="font-size:8px;color:#777;margin-top:2px">* adelantada</div>':'');
 }
 
 function tablaCondensada(lista, cols){
@@ -3370,7 +3385,7 @@ function imprimirLoteVacuna(vacuna){
 
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${vacuna}</title>
-  <style>body{font-family:Arial,sans-serif;font-size:11px;margin:15px}h1{font-size:14px;margin-bottom:2px}h2{font-size:10px;color:#555;margin-bottom:6px}.resumen{margin:4px 0 10px;padding:4px 8px;background:#f0fff0;border-left:3px solid #2d6a4f;font-size:10px}@media print{body{margin:8px}}</style>
+  <style>body{font-family:Arial,sans-serif;font-size:11px;margin:15px}h1{font-size:14px;margin-bottom:2px}h2{font-size:10px;color:#555;margin-bottom:6px}.resumen{margin:4px 0 10px;padding:4px 8px;background:#f0fff0;border-left:3px solid #2d6a4f;font-size:10px}@page{size:letter portrait;margin:7mm}@media print{body{margin:0}}</style>
   </head><body>
   <h1>💉 ${vacuna}</h1>
   <h2>Generado: ${dd}/${mm}/${yyyy}</h2>
