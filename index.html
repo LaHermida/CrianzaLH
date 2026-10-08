@@ -3244,94 +3244,130 @@ async function aplicarVplanSeleccion(){
 function imprimirTodosLotes(){
   const checks = [...document.querySelectorAll('.vplan-check:checked')];
   if(!checks.length){ alert('No hay becerras seleccionadas.'); return; }
-
-  const hoy=new Date();
-  const dd=String(hoy.getDate()).padStart(2,'0'),mm=String(hoy.getMonth()+1).padStart(2,'0'),yyyy=hoy.getFullYear();
-  const partosMap={};
-  (window._clinPartosH||[]).forEach(p=>{ partosMap[p.hembra]=p; });
-
-  // Agrupar por vacuna
-  const grupos={};
-  checks.forEach(c=>{
-    const v=c.dataset.vacuna, h=c.dataset.hembra;
-    if(!grupos[v]) grupos[v]=[];
-    const p=partosMap[h]||{hembra:h,corral:null};
-    const dias=p.fecha_parto?Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000):'—';
-    const cal=(window._clinCalendario||[]).find(x=>x.vacuna===v);
-    const adelantada=cal&&typeof dias==='number'?dias<cal.dias_min:false;
-    grupos[v].push({...p,dias,adelantada});
-  });
-
-  // Resumen
-  let resumenRows='';
-  Object.entries(grupos).forEach(([vac,lista])=>{
-    resumenRows+=`<tr><td style="font-weight:600;padding:2px 6px">${vac}</td><td style="text-align:center;padding:2px 6px">${lista.length}</td></tr>`;
-  });
-
-  let body='';
-  Object.entries(grupos).forEach(([vacuna,lista])=>{
-    lista.sort((a,b)=>{const ca=a.corral!=null?parseInt(a.corral):9999,cb=b.corral!=null?parseInt(b.corral):9999;return ca!==cb?ca-cb:parseInt(a.hembra)-parseInt(b.hembra);});
-    const eligCount=lista.filter(p=>!p.adelantada).length;
-    body+=`<div class="seccion">
-      <h2>${vacuna} <span class="cnt">${lista.length} dosis (${eligCount} elegibles${lista.length-eligCount?' + '+(lista.length-eligCount)+' adelantadas':''})</span></h2>
-      ${tablaPorCorral(lista)}
-    </div>`;
-  });
-
-  const win=window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vacunas Seleccionadas</title>
-  <style>body{font-family:Arial,sans-serif;font-size:10px;margin:12px}h1{font-size:13px;margin-bottom:2px}h2{font-size:11px;background:#fff8e1;padding:4px 8px;border-left:3px solid #f9a825;margin:12px 0 4px}.cnt{color:#c77800;font-weight:normal}.meta{color:#555;font-size:10px;margin-bottom:6px}.seccion{margin-bottom:8px}.res-table{border-collapse:collapse;margin-bottom:12px}.res-table th{background:#2d6a4f;color:white;padding:2px 8px}.res-table td{padding:2px 8px;border-bottom:1px solid #ddd}@page{size:letter portrait;margin:7mm}@media print{body{margin:0}}</style>
-  </head><body>
-  <h1>💉 Vacunas Seleccionadas — CrianzaLH</h1>
-  <div class="meta">Generado: ${dd}/${mm}/${yyyy}</div>
-  <table class="res-table"><thead><tr><th>Vacuna</th><th>Dosis</th></tr></thead><tbody>${resumenRows}</tbody></table>
-  ${body}</body></html>`);
-  win.document.close();win.print();
+  imprimirHojaVacunas(armarGruposVac(checks), 'Vacunas Seleccionadas');
 }
 
-// Columnas por corral tipo periódico: corrales de menor a mayor, aretes de MAYOR a MENOR.
-// Si un corral no cabe en su columna, continúa en la columna de al lado con "(cont.)".
-// Hoja vertical: ROWS filas por columna, COLS columnas por hoja.
-function tablaPorCorral(lista){
-  const ROWS=58, COLS=9;
-  const grupos={};
-  lista.forEach(p=>{
-    const c=p.corral!=null?String(p.corral):'Sin corral';
-    if(!grupos[c]) grupos[c]=[];
-    grupos[c].push(p);
+// Arma [{vacuna, lista}] desde checkboxes, respetando el orden del calendario
+function armarGruposVac(checks){
+  const hoy=new Date();
+  const partosMap={};
+  (window._clinPartosH||[]).forEach(p=>{ partosMap[p.hembra]=p; });
+  const cal=window._clinCalendario||[];
+  const map={};
+  checks.forEach(c=>{
+    const v=c.dataset.vacuna, h=c.dataset.hembra;
+    if(!map[v]) map[v]=[];
+    const p=partosMap[h]||{hembra:h,corral:null};
+    const dias=p.fecha_parto?Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000):null;
+    const cv=cal.find(x=>x.vacuna===v);
+    map[v].push({...p,dias,adelantada:cv&&dias!=null?dias<cv.dias_min:false});
   });
-  const corrales=Object.keys(grupos).sort((a,b)=>{
-    if(a==='Sin corral') return 1; if(b==='Sin corral') return -1;
-    return parseInt(a)-parseInt(b);
+  const orden=cal.map(x=>x.vacuna);
+  return Object.keys(map).sort((a,b)=>{
+    const ia=orden.indexOf(a), ib=orden.indexOf(b);
+    return (ia<0?999:ia)-(ib<0?999:ib);
+  }).map(v=>({vacuna:v, lista:map[v]}));
+}
+
+// Hoja vertical tipo periódico: todas las vacunas fluyen por columnas, una tras otra.
+// Corrales de menor a mayor, aretes de MAYOR a MENOR. Una vacuna nunca se parte entre hojas
+// (salvo que por sí sola no quepa en una hoja; entonces arranca en hoja nueva).
+function imprimirHojaVacunas(grupos, titulo){
+  const ROWS=60, COLS=9, MIN_CORRAL=4, MIN_VAC=6;
+  const rowsPag=pg=>pg===0?ROWS-Math.min(30,6+Math.ceil(grupos.length*1.3)):ROWS;
+
+  // Items de cada vacuna
+  const bloques=grupos.map(g=>{
+    const porCorral={};
+    g.lista.forEach(p=>{const k=p.corral!=null?String(p.corral):'Sin corral';(porCorral[k]=porCorral[k]||[]).push(p);});
+    const corrales=Object.keys(porCorral).sort((a,b)=>{
+      if(a==='Sin corral') return 1; if(b==='Sin corral') return -1; return parseInt(a)-parseInt(b);
+    }).map(k=>({corral:k, animales:porCorral[k].sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))}));
+    const eleg=g.lista.filter(p=>!p.adelantada).length;
+    return {vacuna:g.vacuna, total:g.lista.length, eleg, adel:g.lista.length-eleg, corrales};
   });
-  // Armar columnas
-  const columnas=[]; let col=[];
-  const nuevaCol=()=>{ if(col.length) columnas.push(col); col=[]; };
-  corrales.forEach(c=>{
-    const animales=grupos[c].sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra));
-    // Si no caben al menos encabezado + 3 aretes, empezar en columna nueva
-    if(col.length && ROWS-col.length<4) nuevaCol();
-    col.push({tipo:'h',corral:c,n:animales.length,cont:false});
-    animales.forEach(p=>{
-      if(col.length>=ROWS){ nuevaCol(); col.push({tipo:'h',corral:c,n:animales.length,cont:true}); }
-      col.push({tipo:'a',p});
+
+  // Coloca un bloque a partir del estado; regresa nuevo estado (pages[pg][col] = items)
+  function colocar(st, b){
+    st={pages:st.pages.map(pg=>pg.map(col=>col.slice())), pg:st.pg, col:st.col};
+    const cur=()=>st.pages[st.pg][st.col];
+    const libre=()=>rowsPag(st.pg)-cur().length;
+    const sigCol=()=>{
+      st.col++;
+      if(st.col>=COLS){ st.pg++; st.col=0; st.pages.push(Array.from({length:COLS},()=>[])); }
+    };
+    const startPg=st.pg;
+    if(cur().length && libre()<MIN_VAC) sigCol();
+    cur().push({t:'v',b});
+    cur().push({t:'vn',b});
+    b.corrales.forEach(cr=>{
+      if(cur().length>2 && libre()<MIN_CORRAL && !(cur().length===2&&cur()[0].t==='v')) { sigCol(); cur().push({t:'vc',b}); }
+      cur().push({t:'c',cr,cont:false});
+      cr.animales.forEach(p=>{
+        if(libre()<=0){ sigCol(); cur().push({t:'vc',b}); cur().push({t:'c',cr,cont:true}); }
+        cur().push({t:'a',p});
+      });
     });
-  });
-  nuevaCol();
-  // Render celdas
-  const celda=it=>{
-    if(it.tipo==='h') return `<tr><td colspan="2" style="background:${it.cont?'#cfe5d6':'#2d6a4f'};color:${it.cont?'#1b4332':'#fff'};font-weight:700;padding:1px 3px;white-space:nowrap">C${it.corral}${it.cont?' (cont.)':' · '+it.n}</td></tr>`;
-    const p=it.p;
-    return `<tr><td style="padding:0 3px;border-bottom:1px solid #e5e5e5;font-weight:600${p.adelantada?';color:#888':''}">${p.hembra}${p.adelantada?'*':''}</td><td style="width:11px;border:1px solid #bbb"></td></tr>`;
-  };
-  const colHtml=c=>`<td style="vertical-align:top;padding:0 2px"><table style="border-collapse:collapse;width:100%;font-size:9px;line-height:12px">${c.map(celda).join('')}</table></td>`;
-  let html='';
-  for(let i=0;i<columnas.length;i+=COLS){
-    const grupo=columnas.slice(i,i+COLS);
-    while(grupo.length<COLS) grupo.push([]);
-    html+=`<table class="hoja-corrales" style="width:100%;table-layout:fixed;border-collapse:collapse;${i>0?'page-break-before:always;':''}"><tr>${grupo.map(colHtml).join('')}</tr></table>`;
+    return {st, partio:st.pg!==startPg};
   }
-  return html+(lista.some(p=>p.adelantada)?'<div style="font-size:8px;color:#777;margin-top:2px">* adelantada</div>':'');
+
+  let st={pages:[Array.from({length:COLS},()=>[])], pg:0, col:0};
+  bloques.forEach(b=>{
+    let r=colocar(st,b);
+    const vacio=st.col===0&&st.pages[st.pg][0].length===0;
+    if(r.partio && !vacio){
+      // Empezar la vacuna en hoja nueva
+      const nuevo={pages:st.pages.map(pg=>pg.map(col=>col.slice())), pg:st.pg+1, col:0};
+      nuevo.pages.push(Array.from({length:COLS},()=>[]));
+      r=colocar(nuevo,b);
+    }
+    st=r.st;
+    // La siguiente vacuna sigue en la misma columna
+  });
+
+  const celda=it=>{
+    if(it.t==='v') return `<tr><td colspan="2" class="vh">${it.b.vacuna}</td></tr>`;
+    if(it.t==='vn') return `<tr><td colspan="2" class="vn">${it.b.total} dosis${it.b.adel?` (${it.b.eleg}+${it.b.adel}*)`:''}</td></tr>`;
+    if(it.t==='vc') return `<tr><td colspan="2" class="vc">${it.b.vacuna} (cont.)</td></tr>`;
+    if(it.t==='c') return `<tr><td colspan="2" class="ch${it.cont?' cont':''}">C${it.cr.corral}${it.cont?' (cont.)':' · '+it.cr.animales.length}</td></tr>`;
+    const p=it.p;
+    return `<tr><td class="ar${p.adelantada?' ad':''}">${p.hembra}${p.adelantada?'*':''}</td><td class="bx"></td></tr>`;
+  };
+  const paginas=st.pages.filter(pg=>pg.some(col=>col.length)).map((pg,i)=>
+    `<table class="hoja"${i>0?' style="page-break-before:always;break-before:page"':''}><tr>${pg.map(col=>`<td class="col"><table class="ct">${col.map(celda).join('')}</table></td>`).join('')}</tr></table>`
+  ).join('');
+
+  const hoy=new Date();
+  const fecha=`${String(hoy.getDate()).padStart(2,'0')}/${String(hoy.getMonth()+1).padStart(2,'0')}/${hoy.getFullYear()}`;
+  const resumen=grupos.length>1?`<table class="res"><tr><th>Vacuna</th><th>Dosis</th></tr>${bloques.map(b=>`<tr><td>${b.vacuna}</td><td style="text-align:center">${b.total}</td></tr>`).join('')}<tr><td><b>Total</b></td><td style="text-align:center"><b>${bloques.reduce((s,b)=>s+b.total,0)}</b></td></tr></table>`:'';
+
+  const win=window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${titulo}</title>
+  <style>
+  @page{size:letter portrait;margin:7mm}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{font-family:Arial,sans-serif;font-size:9px;margin:10px}
+  h1{font-size:12px;margin:0 0 1px}.meta{color:#555;font-size:9px;margin-bottom:4px}
+  .res{border-collapse:collapse;margin-bottom:6px;font-size:9px}.res th{border-bottom:1.5px solid #2d6a4f;padding:1px 6px;text-align:left}.res td{padding:1px 6px;border-bottom:1px solid #ddd}
+  .hoja{width:100%;table-layout:fixed;border-collapse:collapse}
+  .col{vertical-align:top;padding:0 2px}
+  .ct{width:100%;border-collapse:collapse;line-height:11.5px}
+  .vh{background:#f9a825;color:#000;font-weight:700;padding:1px 3px;border-top:2px solid #c77800;white-space:nowrap;overflow:hidden}
+  .vn{background:#fff3cd;color:#7a4f00;padding:0 3px;font-size:8px}
+  .vc{background:#fff3cd;color:#7a4f00;font-weight:700;padding:0 3px;font-size:8px;white-space:nowrap;overflow:hidden}
+  .ch{color:#1b4332;font-weight:700;padding:1px 3px 0;border-bottom:1.5px solid #2d6a4f;white-space:nowrap}
+  .ch.cont{color:#555;font-weight:600;border-bottom:1px dashed #2d6a4f}
+  .ar{padding:0 3px;border-bottom:1px solid #e5e5e5;font-weight:600}
+  .ad{color:#888}
+  .bx{width:11px;border:1px solid #bbb}
+  @media print{body{margin:0}}
+  </style></head><body>
+  <h1>💉 ${titulo} — CrianzaLH</h1>
+  <div class="meta">Generado: ${fecha} &nbsp;·&nbsp; * adelantada</div>
+  ${resumen}
+  ${paginas}
+  </body></html>`);
+  win.document.close();win.print();
 }
 
 function tablaCondensada(lista, cols){
@@ -3362,39 +3398,9 @@ function tablaCondensada(lista, cols){
 
 function imprimirLoteVacuna(vacuna){
   const checks = [...document.querySelectorAll(`.vplan-check[data-vacuna="${vacuna}"]:checked`)];
-  const hoy = new Date();
-  const dd=String(hoy.getDate()).padStart(2,'0'),mm=String(hoy.getMonth()+1).padStart(2,'0'),yyyy=hoy.getFullYear();
   if(!checks.length){ alert('No hay becerras seleccionadas para esta vacuna.'); return; }
-
-  const partosMap={};
-  (window._clinPartosH||[]).forEach(p=>{ partosMap[p.hembra]=p; });
-  const cal=(window._clinCalendario||[]).find(c=>c.vacuna===vacuna);
-
-  const seleccionadas = checks.map(c=>{
-    const p=partosMap[c.dataset.hembra]||{hembra:c.dataset.hembra,corral:null};
-    const dias=p.fecha_parto?Math.floor((hoy-new Date(p.fecha_parto+'T12:00:00'))/86400000):'—';
-    const adelantada=cal&&typeof dias==='number'?dias<cal.dias_min:false;
-    return {...p,dias,adelantada};
-  }).sort((a,b)=>{
-    const ca=a.corral!=null?parseInt(a.corral):9999,cb=b.corral!=null?parseInt(b.corral):9999;
-    return ca!==cb?ca-cb:parseInt(a.hembra)-parseInt(b.hembra);
-  });
-
-  const eligCount=seleccionadas.filter(p=>!p.adelantada).length;
-  const tabla=tablaPorCorral(seleccionadas);
-
-  const win=window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${vacuna}</title>
-  <style>body{font-family:Arial,sans-serif;font-size:11px;margin:15px}h1{font-size:14px;margin-bottom:2px}h2{font-size:10px;color:#555;margin-bottom:6px}.resumen{margin:4px 0 10px;padding:4px 8px;background:#f0fff0;border-left:3px solid #2d6a4f;font-size:10px}@page{size:letter portrait;margin:7mm}@media print{body{margin:0}}</style>
-  </head><body>
-  <h1>💉 ${vacuna}</h1>
-  <h2>Generado: ${dd}/${mm}/${yyyy}</h2>
-  <div class="resumen"><strong>Dosis:</strong> ${seleccionadas.length} &nbsp;|&nbsp; Elegibles: ${eligCount} &nbsp;|&nbsp; Adelantadas: ${seleccionadas.length-eligCount}</div>
-  ${tabla}
-  </body></html>`);
-  win.document.close();win.print();
+  imprimirHojaVacunas(armarGruposVac(checks), vacuna);
 }
-
 
 function imprimirPendientes(){
   const hoy = new Date();
