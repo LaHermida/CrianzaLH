@@ -3274,7 +3274,7 @@ function imprimirTodosLotes(){
     const eligCount=lista.filter(p=>!p.adelantada).length;
     body+=`<div class="seccion">
       <h2>${vacuna} <span class="cnt">${lista.length} dosis (${eligCount} elegibles${lista.length-eligCount?' + '+(lista.length-eligCount)+' adelantadas':''})</span></h2>
-      ${tablaCondensada(lista,4)}
+      ${tablaPorCorral(lista)}
     </div>`;
   });
 
@@ -3287,6 +3287,36 @@ function imprimirTodosLotes(){
   <table class="res-table"><thead><tr><th>Vacuna</th><th>Dosis</th></tr></thead><tbody>${resumenRows}</tbody></table>
   ${body}</body></html>`);
   win.document.close();win.print();
+}
+
+// Una columna por corral (corrales de menor a mayor), aretes de MAYOR a MENOR dentro de cada corral
+function tablaPorCorral(lista){
+  const grupos = {};
+  lista.forEach(p=>{
+    const c = p.corral!=null ? String(p.corral) : 'Sin corral';
+    if(!grupos[c]) grupos[c]=[];
+    grupos[c].push(p);
+  });
+  const corrales = Object.keys(grupos).sort((a,b)=>{
+    if(a==='Sin corral') return 1; if(b==='Sin corral') return -1;
+    return parseInt(a)-parseInt(b);
+  });
+  const cols = corrales.map(c=>{
+    const animales = grupos[c].sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra));
+    const filas = animales.map(p=>`<tr><td style="padding:1px 4px;border-bottom:1px solid #eee;font-weight:600${p.adelantada?';color:#777':''}">${p.hembra}${p.adelantada?'*':''}</td><td style="width:14px;border-bottom:1px solid #eee;border-left:1px solid #eee"></td></tr>`).join('');
+    return `<div class="corral-col">
+      <table style="border-collapse:collapse;font-size:10px;width:100%">
+        <thead>
+          <tr style="background:#2d6a4f;color:white"><th colspan="2" style="padding:2px 4px;text-align:left;white-space:nowrap">Corral ${c}</th></tr>
+          <tr style="background:#e8f5e9"><th colspan="2" style="padding:1px 4px;text-align:left;font-weight:normal;color:#2d6a4f">${animales.length} dosis</th></tr>
+        </thead>
+        <tbody>${filas}</tbody>
+      </table>
+    </div>`;
+  }).join('');
+  return `<style>.corral-wrap{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-start}.corral-col{width:78px;border:1px solid #ccc;break-inside:avoid;page-break-inside:avoid}</style>
+  <div class="corral-wrap">${cols}</div>
+  ${lista.some(p=>p.adelantada)?'<div style="font-size:9px;color:#777;margin-top:3px">* adelantada</div>':''}`;
 }
 
 function tablaCondensada(lista, cols){
@@ -3336,7 +3366,7 @@ function imprimirLoteVacuna(vacuna){
   });
 
   const eligCount=seleccionadas.filter(p=>!p.adelantada).length;
-  const tabla=tablaCondensada(seleccionadas, 4); // 4 bloques = ~200+ por hoja
+  const tabla=tablaPorCorral(seleccionadas);
 
   const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${vacuna}</title>
