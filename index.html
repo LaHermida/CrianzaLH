@@ -3298,7 +3298,8 @@ function imprimirHojaVacunas(grupos, titulo){
       if(st.col>=COLS){ st.pg++; st.col=0; st.pages.push(Array.from({length:COLS},()=>[])); }
     };
     const startPg=st.pg;
-    if(cur().length && libre()<MIN_VAC) sigCol();
+    if(cur().length && libre()<MIN_VAC+1) sigCol();
+    if(cur().length) cur().push({t:'sp'}); // espacio entre vacunas
     cur().push({t:'v',b});
     cur().push({t:'vn',b});
     b.corrales.forEach(cr=>{
@@ -3327,12 +3328,13 @@ function imprimirHojaVacunas(grupos, titulo){
   });
 
   const celda=it=>{
+    if(it.t==='sp') return `<tr><td colspan="2" class="sp"></td></tr>`;
     if(it.t==='v') return `<tr><td colspan="2" class="vh">${it.b.vacuna}</td></tr>`;
-    if(it.t==='vn') return `<tr><td colspan="2" class="vn">${it.b.total} dosis${it.b.adel?` (${it.b.eleg}+${it.b.adel}*)`:''}</td></tr>`;
+    if(it.t==='vn') return `<tr><td colspan="2" class="vn">${it.b.total} dosis</td></tr>`;
     if(it.t==='vc') return `<tr><td colspan="2" class="vc">${it.b.vacuna} (cont.)</td></tr>`;
     if(it.t==='c') return `<tr><td colspan="2" class="ch${it.cont?' cont':''}">C${it.cr.corral}${it.cont?' (cont.)':' · '+it.cr.animales.length}</td></tr>`;
     const p=it.p;
-    return `<tr><td class="ar${p.adelantada?' ad':''}">${p.hembra}${p.adelantada?'*':''}</td><td class="bx"></td></tr>`;
+    return `<tr><td class="ar">${p.hembra}</td><td class="bx"></td></tr>`;
   };
   const paginas=st.pages.filter(pg=>pg.some(col=>col.length)).map((pg,i)=>
     `<table class="hoja"${i>0?' style="page-break-before:always;break-before:page"':''}><tr>${pg.map(col=>`<td class="col"><table class="ct"><colgroup><col><col style="width:13px"></colgroup>${col.map(celda).join('')}</table></td>`).join('')}</tr></table>`
@@ -3355,18 +3357,18 @@ function imprimirHojaVacunas(grupos, titulo){
   .ct{width:100%;border-collapse:collapse;table-layout:fixed}
   .ct tr{height:12px}
   .ct td{height:12px;line-height:11px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;box-sizing:border-box}
-  .vh{background:#f9a825;color:#000;font-weight:700;padding:0 3px}
+  .vh{background:#f9a825;color:#000;font-weight:700;padding:0 3px;border-top:2px solid #c77800}
   .vn{background:#fff3cd;color:#7a4f00;padding:0 3px;font-size:8px}
   .vc{background:#fff3cd;color:#7a4f00;font-weight:700;padding:0 3px;font-size:8px}
   .ch{color:#1b4332;font-weight:700;padding:0 3px;border-bottom:1.5px solid #2d6a4f}
   .ch.cont{color:#555;font-weight:600;border-bottom:1px dashed #2d6a4f}
   .ar{padding:0 3px;border-bottom:1px solid #e5e5e5;font-weight:600}
-  .ad{color:#888}
+  .sp{border:none}
   .bx{border:1px solid #bbb}
   @media print{body{margin:0}}
   </style></head><body>
   <h1>💉 ${titulo} — CrianzaLH</h1>
-  <div class="meta">Generado: ${fecha} &nbsp;·&nbsp; * adelantada</div>
+  <div class="meta">Generado: ${fecha}</div>
   ${resumen}
   ${paginas}
   </body></html>`);
