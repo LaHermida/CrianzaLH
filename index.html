@@ -2363,14 +2363,21 @@ function renderDesarrollo(){
   const BANDAS=[{lbl:'4 meses',min:105,max:137},{lbl:'5 meses',min:138,max:167},{lbl:'6 meses',min:168,max:243},{lbl:'10 meses',min:244,max:327},{lbl:'11-12 meses',min:328,max:430}];
   const mesesNL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const lotesD={};
+  const razaLote=window._desLoteRaza||'';
   animales.forEach(a=>{
     if(!a.nac) return;
+    if(razaLote&&a.raza!==razaLote) return;
     const pb=BANDAS.map(b=>a.ps.find(x=>x.dias>=b.min&&x.dias<=b.max)||null);
     if(!pb.some(Boolean)) return;
     const k=a.nac.slice(0,7); (lotesD[k]=lotesD[k]||[]).push({a,pb});
   });
   const kLotes=Object.keys(lotesD).sort();
-  html+=`<div class="kpi-group-label" style="margin-top:.5rem">📅 Etapa desarrollo — Peso y GDP por Lote Mensual de Nacimiento</div>
+  const optR=(v,l)=>`<option value="${v}"${razaLote===v?' selected':''}>${l}</option>`;
+  html+=`<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;margin-bottom:.5rem">
+    <div class="kpi-group-label" style="margin:0">📅 Etapa desarrollo — Peso y GDP por Lote Mensual de Nacimiento</div>
+    <select onchange="window._desLoteRaza=this.value;renderDesarrollo()" style="padding:.25rem .5rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem">
+      ${optR('','Todas las razas')}${optR('H','Holstein')}${optR('J','Jersey')}
+    </select></div>
   <div class="table-wrap" style="margin-bottom:.4rem"><table><thead>
     <tr><th rowspan="2">Lote</th><th rowspan="2">Becerras</th><th rowspan="2">Aretes</th>${BANDAS.map(b=>`<th colspan="2" style="text-align:center">${b.lbl}</th>`).join('')}</tr>
     <tr>${BANDAS.map(()=>'<th>Peso prom<br><small>(días · n)</small></th><th>GDP<br><small>vs anterior</small></th>').join('')}</tr>
@@ -2401,27 +2408,6 @@ function renderDesarrollo(){
     kpiCard('En meta (≥95%)',conMeta.length?`${enMeta} de ${conMeta.length}`:'—','',conMeta.length?`${Math.round(enMeta/conMeta.length*100)}% de las pesadas actuales con raza`:'','',false)+
     kpiCard('Rezagadas',rezagadas.length,'','<85% de meta o GDP último <0.5','',false)+
   '</div>';
-
-  // Curva por mes de edad y raza
-  const bins={};
-  pesadas.forEach(x=>{const m=Math.floor(x.dias/30.4); if(m<0) return; (bins[m]=bins[m]||[]).push(x);});
-  const curva=Object.keys(bins).map(Number).sort((a,b)=>a-b).filter(m=>bins[m].length>=3);
-
-  const cel=(it,raza,m)=>{
-    const s=it.filter(x=>x.raza===raza); if(!s.length) return '<td class="mono">—</td><td class="mono">—</td><td class="mono">—</td><td class="mono" style="border-right:2px solid var(--border)">—</td>';
-    const p=avg(s.map(x=>x.peso)); const mt=desMeta(raza,avg(s.map(x=>x.dias))); const pc=mt?p/mt*100:null;
-    const g=s.filter(x=>x.gdp!=null).map(x=>x.gdp); const gg=g.length?avg(g):null;
-    return `<td class="mono">${f1(p)} <small style="color:var(--text-muted)">(${s.length})</small></td><td class="mono ${pctClass(pc)}">${pc!=null?Math.round(pc)+'%':'—'}</td><td class="mono ${adgClass(gg)}">${f3(gg)}</td><td class="mono" style="color:var(--text-muted);border-right:2px solid var(--border)">${mt!=null?Math.round(mt)+' kg':'—'}</td>`;
-  };
-  const sinRaza=pesadas.filter(x=>!x.raza).length;
-  html+=`<div class="kpi-group-label">📈 Curva de crecimiento por edad (todas las pesadas)</div>
-  <div class="table-wrap" style="margin-bottom:.4rem"><table><thead>
-    <tr><th rowspan="2">Edad</th><th colspan="4">Holstein</th><th colspan="4">Jersey</th></tr>
-    <tr><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th><th>Meta</th><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th><th>Meta</th></tr></thead><tbody>`+
-    curva.map(m=>{const it=bins[m];
-      return `<tr><td style="font-weight:600">${m} mes${m===1?'':'es'}</td>${cel(it,'H',m)}${cel(it,'J',m)}</tr>`;}).join('')+
-  '</tbody></table></div>'+
-  (sinRaza?`<p style="font-size:.78rem;color:var(--text-muted);margin-bottom:1.5rem">${sinRaza} pesadas sin raza (arete no está en partos) — cuentan en los KPIs generales pero no en la curva.</p>`:'<div style="margin-bottom:1.5rem"></div>');
 
   // ---- Cumplimiento individual por etapa
   // LECHE: 2 pesadas (~65d y ~90d), de 30 a 104 días — junta pesajes_crianza (1ª/2ª) + MEDIR.
