@@ -3648,7 +3648,7 @@ function renderClinActivas(){
         <td class="mono">${fmtFecha(e.fecha_alta)}</td>
         <td class="mono" style="text-align:center">${dias}d</td>
         <td style="font-size:.82rem">${e.comentario||'—'}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteClinEvento(${e.id})">🗑</button></td>
+        <td style="white-space:nowrap"><button class="btn btn-secondary btn-sm" title="Editar fecha de alta" onclick="editarAlta(${e.id},'${e.fecha_alta}','${e.fecha_inicio}')">✏️</button> <button class="btn btn-danger btn-sm" onclick="deleteClinEvento(${e.id})">🗑</button></td>
       </tr>`;
     }).join('');
   }
@@ -4310,6 +4310,22 @@ async function darAlta(id){
   if(!fecha) return;
   const iso = ddmmToISO(fecha);
   if(!iso){alert('Fecha inválida');return;}
+  await sbClin(`clin_eventos?id=eq.${id}`,'PATCH',{fecha_alta:iso});
+  await loadClinActivas();
+}
+
+async function editarAlta(id,actual,inicio){
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  const fecha=prompt('Nueva fecha de alta (DD/MM/YYYY).\nDéjala vacía para regresar la becerra a tratamiento activo.',isoToDDMM(actual));
+  if(fecha===null) return;
+  if(!fecha.trim()){
+    if(!confirm('¿Quitar el alta y regresarla a tratamiento activo?')) return;
+    await sbClin(`clin_eventos?id=eq.${id}`,'PATCH',{fecha_alta:null});
+    await loadClinActivas(); return;
+  }
+  const iso=ddmmToISO(fecha);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(iso)||isNaN(new Date(iso+'T12:00:00'))){alert('Fecha inválida. Usa DD/MM/YYYY');return;}
+  if(inicio&&iso<inicio){alert('La fecha de alta no puede ser antes del inicio ('+isoToDDMM(inicio)+').');return;}
   await sbClin(`clin_eventos?id=eq.${id}`,'PATCH',{fecha_alta:iso});
   await loadClinActivas();
 }
