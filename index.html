@@ -495,7 +495,7 @@
       <div id="gdp-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
 
       <!-- Tabla por semana -->
-      <div class="kpi-group-label">📅 GDP por Lote Mensual de Nacimiento</div>
+      <div class="kpi-group-label">📅 Etapa leche — GDP por Lote Mensual de Nacimiento</div>
       <div class="table-wrap">
         <table id="gdp-semana-table">
           <thead>
@@ -509,9 +509,6 @@
               <th>2ª Pesada<br><small>Días prom.</small></th>
               <th>2ª Pesada<br><small>Peso prom.</small></th>
               <th>ADG 2ª<br><small>vs 1ª</small></th>
-              <th>3ª Pesada<br><small>Días prom.</small></th>
-              <th>3ª Pesada<br><small>Peso prom.</small></th>
-              <th>ADG 3ª<br><small>vs 2ª</small></th>
             </tr>
           </thead>
           <tbody id="gdp-semana-body">
@@ -2123,9 +2120,6 @@ function renderDashGDP(){
       <td class="mono">${d2s.length?Math.round(avg(d2s))+'d':'—'}</td>
       <td class="mono">${p2s.length?avg(p2s).toFixed(1)+' kg':'—'}</td>
       <td class="mono ${adgClass(pA2)}">${fmtADG(pA2)}</td>
-      <td class="mono">${d3s.length?Math.round(avg(d3s))+'d':'—'}</td>
-      <td class="mono">${p3s.length?avg(p3s).toFixed(1)+' kg':'—'}</td>
-      <td class="mono ${adgClass(pA3)}">${fmtADG(pA3)}</td>
     </tr>`;
   }).join('');
   renderDesarrollo();
@@ -2318,7 +2312,7 @@ function renderDesarrollo(){
       x.meta=meta; x.pctMeta=meta?x.peso/meta*100:null;
       pesadas.push(x);
     });
-    animales.push({hembra:h,raza,ps,ult:ps[ps.length-1]});
+    animales.push({hembra:h,raza,nac:nacISO,ps,ult:ps[ps.length-1]});
   });
 
   if(!pesadas.length){cont.innerHTML='<div class="kpi-group-label">📏 Desarrollo mensual</div><p style="color:var(--text-muted)">Sin pesadas para el filtro seleccionado.</p>';return;}
@@ -2363,7 +2357,42 @@ function renderDesarrollo(){
   const conMeta=actuales.filter(a=>a.ult.pctMeta!=null);
   const enMeta=conMeta.filter(a=>a.ult.pctMeta>=95).length;
 
-  let html='<div class="kpi-group-label">📏 Desarrollo mensual — pesadas MEDIR</div>';
+  let html='';
+  // ---- Desarrollo por lote mensual de nacimiento
+  // Cada pesada MEDIR (≥105 días) se asigna a su pesada del programa según la edad; si hay 2 en la misma, se toma la primera.
+  const BANDAS=[{lbl:'4 meses',min:105,max:137},{lbl:'5 meses',min:138,max:167},{lbl:'6 meses',min:168,max:243},{lbl:'10 meses',min:244,max:327},{lbl:'11-12 meses',min:328,max:430}];
+  const mesesNL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const lotesD={};
+  animales.forEach(a=>{
+    if(!a.nac) return;
+    const pb=BANDAS.map(b=>a.ps.find(x=>x.dias>=b.min&&x.dias<=b.max)||null);
+    if(!pb.some(Boolean)) return;
+    const k=a.nac.slice(0,7); (lotesD[k]=lotesD[k]||[]).push({a,pb});
+  });
+  const kLotes=Object.keys(lotesD).sort();
+  html+=`<div class="kpi-group-label" style="margin-top:.5rem">📅 Etapa desarrollo — Peso y GDP por Lote Mensual de Nacimiento</div>
+  <div class="table-wrap" style="margin-bottom:.4rem"><table><thead>
+    <tr><th rowspan="2">Lote</th><th rowspan="2">Becerras</th><th rowspan="2">Aretes</th>${BANDAS.map(b=>`<th colspan="2" style="text-align:center">${b.lbl}</th>`).join('')}</tr>
+    <tr>${BANDAS.map(()=>'<th>Peso prom<br><small>(días · n)</small></th><th>GDP<br><small>vs anterior</small></th>').join('')}</tr>
+  </thead><tbody>`+
+  (kLotes.length?kLotes.map(k=>{
+    const it=lotesD[k]; const [y,m]=k.split('-');
+    const ar=it.map(e=>parseInt(e.a.hembra)).sort((x,z)=>x-z);
+    return `<tr><td style="font-weight:600;white-space:nowrap">${mesesNL[parseInt(m)-1]} ${y}</td><td class="mono" style="text-align:center">${it.length}</td>
+      <td style="font-size:.75rem;white-space:nowrap">${ar[0]} – ${ar[ar.length-1]}</td>`+
+      BANDAS.map((b,i)=>{
+        const xs=it.map(e=>e.pb[i]).filter(Boolean);
+        if(!xs.length) return '<td class="mono">—</td><td class="mono" style="border-right:1px solid var(--border)">—</td>';
+        const p=avg(xs.map(x=>x.peso)), d=avg(xs.map(x=>x.dias));
+        const pm=xs.filter(x=>x.pctMeta!=null).map(x=>x.pctMeta); const pmA=pm.length?avg(pm):null;
+        const g=xs.filter(x=>x.gdp!=null).map(x=>x.gdp); const gA=g.length?avg(g):null;
+        return `<td class="mono ${pctClass(pmA)}" title="${pmA!=null?Math.round(pmA)+'% de meta':''}">${f1(p)} <small style="color:var(--text-muted)">(${Math.round(d)}d · ${xs.length})</small></td>
+          <td class="mono ${adgClass(gA)}" style="border-right:1px solid var(--border)">${f3(gA)}</td>`;
+      }).join('')+'</tr>';
+  }).join(''):'<tr><td colspan="13" class="empty">Sin pesadas de desarrollo.</td></tr>')+
+  `</tbody></table></div><p style="font-size:.76rem;color:var(--text-muted);margin-bottom:1.5rem">Color del peso = % vs meta de su raza (verde ≥95%, naranja 85–95%, rojo &lt;85%). Rangos de edad: 4m 105–137d · 5m 138–167d · 6m 168–243d · 10m 244–327d · 11-12m 328–430d.</p>`;
+
+  html+='<div class="kpi-group-label">📏 Desarrollo mensual — pesadas MEDIR</div>';
   html+='<div class="kpi-grid" style="margin-bottom:1rem">'+
     kpiCard(`Pesadas ${mesLbl(ultMes)}`,rU.n,'',rU.rango+delta(rU.n,rP&&rP.n,0),'',false)+
     kpiCard(`GDP prom ${mesLbl(ultMes)}`,rU.gdp!=null?`<span class="${adgClass(rU.gdp)}">${rU.gdp.toFixed(3)} kg/día</span>`:'—','',`vs pesada anterior · ${rU.nG} animales`+delta(rU.gdp,rP&&rP.gdp,3),'',false)+
