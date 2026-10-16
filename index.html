@@ -224,6 +224,7 @@
     <button onclick="showTab('dash-morbilidad',this)">🏥 Morbilidad</button>
     <button onclick="showTab('dash-leche',this)">🥛 KPIs Leche</button>
     <button onclick="showTab('resumen-semanal',this)">📋 Resumen Semanal</button>
+    <button onclick="showTab('dash-machos',this)">🐂 Desarrollo Machos</button>
     <button onclick="showTab('inventario',this)">🐮 Inventario</button>
     <div class="nav-sep"></div>
     <button onclick="showTab('reg-partos',this)">🐄 Registro Partos</button>
@@ -518,8 +519,24 @@
           </tbody>
         </table>
       </div>
+
+      <!-- Desarrollo mensual (pesadas MEDIR) -->
+      <div id="gdp-desarrollo-section" style="margin-top:2rem"></div>
     </div>
 
+
+    <!-- ===== DESARROLLO MACHOS ===== -->
+    <div id="tab-dash-machos" class="hidden">
+      <div class="section-header">
+        <span class="section-title">🐂 Desarrollo Machos <span style="font-size:.8rem;font-weight:400;color:var(--text-muted)">(aretes 20000+)</span></span>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+          <label style="font-size:.85rem;color:var(--text-muted)">Corral:</label>
+          <select id="mach-corral" onchange="renderMachos()" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem"><option value="">Todos</option></select>
+          <label style="font-size:.85rem;color:var(--text-muted)"><input type="checkbox" id="mach-actuales" checked onchange="renderMachos()"/> Solo pesados en el último mes</label>
+        </div>
+      </div>
+      <div id="machos-section"><p style="color:var(--text-muted)">Cargando...</p></div>
+    </div>
 
     <!-- ===== INVENTARIO ===== -->
     <div id="tab-inventario" class="hidden">
@@ -609,6 +626,9 @@
           <button class="btn btn-secondary" onclick="document.getElementById('importPesajesFile').click()">📥 Importar Excel/CSV</button>
           <input type="file" id="importPesajesFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importPesajes(event)"/>
           <button class="btn btn-primary" onclick="openPesajeModal()">+ Nuevo Pesaje</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('importDesarrolloFile').click()">📥 Importar Desarrollo (MEDIR)</button>
+          <input type="file" id="importDesarrolloFile" accept=".csv,.xlsx,.xls" class="hidden" onchange="importDesarrollo(event)"/>
+          <span id="ultimo-desarrollo" style="font-size:.82rem;color:var(--text-muted)"></span>
         </div>
       </div>
       <div class="table-wrap">
@@ -1055,7 +1075,7 @@ function launchApp(u){
   const dias=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   const hFecha=document.getElementById('headerFecha');
   if(hFecha) hFecha.textContent=`${dias[hoy.getDay()]} ${dd}/${mm}/${yyyy}`;
-  loadPartos(); loadPesajes();
+  loadPartos(); loadPesajes(); loadDesarrollo();
   // Show dashboard tab
   aplicarModoMovil();
   if(esModoMovil()){
@@ -1109,7 +1129,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','dash-morbilidad','dash-leche','resumen-semanal','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','leche','calfexpert','ficha-animal'].forEach(t=>{
+  ['dashboard','dash-gdp','dash-machos','dash-morbilidad','dash-leche','resumen-semanal','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','leche','calfexpert','ficha-animal'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -1127,6 +1147,9 @@ function showTab(tab,btn){
   if(tab==='leche') loadLeche();
   if(tab==='refractometria') loadRefractometria();
   if(tab==='calfexpert') loadCalfExpertVivo();
+  if(tab==='dash-machos'){
+    if(!window._desarrollo) loadDesarrollo().then(()=>renderMachos()); else renderMachos();
+  }
   if(tab==='dash-gdp'){
     const needPesajes=!window._pesajes||!window._pesajes.length;
     const needPartos=!window._partos||!window._partos.length;
@@ -2103,6 +2126,399 @@ function renderDashGDP(){
       <td class="mono ${adgClass(pA3)}">${fmtADG(pA3)}</td>
     </tr>`;
   }).join('');
+  renderDesarrollo();
+}
+
+
+// ==================== DESARROLLO MENSUAL (MEDIR) ====================
+// Tabla pesajes_desarrollo: hembra, fecha, peso, altura, corral, edad_dias
+// Import acumulativo: se puede subir el archivo completo cada mes; lo repetido (arete+fecha+peso) se omite.
+// Curva meta peso (kg) por días de edad — Holstein ~350 kg y Jersey ~245 kg a 12 meses
+const DES_META={
+  H:[[0,42],[60,85],[90,110],[120,136],[180,191],[270,268],[365,350],[425,385]],
+  J:[[0,27],[60,55],[90,72],[120,90],[180,128],[270,182],[365,245],[425,272]]
+};
+const DES_ARETE_MIN=4611; // hembras nacidas antes (aretes < 4611) no se importan ni se cuentan
+const DES_GDP_MIN=-0.5, DES_GDP_MAX=2.5; // fuera de este rango = dato sospechoso (se excluye de promedios)
+
+async function loadDesarrollo(){
+  let all=[], from=0;
+  while(true){
+    const url=`${SUPABASE_URL}/rest/v1/pesajes_desarrollo?select=*&order=fecha.asc,id.asc`;
+    const res=await fetch(url,{headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Range':`${from}-${from+4999}`}});
+    if(!res.ok){console.error('pesajes_desarrollo',await res.text());break;}
+    const chunk=await res.json();
+    all=all.concat(chunk);
+    if(chunk.length<5000) break;
+    from+=5000;
+  }
+  window._desarrollo=all;
+  const el=document.getElementById('ultimo-desarrollo');
+  if(el){
+    const ult=all.length?all.reduce((m,r)=>r.fecha>m?r.fecha:m,''):null;
+    el.textContent=all.length?`Desarrollo: ${all.length} pesadas | última ${fmtFecha(ult)}`:'Desarrollo: sin pesadas';
+  }
+  return all;
+}
+
+function mapDesarrolloRows(rows){
+  // Formato del sistema de hato: ID, LACT, CORR, Evento, EDAD, Fecha, Nota(peso o peso/altura)
+  if(!rows.length) return {ok:[],bad:0};
+  const keys=Object.keys(rows[0]).filter(k=>k!=='__row'&&k!=='__raw');
+  const norm=s=>String(s||'').trim().toUpperCase().replace(/[^A-Z]/g,'');
+  const idx=name=>{const i=keys.findIndex(k=>norm(k)===name);return i;};
+  const iID=idx('ID')>=0?idx('ID'):0, iCORR=idx('CORR')>=0?idx('CORR'):2, iEV=idx('EVENTO'),
+        iEDAD=idx('EDAD')>=0?idx('EDAD'):4, iF=idx('FECHA')>=0?idx('FECHA'):5, iN=idx('NOTA')>=0?idx('NOTA'):6;
+  const ok=[]; let bad=0, viejas=0;
+  rows.forEach(r=>{
+    const c=r.__row||[]; const raw=r.__raw||c;
+    const v=i=>i>=0&&c[i]!=null?String(c[i]).trim():'';
+    if(iEV>=0&&v(iEV)&&v(iEV).toUpperCase()!=='MEDIR'){bad++;return;}
+    const hembra=v(iID).replace(/\.0+$/,'');
+    const fecha=parseDateFlex(raw[iF]!=null?raw[iF]:c[iF]);
+    const nota=v(iN).replace(',','.');
+    const m=nota.match(/^(\d+(?:\.\d+)?)\s*(?:\/\s*(\d+(?:\.\d+)?))?/);
+    const peso=m?parseFloat(m[1]):null;
+    const altura=m&&m[2]?parseFloat(m[2]):null;
+    const edad=parseInt(v(iEDAD));
+    if(!hembra||!/^\d+$/.test(hembra)||!fecha||!peso||peso<=0){bad++;return;}
+    if(parseInt(hembra)<DES_ARETE_MIN){viejas++;return;}
+    ok.push({hembra,fecha,peso,altura,corral:v(iCORR)||null,edad_dias:isNaN(edad)?null:edad});
+  });
+  return {ok,bad,viejas};
+}
+
+async function importDesarrollo(event){
+  if(!await checkPass()){alert('Contraseña incorrecta');event.target.value='';return;}
+  const file=event.target.files[0]; if(!file) return; event.target.value='';
+  const rows=await readFile(file);
+  if(!rows.length){alert('Archivo vacío.');return;}
+  const {ok,bad,viejas}=mapDesarrolloRows(rows);
+  // Quitar repetidos dentro del mismo archivo
+  const k=r=>`${r.hembra}|${r.fecha}|${Number(r.peso)}`;
+  const seen=new Set(); const uniq=ok.filter(r=>{const kk=k(r); if(seen.has(kk)) return false; seen.add(kk); return true;});
+  // Quitar los que ya están en Supabase
+  const existentes=await loadDesarrollo();
+  const ya=new Set(existentes.map(k));
+  const nuevos=uniq.filter(r=>!ya.has(k(r)));
+  const fechas=nuevos.map(r=>r.fecha).sort();
+  const msg=`📏 Pesadas de desarrollo\n\n`+
+    `Filas en archivo: ${rows.length}\n`+
+    `Válidas: ${ok.length}${bad?`  (omitidas por formato: ${bad})`:''}\n`+
+    (viejas?`Omitidas aretes < ${DES_ARETE_MIN}: ${viejas}\n`:'')+
+    `Ya existían: ${uniq.length-nuevos.length}\n`+
+    `NUEVAS a importar: ${nuevos.length}`+
+    (nuevos.length?`\nRango: ${fmtFecha(fechas[0])} a ${fmtFecha(fechas[fechas.length-1])}`:'')+
+    (nuevos.length?`\n\n¿Importar?`:'');
+  if(!nuevos.length){alert(msg+'\n\nNada nuevo que importar.');return;}
+  if(!confirm(msg)) return;
+  let inserted=0, errors=0;
+  for(let i=0;i<nuevos.length;i+=500){
+    const batch=nuevos.slice(i,i+500);
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/pesajes_desarrollo?on_conflict=hembra,fecha,peso`,{method:'POST',headers:{
+      'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,
+      'Content-Type':'application/json','Prefer':'return=minimal,resolution=ignore-duplicates'
+    },body:JSON.stringify(batch)});
+    if(res.ok) inserted+=batch.length;
+    else{errors+=batch.length; console.error('Import desarrollo error',await res.text());}
+  }
+  if(errors) alert(`⚠️ ${inserted} importadas, ${errors} con error. Revisa consola (F12).`);
+  else alert(`✅ ${inserted} pesadas de desarrollo importadas.`);
+  await loadDesarrollo();
+  if(!document.getElementById('tab-dash-gdp').classList.contains('hidden')) renderDesarrollo();
+  if(!document.getElementById('tab-dash-machos').classList.contains('hidden')) renderMachos();
+}
+
+function desMeta(raza,dias){
+  const t=DES_META[raza]; if(!t||dias==null) return null;
+  if(dias<=t[0][0]) return t[0][1];
+  for(let i=1;i<t.length;i++){
+    if(dias<=t[i][0]){const [d0,k0]=t[i-1],[d1,k1]=t[i]; return k0+(k1-k0)*(dias-d0)/(d1-d0);}
+  }
+  const [d0,k0]=t[t.length-2],[d1,k1]=t[t.length-1];
+  return k1+(k1-k0)/(d1-d0)*(dias-d1);
+}
+
+function toggleDesList(id,btn){
+  const el=document.getElementById(id); if(!el) return;
+  const vis=el.style.display!=='none';
+  el.style.display=vis?'none':'block';
+  btn.textContent=btn.textContent.replace(vis?'▲':'▼',vis?'▼':'▲');
+}
+
+function renderDesarrollo(){
+  const cont=document.getElementById('gdp-desarrollo-section');
+  if(!cont) return;
+  if(!window._desarrollo){
+    cont.innerHTML='<div class="kpi-group-label">📏 Desarrollo mensual</div><p style="color:var(--text-muted)"><span class="spinner"></span> Cargando pesadas de desarrollo...</p>';
+    loadDesarrollo().then(()=>renderDesarrollo());
+    return;
+  }
+  const data=window._desarrollo.filter(r=>!esMachoDes(r.hembra)&&parseInt(r.hembra)>=DES_ARETE_MIN);
+  if(!data.length){
+    cont.innerHTML='<div class="kpi-group-label">📏 Desarrollo mensual</div><p style="color:var(--text-muted)">Sin pesadas de desarrollo. Impórtalas desde Registro Pesajes → 📥 Importar Desarrollo (MEDIR).</p>';
+    return;
+  }
+  const razaFilter=document.getElementById('gdp-raza').value;
+  const desde=document.getElementById('gdp-desde')?.value;
+  const hasta=document.getElementById('gdp-hasta')?.value;
+  const partoMap={};
+  (window._partos||[]).forEach(p=>{if(p.hembra) partoMap[String(p.hembra).trim()]=p;});
+  const DAY=86400000;
+  const toD=s=>new Date(s+'T12:00:00');
+  const iso=d=>d.toISOString().slice(0,10);
+
+  // Agrupar por arete; mismo día repetido -> promedio
+  const byH={};
+  data.forEach(r=>{
+    const h=String(r.hembra).trim();
+    (byH[h]=byH[h]||{});
+    const d=byH[h][r.fecha]=byH[h][r.fecha]||{fecha:r.fecha,pesos:[],corral:r.corral,edad:r.edad_dias,altura:r.altura};
+    d.pesos.push(parseFloat(r.peso));
+  });
+
+  const animales=[]; const pesadas=[];
+  Object.entries(byH).forEach(([h,fechas])=>{
+    const parto=partoMap[h];
+    const list=Object.values(fechas).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    // Fecha de nacimiento: partos; si no existe, fecha - EDAD del archivo
+    let nac=parto&&parto.fecha_parto?toD(parto.fecha_parto):null;
+    if(!nac){const f=list.find(x=>x.edad!=null); if(f) nac=new Date(toD(f.fecha)-f.edad*DAY);}
+    if(!nac) return;
+    const nacISO=iso(nac);
+    if(desde&&nacISO<desde) return;
+    if(hasta&&nacISO>hasta) return;
+    const raza=parto?parto.raza:null;
+    if(razaFilter&&raza!==razaFilter) return;
+    const ps=list.map((x,i)=>{
+      const peso=avg(x.pesos);
+      const dias=Math.round((toD(x.fecha)-nac)/DAY);
+      return {hembra:h,raza,fecha:x.fecha,mes:x.fecha.slice(0,7),peso,dias,corral:x.corral,dup:x.pesos.length>1};
+    });
+    ps.forEach((x,i)=>{
+      x.gdp=null; x.sosp=false;
+      if(i>0){
+        const pr=ps[i-1]; const dd=Math.round((toD(x.fecha)-toD(pr.fecha))/DAY);
+        if(dd>=7){
+          const g=(x.peso-pr.peso)/dd;
+          if(g<DES_GDP_MIN||g>DES_GDP_MAX){x.sosp=true; x.gdpRaw=g; x.prevPeso=pr.peso; x.prevFecha=pr.fecha;}
+          else x.gdp=g;
+        }
+      }
+      const meta=desMeta(raza,x.dias);
+      x.meta=meta; x.pctMeta=meta?x.peso/meta*100:null;
+      pesadas.push(x);
+    });
+    animales.push({hembra:h,raza,ps,ult:ps[ps.length-1]});
+  });
+
+  if(!pesadas.length){cont.innerHTML='<div class="kpi-group-label">📏 Desarrollo mensual</div><p style="color:var(--text-muted)">Sin pesadas para el filtro seleccionado.</p>';return;}
+
+  const adgClass=v=>v==null?'':v>=0.8?'gdp-ok':v>=0.6?'gdp-warn':'gdp-bad';
+  const pctClass=v=>v==null?'':v>=95?'gdp-ok':v>=85?'gdp-warn':'gdp-bad';
+  const f3=v=>v!=null?v.toFixed(3):'—';
+  const f1=v=>v!=null?v.toFixed(1):'—';
+  const mesesN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const mesLbl=k=>{const [y,m]=k.split('-');return `${mesesN[parseInt(m)-1]} ${y}`;};
+
+  // ---- Por mes de pesaje
+  const byMes={};
+  pesadas.forEach(x=>{(byMes[x.mes]=byMes[x.mes]||[]).push(x);});
+  const meses=Object.keys(byMes).sort().reverse();
+  const ultMes=meses[0];
+  const resumenMes=k=>{
+    const it=byMes[k];
+    const g=it.filter(x=>x.gdp!=null).map(x=>x.gdp);
+    const pm=it.filter(x=>x.pctMeta!=null).map(x=>x.pctMeta);
+    const fechas=it.map(x=>x.fecha).sort();
+    return {
+      n:new Set(it.map(x=>x.hembra)).size, edad:avg(it.map(x=>x.dias)), peso:avg(it.map(x=>x.peso)),
+      gdp:g.length?avg(g):null, nG:g.length,
+      ok:g.length?g.filter(v=>v>=0.8).length/g.length*100:null,
+      bajo:g.length?g.filter(v=>v<0.6).length/g.length*100:null,
+      pm:pm.length?avg(pm):null, sosp:it.filter(x=>x.sosp).length,
+      rango:`${fmtFecha(fechas[0])} – ${fmtFecha(fechas[fechas.length-1])}`
+    };
+  };
+  const rU=resumenMes(ultMes);
+  const rP=meses[1]?resumenMes(meses[1]):null;
+  const delta=(a,b,dec)=>a!=null&&b!=null?` (${a-b>=0?'+':''}${(a-b).toFixed(dec)} vs ${mesLbl(meses[1])})`:'';
+
+  // ---- Rezagadas: última pesada dentro de 45 días de la pesada más reciente
+  const fechaMax=pesadas.reduce((m,x)=>x.fecha>m?x.fecha:m,'');
+  const limite=iso(new Date(toD(fechaMax)-45*DAY));
+  const actuales=animales.filter(a=>a.ult.fecha>=limite);
+  const rezagadas=actuales.filter(a=>(a.ult.pctMeta!=null&&a.ult.pctMeta<85)||(a.ult.gdp!=null&&a.ult.gdp<0.5))
+    .sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+  const sospechosas=pesadas.filter(x=>x.sosp).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)||a.fecha.localeCompare(b.fecha));
+  const conMeta=actuales.filter(a=>a.ult.pctMeta!=null);
+  const enMeta=conMeta.filter(a=>a.ult.pctMeta>=95).length;
+
+  let html='<div class="kpi-group-label">📏 Desarrollo mensual — pesadas MEDIR</div>';
+  html+='<div class="kpi-grid" style="margin-bottom:1rem">'+
+    kpiCard(`Pesadas ${mesLbl(ultMes)}`,rU.n,'',rU.rango+delta(rU.n,rP&&rP.n,0),'',false)+
+    kpiCard(`GDP prom ${mesLbl(ultMes)}`,rU.gdp!=null?`<span class="${adgClass(rU.gdp)}">${rU.gdp.toFixed(3)} kg/día</span>`:'—','',`vs pesada anterior · ${rU.nG} animales`+delta(rU.gdp,rP&&rP.gdp,3),'',false)+
+    kpiCard('% con GDP ≥ 0.8',rU.ok!=null?Math.round(rU.ok)+'%':'—','',rU.bajo!=null?`${Math.round(rU.bajo)}% bajo 0.6 kg/día`:'','',false)+
+    kpiCard('Peso vs meta (prom)',rU.pm!=null?`<span class="${pctClass(rU.pm)}">${Math.round(rU.pm)}%</span>`:'—','','Meta 12 meses: H 350 kg · J 245 kg','',false)+
+    kpiCard('En meta (≥95%)',conMeta.length?`${enMeta} de ${conMeta.length}`:'—','',conMeta.length?`${Math.round(enMeta/conMeta.length*100)}% de las pesadas actuales con raza`:'','',false)+
+    kpiCard('Rezagadas',rezagadas.length,'','<85% de meta o GDP último <0.5','',false)+
+  '</div>';
+
+  // Tabla por mes de pesaje
+  html+=`<div class="kpi-group-label">📅 Evolución por mes de pesaje</div>
+  <div class="table-wrap" style="margin-bottom:1.5rem"><table><thead><tr>
+    <th>Mes</th><th>Animales</th><th>Edad prom</th><th>Peso prom</th><th>GDP prom<br><small>vs anterior</small></th>
+    <th>% ≥0.8</th><th>% &lt;0.6</th><th>Peso vs meta</th><th>Sospechosos</th></tr></thead><tbody>`+
+    meses.map(k=>{const r=resumenMes(k);return `<tr>
+      <td style="font-weight:600">${mesLbl(k)}</td><td class="mono">${r.n}</td>
+      <td class="mono">${Math.round(r.edad)}d</td><td class="mono">${f1(r.peso)} kg</td>
+      <td class="mono ${adgClass(r.gdp)}">${f3(r.gdp)}</td>
+      <td class="mono">${r.ok!=null?Math.round(r.ok)+'%':'—'}</td>
+      <td class="mono">${r.bajo!=null?Math.round(r.bajo)+'%':'—'}</td>
+      <td class="mono ${pctClass(r.pm)}">${r.pm!=null?Math.round(r.pm)+'%':'—'}</td>
+      <td class="mono">${r.sosp||''}</td></tr>`;}).join('')+
+  '</tbody></table></div>';
+
+  // Curva por mes de edad y raza
+  const bins={};
+  pesadas.forEach(x=>{const m=Math.floor(x.dias/30.4); if(m<0) return; (bins[m]=bins[m]||[]).push(x);});
+  const curva=Object.keys(bins).map(Number).sort((a,b)=>a-b).filter(m=>bins[m].length>=3);
+  const cel=(it,raza)=>{
+    const s=it.filter(x=>x.raza===raza); if(!s.length) return '<td class="mono">—</td><td class="mono">—</td><td class="mono">—</td>';
+    const p=avg(s.map(x=>x.peso)); const mt=desMeta(raza,avg(s.map(x=>x.dias))); const pc=mt?p/mt*100:null;
+    const g=s.filter(x=>x.gdp!=null).map(x=>x.gdp); const gg=g.length?avg(g):null;
+    return `<td class="mono">${f1(p)} <small style="color:var(--text-muted)">(${s.length})</small></td><td class="mono ${pctClass(pc)}">${pc!=null?Math.round(pc)+'%':'—'}</td><td class="mono ${adgClass(gg)}">${f3(gg)}</td>`;
+  };
+  const sinRaza=pesadas.filter(x=>!x.raza).length;
+  html+=`<div class="kpi-group-label">📈 Curva de crecimiento por edad (todas las pesadas)</div>
+  <div class="table-wrap" style="margin-bottom:.4rem"><table><thead>
+    <tr><th rowspan="2">Edad</th><th colspan="3">Holstein</th><th colspan="3">Jersey</th><th rowspan="2">Meta H</th><th rowspan="2">Meta J</th></tr>
+    <tr><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th></tr></thead><tbody>`+
+    curva.map(m=>{const it=bins[m]; const dm=(m+0.5)*30.4;
+      return `<tr><td style="font-weight:600">${m} mes${m===1?'':'es'}</td>${cel(it,'H')}${cel(it,'J')}
+      <td class="mono" style="color:var(--text-muted)">${Math.round(desMeta('H',dm))} kg</td>
+      <td class="mono" style="color:var(--text-muted)">${Math.round(desMeta('J',dm))} kg</td></tr>`;}).join('')+
+  '</tbody></table></div>'+
+  (sinRaza?`<p style="font-size:.78rem;color:var(--text-muted);margin-bottom:1.5rem">${sinRaza} pesadas sin raza (arete no está en partos) — cuentan en los KPIs generales pero no en la curva.</p>`:'<div style="margin-bottom:1.5rem"></div>');
+
+  // Rezagadas
+  html+=`<button class="btn btn-secondary btn-sm" style="margin-bottom:.5rem" onclick="toggleDesList('des-rezagadas',this)">⚠️ Rezagadas (${rezagadas.length}) ▼</button>
+  <div id="des-rezagadas" style="display:none;margin-bottom:1rem"><div class="table-wrap"><table><thead><tr>
+    <th>Arete</th><th>Raza</th><th>Corral</th><th>Últ. pesada</th><th>Edad</th><th>Peso</th><th>Meta</th><th>% meta</th><th>GDP último</th></tr></thead><tbody>`+
+    (rezagadas.length?rezagadas.map(a=>{const u=a.ult;return `<tr>
+      <td class="mono" style="font-weight:600">${a.hembra}</td><td class="mono">${a.raza||'—'}</td><td class="mono">${u.corral||'—'}</td>
+      <td class="mono">${fmtFecha(u.fecha)}</td><td class="mono">${u.dias}d</td><td class="mono">${f1(u.peso)} kg</td>
+      <td class="mono">${u.meta!=null?Math.round(u.meta)+' kg':'—'}</td>
+      <td class="mono ${pctClass(u.pctMeta)}">${u.pctMeta!=null?Math.round(u.pctMeta)+'%':'—'}</td>
+      <td class="mono ${adgClass(u.gdp)}">${f3(u.gdp)}</td></tr>`;}).join(''):'<tr><td colspan="9" class="empty">Ninguna 🎉</td></tr>')+
+  '</tbody></table></div></div>';
+
+  // Sospechosas
+  html+=`<br><button class="btn btn-secondary btn-sm" style="margin-bottom:.5rem" onclick="toggleDesList('des-sospechosas',this)">🔎 Datos sospechosos excluidos (${sospechosas.length}) ▼</button>
+  <div id="des-sospechosas" style="display:none"><p style="font-size:.78rem;color:var(--text-muted)">GDP fuera de ${DES_GDP_MIN} a ${DES_GDP_MAX} kg/día contra la pesada anterior. Probable error de captura; no entran a los promedios de GDP.</p>
+  <div class="table-wrap"><table><thead><tr><th>Arete</th><th>Pesada anterior</th><th>Pesada</th><th>GDP calculado</th></tr></thead><tbody>`+
+    (sospechosas.length?sospechosas.map(x=>`<tr><td class="mono" style="font-weight:600">${x.hembra}</td>
+      <td class="mono">${fmtFecha(x.prevFecha)} · ${f1(x.prevPeso)} kg</td>
+      <td class="mono">${fmtFecha(x.fecha)} · ${f1(x.peso)} kg${x.dup?' <small>(prom. doble captura)</small>':''}</td>
+      <td class="mono gdp-bad">${x.gdpRaw.toFixed(3)}</td></tr>`).join(''):'<tr><td colspan="4" class="empty">Ninguno</td></tr>')+
+  '</tbody></table></div></div>';
+
+  cont.innerHTML=html;
+}
+
+// ==================== DESARROLLO MACHOS (aretes 20000+) ====================
+function esMachoDes(h){ const n=parseInt(h); return !isNaN(n)&&n>=20000; }
+
+function renderMachos(){
+  const cont=document.getElementById('machos-section');
+  if(!cont) return;
+  const DAY=86400000, toD=s=>new Date(s+'T12:00:00'), iso=d=>d.toISOString().slice(0,10);
+  const data=(window._desarrollo||[]).filter(r=>esMachoDes(r.hembra));
+  if(!data.length){cont.innerHTML='<p style="color:var(--text-muted)">Sin pesadas de machos. Se cargan con el mismo import de Registro Pesajes → 📥 Importar Desarrollo (MEDIR).</p>';return;}
+
+  // Llenar filtro de corral (con el corral de la última pesada)
+  const sel=document.getElementById('mach-corral'); const corralSel=sel.value;
+  const adgClass=v=>v==null?'':v>=0.8?'gdp-ok':v>=0.6?'gdp-warn':'gdp-bad';
+  const f3=v=>v!=null?v.toFixed(3):'—', f1=v=>v!=null?v.toFixed(1):'—';
+  const mesesN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const mesLbl=k=>{const [y,m]=k.split('-');return `${mesesN[parseInt(m)-1]} ${y}`;};
+
+  // Agrupar por arete; mismo día repetido -> promedio
+  const byH={};
+  data.forEach(r=>{
+    const h=String(r.hembra).trim(); byH[h]=byH[h]||{};
+    const d=byH[h][r.fecha]=byH[h][r.fecha]||{fecha:r.fecha,pesos:[],corral:r.corral,edad:r.edad_dias};
+    d.pesos.push(parseFloat(r.peso));
+  });
+  const animales=[], pesadas=[];
+  Object.entries(byH).forEach(([h,f])=>{
+    const list=Object.values(f).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+    const ref=list.find(x=>x.edad!=null);
+    const nac=ref?new Date(toD(ref.fecha)-ref.edad*DAY):null;
+    const ps=list.map(x=>({hembra:h,fecha:x.fecha,mes:x.fecha.slice(0,7),peso:avg(x.pesos),corral:x.corral,
+      dias:nac?Math.round((toD(x.fecha)-nac)/DAY):x.edad}));
+    ps.forEach((x,i)=>{
+      x.gdp=null; x.sosp=false;
+      if(i>0){const pr=ps[i-1], dd=Math.round((toD(x.fecha)-toD(pr.fecha))/DAY);
+        if(dd>=7){const g=(x.peso-pr.peso)/dd; if(g<DES_GDP_MIN||g>DES_GDP_MAX) x.sosp=true; else x.gdp=g;}}
+      pesadas.push(x);
+    });
+    const p0=ps[0], u=ps[ps.length-1], dTot=Math.round((toD(u.fecha)-toD(p0.fecha))/DAY);
+    const gTot=ps.length>1&&dTot>0?(u.peso-p0.peso)/dTot:null;
+    animales.push({hembra:h,nac:nac?iso(nac):null,ps,p0,ult:u,gTot:(gTot!=null&&gTot>=DES_GDP_MIN&&gTot<=DES_GDP_MAX)?gTot:null});
+  });
+
+  const corrales=[...new Set(animales.map(a=>a.ult.corral).filter(Boolean))].sort((a,b)=>parseInt(a)-parseInt(b));
+  sel.innerHTML='<option value="">Todos</option>'+corrales.map(c=>`<option value="${c}"${c===corralSel?' selected':''}>${c}</option>`).join('');
+
+  const fechaMax=pesadas.reduce((m,x)=>x.fecha>m?x.fecha:m,'');
+  const limite=iso(new Date(toD(fechaMax)-45*DAY));
+  const soloAct=document.getElementById('mach-actuales').checked;
+  const lista=animales.filter(a=>(!corralSel||a.ult.corral===corralSel)&&(!soloAct||a.ult.fecha>=limite))
+    .sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+  const setH=new Set(lista.map(a=>a.hembra));
+  const pesF=pesadas.filter(x=>setH.has(x.hembra));
+
+  // Por mes de pesaje (de los machos en la lista)
+  const byMes={}; pesF.forEach(x=>{(byMes[x.mes]=byMes[x.mes]||[]).push(x);});
+  const meses=Object.keys(byMes).sort().reverse();
+  const res=k=>{const it=byMes[k], g=it.filter(x=>x.gdp!=null).map(x=>x.gdp);
+    return {n:new Set(it.map(x=>x.hembra)).size, edad:avg(it.map(x=>x.dias).filter(v=>v!=null)), peso:avg(it.map(x=>x.peso)),
+      gdp:g.length?avg(g):null, nG:g.length, ok:g.length?g.filter(v=>v>=0.8).length/g.length*100:null,
+      bajo:g.length?g.filter(v=>v<0.6).length/g.length*100:null, sosp:it.filter(x=>x.sosp).length};};
+  const rU=meses[0]?res(meses[0]):null, rP=meses[1]?res(meses[1]):null;
+  const delta=(a,b,dec)=>a!=null&&b!=null?` (${a-b>=0?'+':''}${(a-b).toFixed(dec)} vs ${mesLbl(meses[1])})`:'';
+  const gTots=lista.filter(a=>a.gTot!=null).map(a=>a.gTot);
+
+  let html='<div class="kpi-group-label">📊 Indicadores</div><div class="kpi-grid" style="margin-bottom:1.5rem">'+
+    kpiCard('Machos en lista',lista.length,'',soloAct?`pesados desde ${fmtFecha(limite)}`:'todos los registrados','',false)+
+    (rU?kpiCard(`GDP prom ${mesLbl(meses[0])}`,rU.gdp!=null?`<span class="${adgClass(rU.gdp)}">${rU.gdp.toFixed(3)} kg/día</span>`:'—','',`vs pesada anterior · ${rU.nG} machos`+delta(rU.gdp,rP&&rP.gdp,3),'',false):'')+
+    (rU?kpiCard('% con GDP ≥ 0.8',rU.ok!=null?Math.round(rU.ok)+'%':'—','',rU.bajo!=null?`${Math.round(rU.bajo)}% bajo 0.6 kg/día`:'','',false):'')+
+    (rU?kpiCard(`Peso prom ${mesLbl(meses[0])}`,f1(rU.peso)+' kg','',rU.edad!=null?`edad prom ${Math.round(rU.edad)}d`:'','',false):'')+
+    kpiCard('GDP acumulado (prom)',gTots.length?`<span class="${adgClass(avg(gTots))}">${avg(gTots).toFixed(3)} kg/día</span>`:'—','','de la 1ª a la última pesada','',false)+
+  '</div>';
+
+  html+=`<div class="kpi-group-label">📅 Evolución por mes de pesaje</div>
+  <div class="table-wrap" style="margin-bottom:1.5rem"><table><thead><tr>
+    <th>Mes</th><th>Machos</th><th>Edad prom</th><th>Peso prom</th><th>GDP prom<br><small>vs anterior</small></th><th>% ≥0.8</th><th>% &lt;0.6</th><th>Sospechosos</th></tr></thead><tbody>`+
+    (meses.length?meses.map(k=>{const r=res(k);return `<tr><td style="font-weight:600">${mesLbl(k)}</td><td class="mono">${r.n}</td>
+      <td class="mono">${r.edad!=null?Math.round(r.edad)+'d':'—'}</td><td class="mono">${f1(r.peso)} kg</td>
+      <td class="mono ${adgClass(r.gdp)}">${f3(r.gdp)}</td><td class="mono">${r.ok!=null?Math.round(r.ok)+'%':'—'}</td>
+      <td class="mono">${r.bajo!=null?Math.round(r.bajo)+'%':'—'}</td><td class="mono">${r.sosp||''}</td></tr>`;}).join(''):'<tr><td colspan="8" class="empty">Sin datos</td></tr>')+
+  '</tbody></table></div>';
+
+  html+=`<div class="kpi-group-label">🐂 Listado de machos (${lista.length})</div>
+  <div class="table-wrap"><table><thead><tr>
+    <th>Arete</th><th>Corral</th><th>Nacimiento<br><small>aprox.</small></th><th>Pesadas</th><th>1ª pesada</th><th>Últ. pesada</th><th>Edad</th><th>Último peso</th><th>GDP último</th><th>GDP acumulado</th></tr></thead><tbody>`+
+    (lista.length?lista.map(a=>{const u=a.ult;return `<tr>
+      <td class="mono" style="font-weight:600">${a.hembra}</td><td class="mono">${u.corral||'—'}</td>
+      <td class="mono">${a.nac?fmtFecha(a.nac):'—'}</td><td class="mono" style="text-align:center">${a.ps.length}</td>
+      <td class="mono">${fmtFecha(a.p0.fecha)} · ${f1(a.p0.peso)} kg</td><td class="mono">${fmtFecha(u.fecha)}</td>
+      <td class="mono">${u.dias!=null?u.dias+'d':'—'}</td><td class="mono">${f1(u.peso)} kg</td>
+      <td class="mono ${adgClass(u.gdp)}">${u.sosp?'<span class="gdp-bad">⚠️ revisar</span>':f3(u.gdp)}</td>
+      <td class="mono ${adgClass(a.gTot)}">${f3(a.gTot)}</td></tr>`;}).join(''):'<tr><td colspan="10" class="empty">Sin machos para el filtro.</td></tr>')+
+  '</tbody></table></div>';
+  cont.innerHTML=html;
 }
 
 function toggleP3(raza){
@@ -4891,6 +5307,8 @@ async function buscarFicha(){
       sbFetch(`pesajes_crianza?hembra=eq.${arete}&order=fecha.asc&limit=50`),
       sbClin(`clin_vacunas_aplicadas?hembra=eq.${arete}&order=fecha.desc&limit=50`)
     ]);
+    let desarrolloArr = [];
+    try{ const dv=await sbFetch(`pesajes_desarrollo?hembra=eq.${arete}&order=fecha.asc&limit=100`); if(Array.isArray(dv)) desarrolloArr=dv; }catch(e){}
     let eventosArr = [];
     try{ const ev=await sbClin(`clin_eventos?hembra=eq.${arete}&order=fecha_inicio.desc&limit=50`); if(Array.isArray(ev)) eventosArr=ev; }catch(e){}
 
@@ -4993,6 +5411,26 @@ async function buscarFicha(){
       html += `</tbody></table>`;
     }
 
+    // Pesadas de desarrollo (MEDIR mensual)
+    if(desarrolloArr.length){
+      html += `<div class="kpi-group-label">📏 Pesadas de Desarrollo (${desarrolloArr.length})</div>`;
+      html += `<table style="width:100%;font-size:.85rem;margin-bottom:1rem"><thead><tr style="background:var(--accent);color:#fff"><th style="padding:.4rem">Fecha</th><th>Edad</th><th>Corral</th><th>Peso (kg)</th><th>Altura</th><th>GDP vs anterior</th></tr></thead><tbody>`;
+      desarrolloArr.forEach((d,i)=>{
+        let gdp='—';
+        if(i>0){
+          const prev=desarrolloArr[i-1];
+          const dias=Math.round((new Date(d.fecha+'T12:00:00')-new Date(prev.fecha+'T12:00:00'))/86400000);
+          if(dias>0){
+            const g=(parseFloat(d.peso)-parseFloat(prev.peso))/dias;
+            const color=g>=0.8?'#2d6a4f':g>=0.6?'#c77800':'#c62828';
+            gdp=`<span style="color:${color};font-weight:600">${g.toFixed(3)} kg/d</span>`;
+          }
+        }
+        html += `<tr><td class="mono">${fmtFecha(d.fecha)}</td><td class="mono">${d.edad_dias!=null?d.edad_dias+'d':'—'}</td><td class="mono">${d.corral||'—'}</td><td class="mono">${d.peso}</td><td class="mono">${d.altura!=null?d.altura:'—'}</td><td>${gdp}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+    }
+
     // Vacunas
     if(vacunasArr.length){
       html += `<div class="kpi-group-label">💉 Vacunas Aplicadas (${vacunasArr.length})</div>`;
@@ -5024,7 +5462,7 @@ async function buscarFicha(){
     }
 
     // Summary if nothing found at all
-    if(!parto && !salida && !pesajesArr.length && !vacunasArr.length && !eventosArr.length && !comoCria.length){
+    if(!parto && !salida && !pesajesArr.length && !desarrolloArr.length && !vacunasArr.length && !eventosArr.length && !comoCria.length){
       html += `<p style="color:var(--red);font-weight:600">No se encontró ningún dato para el arete ${arete}.</p>`;
     }
 
