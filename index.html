@@ -2384,20 +2384,18 @@ function renderDesarrollo(){
   pesadas.forEach(x=>{const m=Math.floor(x.dias/30.4); if(m<0) return; (bins[m]=bins[m]||[]).push(x);});
   const curva=Object.keys(bins).map(Number).sort((a,b)=>a-b).filter(m=>bins[m].length>=3);
   const cel=(it,raza)=>{
-    const s=it.filter(x=>x.raza===raza); if(!s.length) return '<td class="mono">—</td><td class="mono">—</td><td class="mono">—</td>';
+    const s=it.filter(x=>x.raza===raza); if(!s.length) return '<td class="mono">—</td><td class="mono">—</td><td class="mono">—</td><td class="mono">—</td>';
     const p=avg(s.map(x=>x.peso)); const mt=desMeta(raza,avg(s.map(x=>x.dias))); const pc=mt?p/mt*100:null;
     const g=s.filter(x=>x.gdp!=null).map(x=>x.gdp); const gg=g.length?avg(g):null;
-    return `<td class="mono">${f1(p)} <small style="color:var(--text-muted)">(${s.length})</small></td><td class="mono ${pctClass(pc)}">${pc!=null?Math.round(pc)+'%':'—'}</td><td class="mono ${adgClass(gg)}">${f3(gg)}</td>`;
+    return `<td class="mono">${f1(p)} <small style="color:var(--text-muted)">(${s.length})</small></td><td class="mono ${pctClass(pc)}">${pc!=null?Math.round(pc)+'%':'—'}</td><td class="mono ${adgClass(gg)}">${f3(gg)}</td><td class="mono" style="color:var(--text-muted);border-right:2px solid var(--border)">${mt!=null?Math.round(mt)+' kg':'—'}</td>`;
   };
   const sinRaza=pesadas.filter(x=>!x.raza).length;
   html+=`<div class="kpi-group-label">📈 Curva de crecimiento por edad (todas las pesadas)</div>
   <div class="table-wrap" style="margin-bottom:.4rem"><table><thead>
-    <tr><th rowspan="2">Edad</th><th colspan="3">Holstein</th><th colspan="3">Jersey</th><th rowspan="2">Meta H</th><th rowspan="2">Meta J</th></tr>
-    <tr><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th></tr></thead><tbody>`+
-    curva.map(m=>{const it=bins[m]; const dm=(m+0.5)*30.4;
-      return `<tr><td style="font-weight:600">${m} mes${m===1?'':'es'}</td>${cel(it,'H')}${cel(it,'J')}
-      <td class="mono" style="color:var(--text-muted)">${Math.round(desMeta('H',dm))} kg</td>
-      <td class="mono" style="color:var(--text-muted)">${Math.round(desMeta('J',dm))} kg</td></tr>`;}).join('')+
+    <tr><th rowspan="2">Edad</th><th colspan="4">Holstein</th><th colspan="4">Jersey</th></tr>
+    <tr><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th><th>Meta</th><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th><th>Meta</th></tr></thead><tbody>`+
+    curva.map(m=>{const it=bins[m];
+      return `<tr><td style="font-weight:600">${m} mes${m===1?'':'es'}</td>${cel(it,'H')}${cel(it,'J')}</tr>`;}).join('')+
   '</tbody></table></div>'+
   (sinRaza?`<p style="font-size:.78rem;color:var(--text-muted);margin-bottom:1.5rem">${sinRaza} pesadas sin raza (arete no está en partos) — cuentan en los KPIs generales pero no en la curva.</p>`:'<div style="margin-bottom:1.5rem"></div>');
 
