@@ -2256,6 +2256,13 @@ function renderDesarrollo(){
     loadDesarrollo().then(()=>renderDesarrollo());
     return;
   }
+  if(!window._partosDes||!window._salidasDes){
+    Promise.all([
+      sbFetch('partos_crianza?select=hembra,sexo,raza,fecha_parto&order=fecha_parto.asc&limit=20000'),
+      sbFetch('salidas_crianza?select=hembra,fecha_salida&limit=20000')
+    ]).then(([pa,sa])=>{window._partosDes=Array.isArray(pa)?pa:[]; window._salidasDes=Array.isArray(sa)?sa:[]; renderDesarrollo();});
+    return;
+  }
   const data=window._desarrollo.filter(r=>!esMachoDes(r.hembra)&&parseInt(r.hembra)>=DES_ARETE_MIN);
   if(!data.length){
     cont.innerHTML='<div class="kpi-group-label">📏 Desarrollo mensual</div><p style="color:var(--text-muted)">Sin pesadas de desarrollo. Impórtalas desde Registro Pesajes → 📥 Importar Desarrollo (MEDIR).</p>';
@@ -2366,27 +2373,13 @@ function renderDesarrollo(){
     kpiCard('Rezagadas',rezagadas.length,'','<85% de meta o GDP último <0.5','',false)+
   '</div>';
 
-  // Tabla por mes de pesaje
-  html+=`<div class="kpi-group-label">📅 Evolución por mes de pesaje</div>
-  <div class="table-wrap" style="margin-bottom:1.5rem"><table><thead><tr>
-    <th>Mes</th><th>Animales</th><th>Edad prom</th><th>Peso prom</th><th>GDP prom<br><small>vs anterior</small></th>
-    <th>% ≥0.8</th><th>% &lt;0.6</th><th>Peso vs meta</th><th>Sospechosos</th></tr></thead><tbody>`+
-    meses.map(k=>{const r=resumenMes(k);return `<tr>
-      <td style="font-weight:600">${mesLbl(k)}</td><td class="mono">${r.n}</td>
-      <td class="mono">${Math.round(r.edad)}d</td><td class="mono">${f1(r.peso)} kg</td>
-      <td class="mono ${adgClass(r.gdp)}">${f3(r.gdp)}</td>
-      <td class="mono">${r.ok!=null?Math.round(r.ok)+'%':'—'}</td>
-      <td class="mono">${r.bajo!=null?Math.round(r.bajo)+'%':'—'}</td>
-      <td class="mono ${pctClass(r.pm)}">${r.pm!=null?Math.round(r.pm)+'%':'—'}</td>
-      <td class="mono">${r.sosp||''}</td></tr>`;}).join('')+
-  '</tbody></table></div>';
-
   // Curva por mes de edad y raza
   const bins={};
   pesadas.forEach(x=>{const m=Math.floor(x.dias/30.4); if(m<0) return; (bins[m]=bins[m]||[]).push(x);});
   const curva=Object.keys(bins).map(Number).sort((a,b)=>a-b).filter(m=>bins[m].length>=3);
-  const cel=(it,raza)=>{
-    const s=it.filter(x=>x.raza===raza); if(!s.length) return '<td class="mono">—</td><td class="mono">—</td><td class="mono">—</td><td class="mono">—</td>';
+
+  const cel=(it,raza,m)=>{
+    const s=it.filter(x=>x.raza===raza); if(!s.length) return '<td class="mono">—</td><td class="mono">—</td><td class="mono">—</td><td class="mono" style="border-right:2px solid var(--border)">—</td>';
     const p=avg(s.map(x=>x.peso)); const mt=desMeta(raza,avg(s.map(x=>x.dias))); const pc=mt?p/mt*100:null;
     const g=s.filter(x=>x.gdp!=null).map(x=>x.gdp); const gg=g.length?avg(g):null;
     return `<td class="mono">${f1(p)} <small style="color:var(--text-muted)">(${s.length})</small></td><td class="mono ${pctClass(pc)}">${pc!=null?Math.round(pc)+'%':'—'}</td><td class="mono ${adgClass(gg)}">${f3(gg)}</td><td class="mono" style="color:var(--text-muted);border-right:2px solid var(--border)">${mt!=null?Math.round(mt)+' kg':'—'}</td>`;
@@ -2397,9 +2390,79 @@ function renderDesarrollo(){
     <tr><th rowspan="2">Edad</th><th colspan="4">Holstein</th><th colspan="4">Jersey</th></tr>
     <tr><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th><th>Meta</th><th>Peso prom (n)</th><th>vs meta</th><th>GDP</th><th>Meta</th></tr></thead><tbody>`+
     curva.map(m=>{const it=bins[m];
-      return `<tr><td style="font-weight:600">${m} mes${m===1?'':'es'}</td>${cel(it,'H')}${cel(it,'J')}</tr>`;}).join('')+
+      return `<tr><td style="font-weight:600">${m} mes${m===1?'':'es'}</td>${cel(it,'H',m)}${cel(it,'J',m)}</tr>`;}).join('')+
   '</tbody></table></div>'+
   (sinRaza?`<p style="font-size:.78rem;color:var(--text-muted);margin-bottom:1.5rem">${sinRaza} pesadas sin raza (arete no está en partos) — cuentan en los KPIs generales pero no en la curva.</p>`:'<div style="margin-bottom:1.5rem"></div>');
+
+  // ---- Cumplimiento individual por etapa
+  // LECHE: 2 pesadas (~65d y ~90d), de 30 a 104 días — junta pesajes_crianza (1ª/2ª) + MEDIR.
+  // DESARROLLO: 5 pesadas MEDIR (4m · 5m · 6m · 10m · 11-12m) desde 105 días.
+  // "debe" = edad a la que ya debe tenerla (un mes de holgura por la edad del lote).
+  const salMap={}; (window._salidasDes||[]).forEach(s=>{if(s.hembra&&s.fecha_salida) salMap[String(s.hembra).trim()]=toD(s.fecha_salida);});
+  const nacMapH={}; (window._partosDes||[]).forEach(pt=>{if(pt.hembra&&pt.fecha_parto) nacMapH[String(pt.hembra).trim()]=toD(pt.fecha_parto);});
+  const pesDiasH={}; // hembra -> [{dias,fecha}]
+  const addP=(hh,fecha)=>{const nac=nacMapH[hh]; if(!nac) return; const d=Math.round((toD(fecha)-nac)/DAY); if(d<0) return; (pesDiasH[hh]=pesDiasH[hh]||[]).push({dias:d,fecha});};
+  window._desarrollo.forEach(r=>addP(String(r.hembra).trim(),r.fecha));
+  (window._pesajes||[]).forEach(r=>{if(r.hembra&&r.fecha) addP(String(r.hembra).trim(),r.fecha);});
+  const fechasDes=window._desarrollo.map(r=>r.fecha).sort();
+  const fechasLeche=fechasDes.concat((window._pesajes||[]).map(r=>r.fecha).filter(Boolean)).sort();
+  const corte=toD(fechasDes[fechasDes.length-1]);
+  const ETAPAS=[
+    {id:'leche',titulo:'🍼 Etapa leche',sub:'2 pesadas: ~65d y ~90d',edadMin:30,edadMax:104,sep:15,
+     prog:[{debe:95},{debe:120}],ini:toD(fechasLeche[0]),
+     nota:'Pesadas de 30 a 104 días (1ª/2ª de Registro Pesajes + MEDIR), separadas al menos 15 días. Ya debe tener 1 a los 95 días y 2 a los 120.'},
+    {id:'des',titulo:'📏 Etapa desarrollo',sub:'5 pesadas: 4m · 5m · 6m · 10m · 11-12m',edadMin:105,edadMax:99999,sep:20,
+     prog:[{debe:152},{debe:183},{debe:213},{debe:335},{debe:396}],ini:toD(fechasDes[0]),
+     nota:'Pesadas MEDIR desde 105 días, separadas al menos 20 días. Ya debe tener 1 a los 5 meses, 2 a los 6, 3 a los 7, 4 a los 11 y 5 a los 13.'}
+  ];
+  const pc=(x,y)=>y?Math.round(x/y*100):null;
+  const evalEtapa=E=>{
+    const N=E.prog.length, fin=E.prog[N-1].debe, ev=[];
+    (window._partosDes||[]).forEach(pt=>{
+      const hh=String(pt.hembra||'').trim();
+      if(pt.sexo!=='H'||!/^\d+$/.test(hh)) return;
+      const n=parseInt(hh); if(n<DES_ARETE_MIN||n>=20000) return;
+      if(!pt.fecha_parto||(desde&&pt.fecha_parto<desde)||(hasta&&pt.fecha_parto>hasta)) return;
+      if(razaFilter&&pt.raza!==razaFilter) return;
+      const nac=toD(pt.fecha_parto);
+      if((E.ini-nac)/DAY>E.edadMin) return;           // la etapa empezó antes de que hubiera registro
+      const sal=salMap[hh];
+      if(sal&&sal<corte) return;                        // con salida: no cuenta
+      const edad=Math.floor((corte-nac)/DAY);
+      if(edad<E.prog[0].debe) return;                   // aún no le toca ninguna
+      const ps=(pesDiasH[hh]||[]).filter(x=>x.dias>=E.edadMin&&x.dias<=E.edadMax).sort((a,b)=>a.dias-b.dias);
+      const dist=[]; ps.forEach(x=>{if(!dist.length||x.dias-dist[dist.length-1].dias>=E.sep) dist.push(x);});
+      ev.push({hembra:hh,raza:pt.raza||'—',edad,esperadas:E.prog.filter(m=>edad>=m.debe).length,
+        tiene:Math.min(dist.length,N),edades:dist.map(x=>x.dias),termino:edad>=fin});
+    });
+    const term=ev.filter(e=>e.termino), curso=ev.filter(e=>!e.termino);
+    const r=x=>{const t=term.filter(e=>x==null||e.raza===x);return {n:t.length,ok:t.filter(e=>e.tiene>=N).length,prom:t.length?avg(t.map(e=>e.tiene)):null};};
+    return {N,term,curso,G:r(null),H:r('H'),J:r('J'),
+      atrasadas:curso.filter(e=>e.tiene<e.esperadas).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra)),
+      incompletas:term.filter(e=>e.tiene<N).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra))};
+  };
+  const pctTxt=c=>c.n?`<span class="${pctClass(pc(c.ok,c.n))}">${pc(c.ok,c.n)}%</span>`:'—';
+  const filaEv=e=>`<tr><td class="mono" style="font-weight:600">${e.hembra}</td><td class="mono">${e.raza}</td><td class="mono">${e.edad}d</td>
+    <td class="mono ${e.tiene>=e.esperadas?'gdp-ok':'gdp-bad'}">${e.tiene} de ${e.esperadas}</td>
+    <td class="mono" style="font-size:.78rem">${e.edades.length?e.edades.map(d=>d+'d').join(' · '):'sin pesadas'}</td></tr>`;
+  const tablaEv=(id,titulo,arr)=>`<button class="btn btn-secondary btn-sm" style="margin:.3rem .5rem .5rem 0" onclick="toggleDesList('${id}',this)">${titulo} (${arr.length}) ▼</button>
+    <div id="${id}" style="display:none;margin-bottom:1rem"><div class="table-wrap"><table><thead><tr><th>Arete</th><th>Raza</th><th>Edad</th><th>Pesadas</th><th>Edades a las que se pesó</th></tr></thead><tbody>`+
+    (arr.length?arr.map(filaEv).join(''):'<tr><td colspan="5" class="empty">Ninguna 🎉</td></tr>')+'</tbody></table></div></div>';
+  html+='<div class="kpi-group-label">✅ Cumplimiento de pesadas por etapa</div>';
+  ETAPAS.forEach(E=>{
+    const R=evalEtapa(E);
+    const alDia=R.curso.length-R.atrasadas.length;
+    html+=`<div style="font-weight:600;margin:.6rem 0 .4rem">${E.titulo} <span style="font-weight:400;font-size:.82rem;color:var(--text-muted)">— ${E.sub}</span></div>
+    <div class="kpi-grid" style="margin-bottom:.6rem">`+
+      kpiCard('Cumplimiento (terminaron)',pctTxt(R.G),'',R.G.n?`${R.G.ok} de ${R.G.n} con las ${R.N} · prom ${R.G.prom.toFixed(1)} de ${R.N}`:'aún sin becerras que terminen la etapa en el periodo','',false)+
+      kpiCard('Holstein',pctTxt(R.H),'',R.H.n?`${R.H.ok} de ${R.H.n} · prom ${R.H.prom.toFixed(1)}`:'','',false)+
+      kpiCard('Jersey',pctTxt(R.J),'',R.J.n?`${R.J.ok} de ${R.J.n} · prom ${R.J.prom.toFixed(1)}`:'','',false)+
+      kpiCard('En curso al día',R.curso.length?`<span class="${pctClass(pc(alDia,R.curso.length))}">${pc(alDia,R.curso.length)}%</span>`:'—','',R.curso.length?`${alDia} de ${R.curso.length} vivas en la etapa`:'','',false)+
+    '</div>'+
+    tablaEv(`cum-${E.id}-atr`,'⏰ En curso atrasadas',R.atrasadas)+tablaEv(`cum-${E.id}-inc`,'📋 Terminaron incompletas',R.incompletas)+
+    `<p style="font-size:.76rem;color:var(--text-muted);margin:.2rem 0 1.2rem">${E.nota} Solo hembras vivas cuya etapa empezó después del ${fmtFecha(E.ini.toISOString().slice(0,10))}.</p>`;
+  });
+  html+='<div style="margin-bottom:1rem"></div>';
 
   // Rezagadas
   html+=`<button class="btn btn-secondary btn-sm" style="margin-bottom:.5rem" onclick="toggleDesList('des-rezagadas',this)">⚠️ Rezagadas (${rezagadas.length}) ▼</button>
