@@ -1785,9 +1785,22 @@ async function deleteParto(id){
 }
 
 // ==================== PESAJES ====================
+// Baja TODOS los registros en bloques de 1000 (no depende del tope de filas de Supabase)
+async function sbFetchAll(path){
+  let all=[], from=0; const CH=1000;
+  while(true){
+    const res=await fetch(`${SUPABASE_URL}/rest/v1/${path}`,{headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Range':`${from}-${from+CH-1}`}});
+    if(!res.ok){console.error(path,await res.text());break;}
+    const chunk=await res.json();
+    all=all.concat(chunk);
+    if(chunk.length<CH) break;
+    from+=chunk.length;
+  }
+  return all;
+}
 async function loadPesajes(){
-  const partos=await sbFetch('partos_crianza?order=fecha_parto.asc&limit=10000');
-  const pesajes=await sbFetch('pesajes_crianza?order=fecha.asc&limit=5000');
+  const partos=await sbFetchAll('partos_crianza?order=fecha_parto.asc,id.asc');
+  const pesajes=await sbFetchAll('pesajes_crianza?order=fecha.asc,id.asc');
   window._partos=partos||[];
   window._pesajes=pesajes||[];
   renderPesajes(pesajes,partos);
@@ -2171,12 +2184,12 @@ async function loadDesarrollo(){
   let all=[], from=0;
   while(true){
     const url=`${SUPABASE_URL}/rest/v1/pesajes_desarrollo?select=*&order=fecha.asc,id.asc`;
-    const res=await fetch(url,{headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Range':`${from}-${from+4999}`}});
+    const res=await fetch(url,{headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Range':`${from}-${from+999}`}});
     if(!res.ok){console.error('pesajes_desarrollo',await res.text());break;}
     const chunk=await res.json();
     all=all.concat(chunk);
-    if(chunk.length<5000) break;
-    from+=5000;
+    if(chunk.length<1000) break;
+    from+=chunk.length;
   }
   window._desarrollo=all;
   const el=document.getElementById('ultimo-desarrollo');
@@ -2282,8 +2295,8 @@ function renderDesarrollo(){
   }
   if(!window._partosDes||!window._salidasDes){
     Promise.all([
-      sbFetch('partos_crianza?select=hembra,sexo,raza,fecha_parto&order=fecha_parto.asc&limit=20000'),
-      sbFetch('salidas_crianza?select=hembra,fecha_salida&limit=20000')
+      sbFetchAll('partos_crianza?select=hembra,sexo,raza,fecha_parto&order=fecha_parto.asc,hembra.asc'),
+      sbFetchAll('salidas_crianza?select=hembra,fecha_salida&order=hembra.asc')
     ]).then(([pa,sa])=>{window._partosDes=Array.isArray(pa)?pa:[]; window._salidasDes=Array.isArray(sa)?sa:[]; renderDesarrollo();});
     return;
   }
@@ -2507,6 +2520,69 @@ function renderDesarrollo(){
     tablaEv(`cum-${E.id}-atr`,'⏰ En curso atrasadas',R.atrasadas)+tablaEv(`cum-${E.id}-inc`,'📋 Terminaron incompletas',R.incompletas)+
     `<p style="font-size:.76rem;color:var(--text-muted);margin:.2rem 0 1.2rem">${E.nota} Solo hembras vivas cuya etapa empezó después del ${fmtFecha(E.ini.toISOString().slice(0,10))}.</p>`;
   });
+  // ---- Cumplimiento al corte de cada mes de pesada (programa completo: 2 leche + 5 desarrollo)
+  // Al día = tiene todas las que ya le tocaban a su edad; o pasó por báscula ese mes y tiene todas las previas
+  // (holgura de una pesada: puede venir en el lote de vacunación de un mes más chico).
+  {
+    const DEBE_L=[95,120], DEBE_D=[152,183,213,335,396], EDAD_MAX=430;
+    const iniL=toD(fechasLeche[0]), iniD=toD(fechasDes[0]);
+    const cortes={}; fechasDes.forEach(f=>{const k=f.slice(0,7); if(!cortes[k]||f>cortes[k]) cortes[k]=f;});
+    const kM=Object.keys(cortes).sort().reverse();
+    const distinct=(arr,min,max,sep)=>{const out=[]; arr.filter(x=>x.dias>=min&&x.dias<=max).sort((a,b)=>a.dias-b.dias).forEach(x=>{if(!out.length||x.dias-out[out.length-1].dias>=sep) out.push(x);}); return out;};
+    const eleg=(window._partosDes||[]).filter(pt=>{
+      const hh=String(pt.hembra||'').trim();
+      if(pt.sexo!=='H'||!/^\d+$/.test(hh)) return false;
+      const n=parseInt(hh); if(n<DES_ARETE_MIN||n>=20000) return false;
+      if(!pt.fecha_parto||(desde&&pt.fecha_parto<desde)||(hasta&&pt.fecha_parto>hasta)) return false;
+      if(razaFilter&&pt.raza!==razaFilter) return false;
+      return true;
+    });
+    const evalMes=k=>{
+      const cf=cortes[k], corteM=toD(cf), mesIni=k+'-01', ev=[];
+      eleg.forEach(pt=>{
+        const hh=String(pt.hembra).trim(), nac=toD(pt.fecha_parto);
+        const sal=salMap[hh]; if(sal&&sal<=corteM) return;
+        const edad=Math.floor((corteM-nac)/DAY);
+        if(edad<DEBE_L[0]||edad>EDAD_MAX) return;
+        const cuentaL=(iniL-nac)/DAY<=30, cuentaD=(iniD-nac)/DAY<=105;
+        const ps=(pesDiasH[hh]||[]).filter(x=>String(x.fecha).slice(0,10)<=cf);
+        const dL=cuentaL?distinct(ps,30,104,15).slice(0,2):[], dD=cuentaD?distinct(ps,105,99999,20).slice(0,5):[];
+        const esp=(cuentaL?DEBE_L.filter(d=>edad>=d).length:0)+(cuentaD?DEBE_D.filter(d=>edad>=d).length:0);
+        if(!esp) return;
+        const tiene=dL.length+dD.length;
+        const bascula=ps.some(x=>String(x.fecha).slice(0,10)>=mesIni);
+        const okCompleto=tiene>=esp, okHolgura=!okCompleto&&bascula&&tiene>=esp-1;
+        ev.push({hembra:hh,raza:pt.raza||'—',edad,esp,tiene,bascula,ok:okCompleto||okHolgura,okHolgura,edades:dL.concat(dD).map(x=>x.dias)});
+      });
+      const r=x=>{const t=ev.filter(e=>x==null||e.raza===x); return {n:t.length,ok:t.filter(e=>e.ok).length};};
+      return {k,cf,ev,G:r(null),H:r('H'),J:r('J'),bas:ev.filter(e=>e.bascula).length,hol:ev.filter(e=>e.okHolgura).length,
+        no:ev.filter(e=>!e.ok).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra))};
+    };
+    if(kM.length){
+      const M=kM.slice(0,12).map(evalMes), U=M[0], Pv=M[1];
+      const pTxt=c=>c.n?`<span class="${pctClass(pc(c.ok,c.n))}">${pc(c.ok,c.n)}%</span>`:'—';
+      const dlt=(Pv&&Pv.G.n&&U.G.n)?` (${pc(U.G.ok,U.G.n)-pc(Pv.G.ok,Pv.G.n)>=0?'+':''}${pc(U.G.ok,U.G.n)-pc(Pv.G.ok,Pv.G.n)} pts vs ${mesLbl(Pv.k)})`:'';
+      html+=`<div style="font-weight:600;margin:.6rem 0 .4rem">📆 Al día al corte del mes <span style="font-weight:400;font-size:.82rem;color:var(--text-muted)">— programa completo: 2 leche + 5 desarrollo</span></div>
+      <div class="kpi-grid" style="margin-bottom:.6rem">`+
+        kpiCard(`Al día · corte ${mesLbl(U.k)}`,pTxt(U.G),'',`${U.G.ok} de ${U.G.n} becerras de 95 a ${EDAD_MAX} días`+dlt,'',false)+
+        kpiCard('Holstein',pTxt(U.H),'',U.H.n?`${U.H.ok} de ${U.H.n}`:'','',false)+
+        kpiCard('Jersey',pTxt(U.J),'',U.J.n?`${U.J.ok} de ${U.J.n}`:'','',false)+
+        kpiCard(`Pasaron báscula en ${mesLbl(U.k)}`,U.bas,'',`${U.hol} al día gracias a la holgura de 1 pesada`,'',false)+
+      '</div>'+
+      `<div class="table-wrap" style="margin-bottom:.4rem"><table><thead><tr><th>Mes</th><th>Corte</th><th>Becerras</th><th>Al día</th><th>%</th><th>Holstein</th><th>Jersey</th><th>Pasaron báscula</th></tr></thead><tbody>`+
+        M.map(m=>`<tr><td style="font-weight:600;white-space:nowrap">${mesLbl(m.k)}</td><td class="mono">${fmtFecha(m.cf)}</td><td class="mono">${m.G.n}</td><td class="mono">${m.G.ok}</td>
+          <td class="mono">${pTxt(m.G)}</td><td class="mono">${pTxt(m.H)}</td><td class="mono">${pTxt(m.J)}</td><td class="mono">${m.bas}</td></tr>`).join('')+
+      '</tbody></table></div>'+
+      `<button class="btn btn-secondary btn-sm" style="margin:.3rem .5rem .5rem 0" onclick="toggleDesList('cum-mes-no',this)">⏰ No al día · corte ${mesLbl(U.k)} (${U.no.length}) ▼</button>
+      <div id="cum-mes-no" style="display:none;margin-bottom:1rem"><div class="table-wrap"><table><thead><tr><th>Arete</th><th>Raza</th><th>Edad al corte</th><th>Pesadas</th><th>Pasó báscula en el mes</th><th>Edades a las que se pesó</th></tr></thead><tbody>`+
+        (U.no.length?U.no.map(e=>`<tr><td class="mono" style="font-weight:600">${e.hembra}</td><td class="mono">${e.raza}</td><td class="mono">${e.edad}d</td>
+          <td class="mono gdp-bad">${e.tiene} de ${e.esp}</td><td class="mono">${e.bascula?'Sí':'No'}</td>
+          <td class="mono" style="font-size:.78rem">${e.edades.length?e.edades.map(d=>d+'d').join(' · '):'sin pesadas'}</td></tr>`).join(''):'<tr><td colspan="6" class="empty">Ninguna 🎉</td></tr>')+
+      '</tbody></table></div></div>'+
+      `<p style="font-size:.76rem;color:var(--text-muted);margin:.2rem 0 1.2rem">Corte = última pesada MEDIR de cada mes. Entran hembras vivas de 95 a ${EDAD_MAX} días al corte. Pesadas esperadas por edad: leche 1 a los 95d y 2 a los 120d; desarrollo 1 a los 152d, 2 a los 183, 3 a los 213, 4 a los 335 y 5 a los 396. Al día = tiene todas las que le tocan, o pasó por báscula ese mes y le falta máximo 1 (puede venir en un lote de vacunación más chico).</p>`;
+    }
+  }
+
   html+='<div style="margin-bottom:1rem"></div>';
 
   // Rezagadas
