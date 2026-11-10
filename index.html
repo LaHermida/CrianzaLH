@@ -490,6 +490,9 @@
         </div>
       </div>
 
+      <!-- Último mes subido -->
+      <div id="gdp-ultimo-subido" style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem"></div>
+
       <!-- KPIs generales -->
       <div class="kpi-group-label">📊 Indicadores Generales</div>
       <div id="gdp-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
@@ -1891,7 +1894,34 @@ function setGdpQuick(periodo){
   renderDashGDP();
 }
 
+// Muestra el último mes subido (MEDIR y pesajes etapa leche) para saber si está al día
+async function renderUltimoSubido(){
+  const el=document.getElementById('gdp-ultimo-subido');
+  if(!el) return;
+  const mesesNL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const hoy=new Date(); const hoyK=hoy.getFullYear()*12+hoy.getMonth();
+  const chip=(titulo,fecha)=>{
+    if(!fecha) return `<div style="background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;padding:.6rem .9rem;border-left:4px solid #999"><div style="font-size:.75rem;color:var(--text-muted)">${titulo}</div><div style="font-weight:700">Sin datos</div></div>`;
+    const [y,m]=fecha.split('-').map(Number);
+    const atraso=hoyK-(y*12+m-1); // 0 = mes actual, 1 = mes pasado
+    const dias=Math.floor((hoy-new Date(fecha+'T12:00:00'))/86400000);
+    const [color,txt]=atraso<=0?['#2d6a4f','✅ Al día']:atraso===1?['#e65100','⚠️ Falta subir '+mesesNL[hoy.getMonth()]]:['#c62828','❌ Atrasado '+atraso+' meses'];
+    return `<div style="background:var(--surface,#fff);border:1px solid var(--border);border-radius:8px;padding:.6rem .9rem;border-left:4px solid ${color}">
+      <div style="font-size:.75rem;color:var(--text-muted)">${titulo}</div>
+      <div style="font-weight:700;font-size:1.05rem">${mesesNL[m-1]} ${y}</div>
+      <div style="font-size:.78rem">Última pesada ${fmtFecha(fecha)} · hace ${dias} días · <span style="color:${color};font-weight:600">${txt}</span></div></div>`;
+  };
+  try{
+    const des=window._desarrollo||await loadDesarrollo();
+    const ultDes=des.length?des.reduce((mx,r)=>r.fecha>mx?r.fecha:mx,''):null;
+    const lec=await sbFetch('pesajes_crianza?select=fecha&order=fecha.desc&limit=1');
+    const ultLec=Array.isArray(lec)&&lec.length?String(lec[0].fecha).slice(0,10):null;
+    el.innerHTML=chip('📏 Último mes subido — Desarrollo (MEDIR)',ultDes)+chip('🍼 Último mes subido — Pesajes etapa leche',ultLec);
+  }catch(e){console.error('ultimo subido',e);}
+}
+
 function renderDashGDP(){
+  renderUltimoSubido();
   const razaFilter=document.getElementById('gdp-raza').value;
   const desde=document.getElementById('gdp-desde')?.value;
   const hasta=document.getElementById('gdp-hasta')?.value;
@@ -2129,10 +2159,10 @@ function renderDashGDP(){
 // ==================== DESARROLLO MENSUAL (MEDIR) ====================
 // Tabla pesajes_desarrollo: hembra, fecha, peso, altura, corral, edad_dias
 // Import acumulativo: se puede subir el archivo completo cada mes; lo repetido (arete+fecha+peso) se omite.
-// Curva meta peso (kg) por días de edad — Holstein ~350 kg y Jersey ~245 kg a 12 meses
+// Curva meta peso (kg) por días de edad — Holstein 360 kg y Jersey 260 kg a 12 meses
 const DES_META={
-  H:[[0,42],[60,85],[90,110],[120,136],[180,191],[270,268],[365,350],[425,385]],
-  J:[[0,27],[60,55],[90,72],[120,90],[180,128],[270,182],[365,245],[425,272]]
+  H:[[0,42],[60,87],[90,113],[120,140],[180,196],[270,276],[365,360],[425,396]],
+  J:[[0,27],[60,58],[90,76],[120,96],[180,136],[270,193],[365,260],[425,289]]
 };
 const DES_ARETE_MIN=4611; // hembras nacidas antes (aretes < 4611) no se importan ni se cuentan
 const DES_GDP_MIN=-0.5, DES_GDP_MAX=2.5; // fuera de este rango = dato sospechoso (se excluye de promedios)
@@ -2404,7 +2434,7 @@ function renderDesarrollo(){
     kpiCard(`Pesadas ${mesLbl(ultMes)}`,rU.n,'',rU.rango+delta(rU.n,rP&&rP.n,0),'',false)+
     kpiCard(`GDP prom ${mesLbl(ultMes)}`,rU.gdp!=null?`<span class="${adgClass(rU.gdp)}">${rU.gdp.toFixed(3)} kg/día</span>`:'—','',`vs pesada anterior · ${rU.nG} animales`+delta(rU.gdp,rP&&rP.gdp,3),'',false)+
     kpiCard('% con GDP ≥ 0.8',rU.ok!=null?Math.round(rU.ok)+'%':'—','',rU.bajo!=null?`${Math.round(rU.bajo)}% bajo 0.6 kg/día`:'','',false)+
-    kpiCard('Peso vs meta (prom)',rU.pm!=null?`<span class="${pctClass(rU.pm)}">${Math.round(rU.pm)}%</span>`:'—','','Meta 12 meses: H 350 kg · J 245 kg','',false)+
+    kpiCard('Peso vs meta (prom)',rU.pm!=null?`<span class="${pctClass(rU.pm)}">${Math.round(rU.pm)}%</span>`:'—','','Meta 12 meses: H 360 kg · J 260 kg','',false)+
     kpiCard('En meta (≥95%)',conMeta.length?`${enMeta} de ${conMeta.length}`:'—','',conMeta.length?`${Math.round(enMeta/conMeta.length*100)}% de las pesadas actuales con raza`:'','',false)+
     kpiCard('Rezagadas',rezagadas.length,'','<85% de meta o GDP último <0.5','',false)+
   '</div>';
