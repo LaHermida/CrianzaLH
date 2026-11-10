@@ -535,6 +535,8 @@
           <label style="font-size:.85rem;color:var(--text-muted)"><input type="checkbox" id="mach-actuales" checked onchange="renderMachos()"/> Solo pesados en el último mes</label>
           <button class="btn btn-secondary btn-sm" onclick="document.getElementById('importMachosFile').click()">📥 Importar nacimientos</button>
           <input type="file" id="importMachosFile" accept=".csv,.xlsx,.xls" class="hidden" onchange="importMachosNac(event)"/>
+          <button class="btn btn-secondary btn-sm" onclick="downloadMachosTemplate()">📄 Template</button>
+          <button class="btn btn-primary btn-sm" onclick="openVentaMacho()">💲 Registrar venta</button>
         </div>
       </div>
       <div id="machos-section"><p style="color:var(--text-muted)">Cargando...</p></div>
@@ -919,6 +921,32 @@
 </div>
 
 <!-- MODAL CONTRASEÑA -->
+<div class="modal-overlay" id="ventaMachoModal" onclick="if(event.target===this)closeVentaMacho()">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-header">
+      <h2>💲 Registrar venta de macho</h2>
+      <button class="modal-close" onclick="closeVentaMacho()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group"><label>Arete</label>
+        <input type="text" id="vm-arete" list="vm-aretes-list" inputmode="numeric" style="width:100%" onkeydown="if(event.key==='Enter')document.getElementById('vm-peso').focus()"/>
+        <datalist id="vm-aretes-list"></datalist></div>
+      <div class="form-group"><label>Fecha de venta</label>
+        <input type="date" id="vm-fecha" style="width:100%"/></div>
+      <div class="form-group"><label>Peso (kg)</label>
+        <input type="number" id="vm-peso" step="0.1" min="0" inputmode="decimal" style="width:100%" onkeydown="if(event.key==='Enter')guardarVentaMacho()"/></div>
+      <div class="form-group"><label>Destino</label>
+        <input type="text" id="vm-destino" list="vm-destinos-list" placeholder="Comprador / rancho / engorda" style="width:100%"/>
+        <datalist id="vm-destinos-list"></datalist></div>
+      <p id="vm-msg" style="font-size:.8rem;color:var(--text-muted);min-height:1em;margin:0"></p>
+    </div>
+    <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:1rem">
+      <button class="btn btn-secondary" onclick="closeVentaMacho()">Cerrar</button>
+      <button class="btn btn-primary" onclick="guardarVentaMacho()">Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="passModal">
   <div class="modal" style="max-width:320px">
     <div class="modal-header">
@@ -2619,6 +2647,7 @@ function renderMachos(){
   const DAY=86400000, toD=s=>new Date(s+'T12:00:00'), iso=d=>d.toISOString().slice(0,10);
   const data=(window._desarrollo||[]).filter(r=>esMachoDes(r.hembra));
   const nacMap={}; (window._machos||[]).forEach(m=>{if(m.arete&&m.fecha_nac) nacMap[String(m.arete).trim()]=m.fecha_nac;});
+  const ventaMap={}; (window._machos||[]).forEach(m=>{if(m.arete&&m.fecha_venta) ventaMap[String(m.arete).trim()]=m;});
   if(!data.length&&!Object.keys(nacMap).length){cont.innerHTML='<p style="color:var(--text-muted)">Sin pesadas de machos. Se cargan con el mismo import de Registro Pesajes → 📥 Importar Desarrollo (MEDIR).</p>';return;}
 
   // Llenar filtro de corral (con el corral de la última pesada)
@@ -2668,9 +2697,10 @@ function renderMachos(){
   const fechaMax=pesadas.reduce((m,x)=>x.fecha>m?x.fecha:m,'');
   const limite=iso(new Date(toD(fechaMax)-45*DAY));
   const soloAct=document.getElementById('mach-actuales').checked;
-  const lista=animales.filter(a=>(!corralSel||a.ult.corral===corralSel)&&(!soloAct||a.ult.fecha>=limite))
-    .sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
-  const setH=new Set(lista.map(a=>a.hembra));
+  // La evolución mensual conserva el historial de los vendidos; el listado y KPIs solo los activos
+  const listaHist=animales.filter(a=>(!corralSel||a.ult.corral===corralSel)&&(!soloAct||a.ult.fecha>=limite));
+  const lista=listaHist.filter(a=>!ventaMap[a.hembra]).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+  const setH=new Set(listaHist.map(a=>a.hembra));
   const pesF=pesadas.filter(x=>setH.has(x.hembra));
 
   // Por mes de pesaje (de los machos en la lista)
@@ -2703,14 +2733,15 @@ function renderMachos(){
 
   html+=`<div class="kpi-group-label">🐂 Listado de machos (${lista.length})</div>
   <div class="table-wrap"><table><thead><tr>
-    <th>Arete</th><th>Corral</th><th>Nacimiento</th><th>Pesadas</th><th>1ª pesada</th><th>Últ. pesada</th><th>Edad</th><th>Último peso</th><th>GDP último</th><th>GDP acumulado</th></tr></thead><tbody>`+
+    <th>Arete</th><th>Corral</th><th>Nacimiento</th><th>Pesadas</th><th>1ª pesada</th><th>Últ. pesada</th><th>Edad</th><th>Último peso</th><th>GDP último</th><th>GDP acumulado</th><th></th></tr></thead><tbody>`+
     (lista.length?lista.map(a=>{const u=a.ult;return `<tr>
       <td class="mono" style="font-weight:600">${a.hembra}</td><td class="mono">${u.corral||'—'}</td>
       <td class="mono">${a.nac?(a.nacExacta?'':'≈ ')+fmtFecha(a.nac):'—'}</td><td class="mono" style="text-align:center">${a.ps.length}</td>
       <td class="mono">${fmtFecha(a.p0.fecha)} · ${f1(a.p0.peso)} kg</td><td class="mono">${fmtFecha(u.fecha)}</td>
       <td class="mono">${u.dias!=null?u.dias+'d':'—'}</td><td class="mono">${f1(u.peso)} kg</td>
       <td class="mono ${adgClass(u.gdp)}">${u.sosp?'<span class="gdp-bad">⚠️ revisar</span>':f3(u.gdp)}</td>
-      <td class="mono ${adgClass(a.gTot)}">${f3(a.gTot)}</td></tr>`;}).join(''):'<tr><td colspan="10" class="empty">Sin machos para el filtro.</td></tr>')+
+      <td class="mono ${adgClass(a.gTot)}">${f3(a.gTot)}</td>
+      <td><button class="btn btn-secondary btn-sm" title="Registrar venta" onclick="openVentaMacho('${a.hembra}')">💲</button></td></tr>`;}).join(''):'<tr><td colspan="11" class="empty">Sin machos para el filtro.</td></tr>')+
   '</tbody></table></div>'+
   (bajas.length?`<p style="font-size:.78rem;color:var(--text-muted)">Excluidos por no estar en la lista de nacimientos (baja): ${bajas.join(', ')}</p>`:'')+
   (animales.some(a=>!a.nacExacta)?'<p style="font-size:.78rem;color:var(--text-muted)">≈ nacimiento calculado con la EDAD del archivo de pesajes (falta en nacimientos de machos).</p>':'');
@@ -2718,13 +2749,39 @@ function renderMachos(){
   // Machos registrados sin ninguna pesada
   const conPesada=new Set(animales.map(a=>a.hembra));
   const hoy=new Date(); hoy.setHours(12,0,0,0);
-  const sinPesar=Object.entries(nacMap).filter(([a])=>!conPesada.has(a))
+  const sinPesar=Object.entries(nacMap).filter(([a])=>!conPesada.has(a)&&!ventaMap[a])
     .map(([a,f])=>({arete:a,fecha:f,edad:Math.round((hoy-toD(f))/DAY)}))
     .sort((x,y)=>parseInt(x.arete)-parseInt(y.arete));
   if(sinPesar.length){
     html+=`<br><button class="btn btn-secondary btn-sm" style="margin:1rem 0 .5rem" onclick="toggleDesList('mach-sinpesar',this)">🍼 Machos sin pesar aún (${sinPesar.length}) ▼</button>
     <div id="mach-sinpesar" style="display:none"><div class="table-wrap" style="max-width:520px"><table><thead><tr><th>Arete</th><th>Nacimiento</th><th>Edad hoy</th></tr></thead><tbody>`+
     sinPesar.map(s=>`<tr><td class="mono" style="font-weight:600">${s.arete}</td><td class="mono">${fmtFecha(s.fecha)}</td><td class="mono">${s.edad}d</td></tr>`).join('')+
+    '</tbody></table></div></div>';
+  }
+
+  // Machos vendidos
+  const animMap={}; animales.forEach(a=>animMap[a.hembra]=a);
+  const vendidos=Object.values(ventaMap).map(m=>{
+    const ar=String(m.arete).trim(), a=animMap[ar];
+    const nac=m.fecha_nac||(a&&a.nac)||null;
+    const edad=nac?Math.round((toD(m.fecha_venta)-toD(nac))/DAY):null;
+    const u=a?a.ps.filter(x=>x.fecha<=m.fecha_venta).slice(-1)[0]:null;
+    const pv=m.peso_venta!=null?parseFloat(m.peso_venta):null;
+    let gdp=null; if(u&&pv!=null){const dd=Math.round((toD(m.fecha_venta)-toD(u.fecha))/DAY); if(dd>=7){const g=(pv-u.peso)/dd; if(g>=DES_GDP_MIN&&g<=DES_GDP_MAX) gdp=g;}}
+    return {arete:ar,nac,nacExacta:!!m.fecha_nac,fecha:m.fecha_venta,edad,peso:pv,destino:m.destino||'',u,gdp};
+  }).sort((x,y)=>parseInt(x.arete)-parseInt(y.arete));
+  if(vendidos.length){
+    const pesosV=vendidos.map(v=>v.peso).filter(v=>v!=null), edadesV=vendidos.map(v=>v.edad).filter(v=>v!=null);
+    html+=`<br><button class="btn btn-secondary btn-sm" style="margin:1rem 0 .5rem" onclick="toggleDesList('mach-vendidos',this)">💲 Machos vendidos (${vendidos.length}) · peso prom ${pesosV.length?avg(pesosV).toFixed(1)+' kg':'—'} · edad prom ${edadesV.length?Math.round(avg(edadesV))+'d':'—'} ▼</button>
+    <div id="mach-vendidos" style="display:none"><div class="table-wrap"><table><thead><tr>
+      <th>Arete</th><th>Nacimiento</th><th>Fecha venta</th><th>Edad venta</th><th>Peso venta</th><th>Últ. pesada</th><th>GDP últ. pesada → venta</th><th>Destino</th><th></th></tr></thead><tbody>`+
+    vendidos.map(v=>`<tr><td class="mono" style="font-weight:600">${v.arete}</td>
+      <td class="mono">${v.nac?(v.nacExacta?'':'≈ ')+fmtFecha(v.nac):'—'}</td><td class="mono">${fmtFecha(v.fecha)}</td>
+      <td class="mono">${v.edad!=null?v.edad+'d':'—'}</td><td class="mono">${f1(v.peso)} kg</td>
+      <td class="mono">${v.u?fmtFecha(v.u.fecha)+' · '+f1(v.u.peso)+' kg':'—'}</td>
+      <td class="mono ${adgClass(v.gdp)}">${f3(v.gdp)}</td><td>${escHtmlM(v.destino)||'—'}</td>
+      <td><button class="btn btn-secondary btn-sm" title="Editar venta" onclick="openVentaMacho('${v.arete}')">✏️</button>
+        <button class="btn btn-secondary btn-sm" title="Cancelar venta (regresa a activos)" onclick="cancelarVentaMacho('${v.arete}')">↩️</button></td></tr>`).join('')+
     '</tbody></table></div></div>';
   }
   cont.innerHTML=html;
@@ -2762,6 +2819,89 @@ async function importMachosNac(event){
   },body:JSON.stringify(lista)});
   if(!res.ok){alert('⚠️ Error al importar. Revisa consola (F12).');console.error(await res.text());return;}
   alert(`✅ ${lista.length} machos guardados.`);
+  await loadMachos(); renderMachos();
+}
+
+function escHtmlM(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function downloadMachosTemplate(){
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([['ID','FNACI','EDADD'],[20001,'15/09/2026',56],[20002,'18/09/2026',53]]);
+  ws['!cols']=[{wch:10},{wch:12},{wch:8}];
+  XLSX.utils.book_append_sheet(wb,ws,'Nacimientos machos');
+  XLSX.writeFile(wb,'Template_Nacimientos_Machos.xlsx');
+}
+
+// ---- Venta de machos ----
+async function openVentaMacho(arete){
+  if(!window._ventaOk){
+    if(!await checkPass()){alert('Contraseña incorrecta');return;}
+    window._ventaOk=true; // una vez por sesión
+  }
+  if(!window._machos) await loadMachos();
+  const activos=new Set();
+  (window._machos||[]).forEach(m=>{if(!m.fecha_venta) activos.add(String(m.arete));});
+  (window._desarrollo||[]).forEach(r=>{if(esMachoDes(r.hembra)) activos.add(String(r.hembra).trim());});
+  (window._machos||[]).forEach(m=>{if(m.fecha_venta) activos.delete(String(m.arete));});
+  document.getElementById('vm-aretes-list').innerHTML=[...activos].sort((a,b)=>parseInt(a)-parseInt(b)).map(a=>`<option value="${a}">`).join('');
+  const destinos=[...new Set((window._machos||[]).map(m=>m.destino).filter(Boolean))].sort();
+  document.getElementById('vm-destinos-list').innerHTML=destinos.map(d=>`<option value="${escHtmlM(d)}">`).join('');
+  const prev=arete?(window._machos||[]).find(m=>String(m.arete)===String(arete)):null;
+  const iso=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  document.getElementById('vm-arete').value=arete||'';
+  document.getElementById('vm-fecha').value=(prev&&prev.fecha_venta)||window._vmUltFecha||iso;
+  document.getElementById('vm-peso').value=(prev&&prev.peso_venta!=null)?prev.peso_venta:'';
+  document.getElementById('vm-destino').value=(prev&&prev.destino)||window._vmUltDestino||'';
+  document.getElementById('vm-msg').textContent='';
+  document.getElementById('ventaMachoModal').classList.add('open');
+  document.getElementById(arete?'vm-peso':'vm-arete').focus();
+}
+function closeVentaMacho(){ document.getElementById('ventaMachoModal').classList.remove('open'); }
+
+async function guardarVentaMacho(){
+  const msg=document.getElementById('vm-msg');
+  const arete=document.getElementById('vm-arete').value.trim().replace(/\.0+$/,'');
+  const fecha=document.getElementById('vm-fecha').value;
+  const peso=parseFloat(document.getElementById('vm-peso').value);
+  const destino=document.getElementById('vm-destino').value.trim();
+  if(!/^\d+$/.test(arete)){msg.textContent='⚠️ Arete inválido.';return;}
+  if(!esMachoDes(arete)&&!confirm(`El arete ${arete} es menor a 20000 (no es macho). ¿Registrar de todos modos?`)) return;
+  if(!fecha){msg.textContent='⚠️ Falta la fecha.';return;}
+  if(isNaN(peso)||peso<=0){msg.textContent='⚠️ Peso inválido.';return;}
+  if(!destino){msg.textContent='⚠️ Falta el destino.';return;}
+  const prev=(window._machos||[]).find(m=>String(m.arete)===arete);
+  if(prev&&prev.fecha_venta&&prev.fecha_venta!==fecha&&!confirm(`El ${arete} ya tiene venta registrada el ${fmtFecha(prev.fecha_venta)}. ¿Sobrescribir?`)) return;
+  const venta={fecha_venta:fecha,peso_venta:peso,destino};
+  let res;
+  if(prev){
+    res=await sbFetch(`machos_crianza?arete=eq.${encodeURIComponent(arete)}`,'PATCH',venta);
+  }else{
+    // Macho sin registro de nacimiento: se da de alta con la fecha estimada por la edad del pesaje (si existe)
+    const ref=(window._desarrollo||[]).filter(r=>String(r.hembra).trim()===arete&&r.edad_dias!=null).sort((a,b)=>a.fecha.localeCompare(b.fecha))[0];
+    const nac=ref?new Date(new Date(ref.fecha+'T12:00:00')-ref.edad_dias*86400000).toISOString().slice(0,10):null;
+    res=await sbFetch('machos_crianza','POST',Object.assign({arete,fecha_nac:nac},venta));
+  }
+  if(!res.ok){
+    const t=await res.text(); console.error(t);
+    msg.textContent=/fecha_venta|peso_venta|destino|column/i.test(t)
+      ?'⚠️ Falta agregar las columnas de venta en Supabase (fecha_venta, peso_venta, destino).'
+      :'⚠️ Error al guardar. Revisa consola (F12).';
+    return;
+  }
+  window._vmUltFecha=fecha; window._vmUltDestino=destino;
+  await loadMachos(); renderMachos();
+  // Deja el formulario listo para el siguiente macho del mismo lote
+  document.getElementById('vm-arete').value=''; document.getElementById('vm-peso').value='';
+  const op=document.querySelector(`#vm-aretes-list option[value="${arete}"]`); if(op) op.remove();
+  msg.innerHTML=`<span style="color:#2d6a4f">✅ ${arete} vendido · ${peso.toFixed(1)} kg · ${escHtmlM(destino)}</span>`;
+  document.getElementById('vm-arete').focus();
+}
+
+async function cancelarVentaMacho(arete){
+  if(!confirm(`¿Cancelar la venta del ${arete}? Regresa a la lista de activos.`)) return;
+  if(!window._ventaOk){ if(!await checkPass()){alert('Contraseña incorrecta');return;} window._ventaOk=true; }
+  const res=await sbFetch(`machos_crianza?arete=eq.${encodeURIComponent(arete)}`,'PATCH',{fecha_venta:null,peso_venta:null,destino:null});
+  if(!res.ok){alert('⚠️ Error. Revisa consola (F12).');console.error(await res.text());return;}
   await loadMachos(); renderMachos();
 }
 
