@@ -922,27 +922,41 @@
 
 <!-- MODAL CONTRASEÑA -->
 <div class="modal-overlay" id="ventaMachoModal" onclick="if(event.target===this)closeVentaMacho()">
-  <div class="modal" style="max-width:380px">
+  <div class="modal" style="max-width:760px">
     <div class="modal-header">
-      <h2>💲 Registrar venta de macho</h2>
+      <h2>💲 Registrar venta de machos</h2>
       <button class="modal-close" onclick="closeVentaMacho()">×</button>
     </div>
     <div class="modal-body">
-      <div class="form-group"><label>Arete</label>
-        <input type="text" id="vm-arete" list="vm-aretes-list" inputmode="numeric" style="width:100%" onkeydown="if(event.key==='Enter')document.getElementById('vm-peso').focus()"/>
-        <datalist id="vm-aretes-list"></datalist></div>
-      <div class="form-group"><label>Fecha de venta</label>
-        <input type="date" id="vm-fecha" style="width:100%"/></div>
-      <div class="form-group"><label>Peso (kg)</label>
-        <input type="number" id="vm-peso" step="0.1" min="0" inputmode="decimal" style="width:100%" onkeydown="if(event.key==='Enter')guardarVentaMacho()"/></div>
-      <div class="form-group"><label>Destino</label>
-        <input type="text" id="vm-destino" list="vm-destinos-list" placeholder="Comprador / rancho / engorda" style="width:100%"/>
-        <datalist id="vm-destinos-list"></datalist></div>
-      <p id="vm-msg" style="font-size:.8rem;color:var(--text-muted);min-height:1em;margin:0"></p>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <div class="form-group" style="flex:1;min-width:150px"><label>Fecha de venta</label>
+          <input type="date" id="vm-fecha" style="width:100%"/></div>
+        <div class="form-group" style="flex:2;min-width:200px"><label>Destino</label>
+          <input type="text" id="vm-destino" list="vm-destinos-list" placeholder="Comprador / rancho / engorda" style="width:100%"/>
+          <datalist id="vm-destinos-list"></datalist></div>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin:.25rem 0 .5rem">
+        <select id="vm-corral" onchange="renderVmGrid()" style="width:auto;padding:.3rem .5rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"><option value="">Todos los corrales</option></select>
+        <input type="text" id="vm-buscar" placeholder="Buscar arete" inputmode="numeric" oninput="renderVmGrid()" onkeydown="if(event.key==='Enter')vmBuscarEnter()" style="width:120px;padding:.3rem .5rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"/>
+        <button class="btn btn-secondary btn-sm" onclick="vmSelTodos(true)">☑️ Todos visibles</button>
+        <button class="btn btn-secondary btn-sm" onclick="vmSelTodos(false)">Limpiar</button>
+        <span id="vm-count" style="font-size:.85rem;color:var(--text-muted);margin-left:auto"></span>
+      </div>
+      <div id="vm-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:.35rem;max-height:240px;overflow-y:auto;padding:.25rem;border:1px solid var(--border);border-radius:6px"></div>
+      <div id="vm-sel-wrap" style="margin-top:1rem;display:none">
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;margin-bottom:.5rem">
+          <span class="kpi-group-label" style="margin:0">Pesos de venta</span>
+          <input type="number" id="vm-peso-todos" step="0.1" min="0" inputmode="decimal" placeholder="kg" style="width:90px;padding:.3rem .5rem;border-radius:6px;border:1px solid var(--border)"/>
+          <button class="btn btn-secondary btn-sm" onclick="vmPesoTodos()">Mismo peso a todos</button>
+          <span id="vm-peso-prom" style="font-size:.85rem;color:var(--text-muted);margin-left:auto"></span>
+        </div>
+        <div class="table-wrap" style="max-height:260px;overflow-y:auto"><table><thead><tr><th>Arete</th><th>Corral</th><th>Últ. pesada</th><th>Peso venta (kg)</th><th></th></tr></thead><tbody id="vm-sel-body"></tbody></table></div>
+      </div>
+      <p id="vm-msg" style="font-size:.85rem;color:var(--text-muted);min-height:1em;margin:.5rem 0 0"></p>
     </div>
     <div class="modal-footer" style="display:flex;gap:.5rem;justify-content:flex-end;padding:1rem">
       <button class="btn btn-secondary" onclick="closeVentaMacho()">Cerrar</button>
-      <button class="btn btn-primary" onclick="guardarVentaMacho()">Guardar</button>
+      <button class="btn btn-primary" id="vm-guardar" onclick="guardarVentaMacho()">Guardar</button>
     </div>
   </div>
 </div>
@@ -2752,6 +2766,10 @@ function renderMachos(){
   const sinPesar=Object.entries(nacMap).filter(([a])=>!conPesada.has(a)&&!ventaMap[a])
     .map(([a,f])=>({arete:a,fecha:f,edad:Math.round((hoy-toD(f))/DAY)}))
     .sort((x,y)=>parseInt(x.arete)-parseInt(y.arete));
+  // Pool de machos activos para la cuadrícula de venta (sin filtros de la vista)
+  window._vmPool=animales.filter(a=>!ventaMap[a.hembra]).map(a=>({arete:a.hembra,corral:a.ult.corral||'',peso:a.ult.peso,fecha:a.ult.fecha}))
+    .concat(sinPesar.map(s=>({arete:s.arete,corral:'',peso:null,fecha:null})))
+    .sort((x,y)=>parseInt(x.arete)-parseInt(y.arete));
   if(sinPesar.length){
     html+=`<br><button class="btn btn-secondary btn-sm" style="margin:1rem 0 .5rem" onclick="toggleDesList('mach-sinpesar',this)">🍼 Machos sin pesar aún (${sinPesar.length}) ▼</button>
     <div id="mach-sinpesar" style="display:none"><div class="table-wrap" style="max-width:520px"><table><thead><tr><th>Arete</th><th>Nacimiento</th><th>Edad hoy</th></tr></thead><tbody>`+
@@ -2832,69 +2850,149 @@ function downloadMachosTemplate(){
   XLSX.writeFile(wb,'Template_Nacimientos_Machos.xlsx');
 }
 
-// ---- Venta de machos ----
+// ---- Venta de machos (selección múltiple) ----
 async function openVentaMacho(arete){
   if(!window._ventaOk){
     if(!await checkPass()){alert('Contraseña incorrecta');return;}
     window._ventaOk=true; // una vez por sesión
   }
   if(!window._machos) await loadMachos();
-  const activos=new Set();
-  (window._machos||[]).forEach(m=>{if(!m.fecha_venta) activos.add(String(m.arete));});
-  (window._desarrollo||[]).forEach(r=>{if(esMachoDes(r.hembra)) activos.add(String(r.hembra).trim());});
-  (window._machos||[]).forEach(m=>{if(m.fecha_venta) activos.delete(String(m.arete));});
-  document.getElementById('vm-aretes-list').innerHTML=[...activos].sort((a,b)=>parseInt(a)-parseInt(b)).map(a=>`<option value="${a}">`).join('');
+  if(!window._vmPool){ // sin render previo: arma pool con la lista de nacimientos
+    window._vmPool=(window._machos||[]).filter(m=>!m.fecha_venta).map(m=>({arete:String(m.arete),corral:'',peso:null,fecha:null}))
+      .sort((x,y)=>parseInt(x.arete)-parseInt(y.arete));
+  }
+  const pool=window._vmPool.slice();
+  window._vmSel=new Map();
+  const prev=arete?(window._machos||[]).find(m=>String(m.arete)===String(arete)):null;
+  if(arete){
+    if(!pool.some(p=>p.arete===String(arete))) pool.push({arete:String(arete),corral:'',peso:null,fecha:null,vendido:!!(prev&&prev.fecha_venta)});
+    window._vmSel.set(String(arete),(prev&&prev.peso_venta!=null)?String(prev.peso_venta):'');
+  }
+  window._vmPoolView=pool.sort((x,y)=>parseInt(x.arete)-parseInt(y.arete));
+  const corrales=[...new Set(pool.map(p=>p.corral).filter(Boolean))].sort((a,b)=>parseInt(a)-parseInt(b));
+  document.getElementById('vm-corral').innerHTML='<option value="">Todos los corrales</option>'+corrales.map(c=>`<option value="${c}">Corral ${c}</option>`).join('');
   const destinos=[...new Set((window._machos||[]).map(m=>m.destino).filter(Boolean))].sort();
   document.getElementById('vm-destinos-list').innerHTML=destinos.map(d=>`<option value="${escHtmlM(d)}">`).join('');
-  const prev=arete?(window._machos||[]).find(m=>String(m.arete)===String(arete)):null;
   const iso=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
-  document.getElementById('vm-arete').value=arete||'';
   document.getElementById('vm-fecha').value=(prev&&prev.fecha_venta)||window._vmUltFecha||iso;
-  document.getElementById('vm-peso').value=(prev&&prev.peso_venta!=null)?prev.peso_venta:'';
   document.getElementById('vm-destino').value=(prev&&prev.destino)||window._vmUltDestino||'';
+  document.getElementById('vm-buscar').value='';
+  document.getElementById('vm-peso-todos').value='';
   document.getElementById('vm-msg').textContent='';
+  renderVmGrid(); renderVmSel();
   document.getElementById('ventaMachoModal').classList.add('open');
-  document.getElementById(arete?'vm-peso':'vm-arete').focus();
+  document.getElementById('vm-buscar').focus();
 }
 function closeVentaMacho(){ document.getElementById('ventaMachoModal').classList.remove('open'); }
 
+function vmVisibles(){
+  const c=document.getElementById('vm-corral').value, q=document.getElementById('vm-buscar').value.trim();
+  return (window._vmPoolView||[]).filter(p=>(!c||p.corral===c)&&(!q||p.arete.includes(q)));
+}
+function renderVmGrid(){
+  const sel=window._vmSel||new Map();
+  document.getElementById('vm-grid').innerHTML=vmVisibles().map(p=>{
+    const on=sel.has(p.arete);
+    return `<div onclick="vmToggle('${p.arete}')" style="cursor:pointer;user-select:none;padding:.35rem .25rem;border-radius:6px;text-align:center;line-height:1.15;
+      border:1.5px solid ${on?'#2d6a4f':'var(--border)'};background:${on?'#d8f3dc':'var(--surface)'}">
+      <div class="mono" style="font-weight:700;font-size:.9rem">${on?'✓ ':''}${p.arete}</div>
+      <div style="font-size:.68rem;color:var(--text-muted)">${p.corral?'C'+p.corral:'—'}${p.peso!=null?' · '+p.peso.toFixed(0)+' kg':''}</div></div>`;
+  }).join('')||'<p style="color:var(--text-muted);font-size:.85rem;padding:.5rem">Sin machos activos para el filtro.</p>';
+  document.getElementById('vm-count').textContent=`${sel.size} seleccionado${sel.size===1?'':'s'}`;
+}
+function vmToggle(ar){
+  const sel=window._vmSel;
+  if(sel.has(ar)) sel.delete(ar); else sel.set(ar,'');
+  renderVmGrid(); renderVmSel();
+}
+function vmSelTodos(on){
+  if(on) vmVisibles().forEach(p=>{if(!window._vmSel.has(p.arete)) window._vmSel.set(p.arete,'');});
+  else window._vmSel.clear();
+  renderVmGrid(); renderVmSel();
+}
+function vmBuscarEnter(){
+  const v=vmVisibles();
+  const q=document.getElementById('vm-buscar').value.trim();
+  const exact=v.find(p=>p.arete===q)||(v.length===1?v[0]:null);
+  if(exact){ if(!window._vmSel.has(exact.arete)) window._vmSel.set(exact.arete,''); document.getElementById('vm-buscar').value=''; renderVmGrid(); renderVmSel();
+    const inp=document.getElementById('vm-p-'+exact.arete); if(inp) inp.focus(); }
+}
+function renderVmSel(){
+  const sel=window._vmSel, wrap=document.getElementById('vm-sel-wrap');
+  wrap.style.display=sel.size?'block':'none';
+  const pm={}; (window._vmPoolView||[]).forEach(p=>pm[p.arete]=p);
+  const ars=[...sel.keys()].sort((a,b)=>parseInt(a)-parseInt(b));
+  document.getElementById('vm-sel-body').innerHTML=ars.map((ar,i)=>{const p=pm[ar]||{};return `<tr>
+    <td class="mono" style="font-weight:600">${ar}</td><td class="mono">${p.corral||'—'}</td>
+    <td class="mono">${p.fecha?fmtFecha(p.fecha)+' · '+p.peso.toFixed(1)+' kg':'—'}</td>
+    <td><input type="number" id="vm-p-${ar}" step="0.1" min="0" inputmode="decimal" value="${escHtmlM(sel.get(ar))}" style="width:90px"
+      oninput="window._vmSel.set('${ar}',this.value);vmPesoProm()"
+      onkeydown="if(event.key==='Enter'){const n=document.getElementById('vm-p-${ars[i+1]||''}');if(n)n.focus();else guardarVentaMacho();}"/></td>
+    <td><button class="btn btn-secondary btn-sm" onclick="vmToggle('${ar}')">✕</button></td></tr>`;}).join('');
+  document.getElementById('vm-guardar').textContent=sel.size?`Guardar ${sel.size} venta${sel.size===1?'':'s'}`:'Guardar';
+  vmPesoProm();
+}
+function vmPesoProm(){
+  const ps=[...window._vmSel.values()].map(parseFloat).filter(v=>!isNaN(v)&&v>0);
+  document.getElementById('vm-peso-prom').textContent=ps.length?`${ps.length} con peso · total ${ps.reduce((a,b)=>a+b,0).toFixed(1)} kg · prom ${avg(ps).toFixed(1)} kg`:'';
+}
+function vmPesoTodos(){
+  const v=parseFloat(document.getElementById('vm-peso-todos').value);
+  if(isNaN(v)||v<=0){alert('Escribe un peso válido.');return;}
+  const vacios=[...window._vmSel.entries()].filter(([,p])=>!(parseFloat(p)>0));
+  const soloVacios=vacios.length<window._vmSel.size&&vacios.length>0?confirm('¿Aplicar solo a los que no tienen peso? (Cancelar = aplicar a todos)'):false;
+  [...window._vmSel.keys()].forEach(ar=>{ if(!soloVacios||!(parseFloat(window._vmSel.get(ar))>0)) window._vmSel.set(ar,String(v)); });
+  renderVmSel();
+}
+
 async function guardarVentaMacho(){
   const msg=document.getElementById('vm-msg');
-  const arete=document.getElementById('vm-arete').value.trim().replace(/\.0+$/,'');
   const fecha=document.getElementById('vm-fecha').value;
-  const peso=parseFloat(document.getElementById('vm-peso').value);
   const destino=document.getElementById('vm-destino').value.trim();
-  if(!/^\d+$/.test(arete)){msg.textContent='⚠️ Arete inválido.';return;}
-  if(!esMachoDes(arete)&&!confirm(`El arete ${arete} es menor a 20000 (no es macho). ¿Registrar de todos modos?`)) return;
+  const sel=window._vmSel;
+  if(!sel.size){msg.textContent='⚠️ Selecciona al menos un macho.';return;}
   if(!fecha){msg.textContent='⚠️ Falta la fecha.';return;}
-  if(isNaN(peso)||peso<=0){msg.textContent='⚠️ Peso inválido.';return;}
   if(!destino){msg.textContent='⚠️ Falta el destino.';return;}
-  const prev=(window._machos||[]).find(m=>String(m.arete)===arete);
-  if(prev&&prev.fecha_venta&&prev.fecha_venta!==fecha&&!confirm(`El ${arete} ya tiene venta registrada el ${fmtFecha(prev.fecha_venta)}. ¿Sobrescribir?`)) return;
-  const venta={fecha_venta:fecha,peso_venta:peso,destino};
-  let res;
-  if(prev){
-    res=await sbFetch(`machos_crianza?arete=eq.${encodeURIComponent(arete)}`,'PATCH',venta);
-  }else{
-    // Macho sin registro de nacimiento: se da de alta con la fecha estimada por la edad del pesaje (si existe)
-    const ref=(window._desarrollo||[]).filter(r=>String(r.hembra).trim()===arete&&r.edad_dias!=null).sort((a,b)=>a.fecha.localeCompare(b.fecha))[0];
-    const nac=ref?new Date(new Date(ref.fecha+'T12:00:00')-ref.edad_dias*86400000).toISOString().slice(0,10):null;
-    res=await sbFetch('machos_crianza','POST',Object.assign({arete,fecha_nac:nac},venta));
-  }
-  if(!res.ok){
-    const t=await res.text(); console.error(t);
-    msg.textContent=/fecha_venta|peso_venta|destino|column/i.test(t)
-      ?'⚠️ Falta agregar las columnas de venta en Supabase (fecha_venta, peso_venta, destino).'
-      :'⚠️ Error al guardar. Revisa consola (F12).';
-    return;
-  }
+  const items=[...sel.entries()].map(([arete,p])=>({arete,peso:parseFloat(p)})).sort((a,b)=>parseInt(a.arete)-parseInt(b.arete));
+  const sinPeso=items.filter(x=>isNaN(x.peso)||x.peso<=0).map(x=>x.arete);
+  if(sinPeso.length){msg.textContent=`⚠️ Falta peso en: ${sinPeso.join(', ')}`;const f=document.getElementById('vm-p-'+sinPeso[0]);if(f)f.focus();return;}
+  const machos=window._machos||[], byAr={}; machos.forEach(m=>byAr[String(m.arete)]=m);
+  const yaVend=items.filter(x=>byAr[x.arete]&&byAr[x.arete].fecha_venta&&byAr[x.arete].fecha_venta!==fecha).map(x=>x.arete);
+  const total=items.reduce((a,x)=>a+x.peso,0);
+  if(!confirm(`💲 Venta de ${items.length} macho${items.length===1?'':'s'}\n\nFecha: ${fmtFecha(fecha)}\nDestino: ${destino}\nPeso total: ${total.toFixed(1)} kg · prom ${(total/items.length).toFixed(1)} kg`+
+    (yaVend.length?`\n\n⚠️ Ya tenían otra venta (se sobrescribe): ${yaVend.join(', ')}`:'')+'\n\n¿Guardar?')) return;
+  const btn=document.getElementById('vm-guardar'); btn.disabled=true; msg.textContent='Guardando...';
+  const errores=[]; let colErr=false;
+  const chk=async(res,ars)=>{ if(!res.ok){const t=await res.text();console.error(t);if(/fecha_venta|peso_venta|destino|column/i.test(t))colErr=true;errores.push(...ars);} };
+  try{
+    // Existentes: PATCH individual (en grupos de 10)
+    const exist=items.filter(x=>byAr[x.arete]);
+    for(let i=0;i<exist.length;i+=10){
+      await Promise.all(exist.slice(i,i+10).map(x=>
+        sbFetch(`machos_crianza?arete=eq.${encodeURIComponent(x.arete)}`,'PATCH',{fecha_venta:fecha,peso_venta:x.peso,destino}).then(r=>chk(r,[x.arete]))));
+    }
+    // Sin registro de nacimiento: alta con fecha estimada por la edad del pesaje (si existe)
+    const nuevos=items.filter(x=>!byAr[x.arete]).map(x=>{
+      const ref=(window._desarrollo||[]).filter(r=>String(r.hembra).trim()===x.arete&&r.edad_dias!=null).sort((a,b)=>a.fecha.localeCompare(b.fecha))[0];
+      const nac=ref?new Date(new Date(ref.fecha+'T12:00:00')-ref.edad_dias*86400000).toISOString().slice(0,10):null;
+      return {arete:x.arete,fecha_nac:nac,fecha_venta:fecha,peso_venta:x.peso,destino};
+    });
+    if(nuevos.length) await chk(await sbFetch('machos_crianza','POST',nuevos),nuevos.map(n=>n.arete));
+  }catch(e){ console.error(e); errores.push('red'); }
+  btn.disabled=false;
   window._vmUltFecha=fecha; window._vmUltDestino=destino;
   await loadMachos(); renderMachos();
-  // Deja el formulario listo para el siguiente macho del mismo lote
-  document.getElementById('vm-arete').value=''; document.getElementById('vm-peso').value='';
-  const op=document.querySelector(`#vm-aretes-list option[value="${arete}"]`); if(op) op.remove();
-  msg.innerHTML=`<span style="color:#2d6a4f">✅ ${arete} vendido · ${peso.toFixed(1)} kg · ${escHtmlM(destino)}</span>`;
-  document.getElementById('vm-arete').focus();
+  if(errores.length){
+    msg.innerHTML=colErr?'⚠️ Falta agregar las columnas de venta en Supabase (fecha_venta, peso_venta, destino).'
+      :`⚠️ No se guardaron: ${errores.join(', ')}. Revisa consola (F12).`;
+    [...sel.keys()].forEach(ar=>{if(!errores.includes(ar)) sel.delete(ar);});
+  }else{
+    sel.clear();
+    msg.innerHTML=`<span style="color:#2d6a4f">✅ ${items.length} venta${items.length===1?'':'s'} guardada${items.length===1?'':'s'} · ${total.toFixed(1)} kg · ${escHtmlM(destino)}</span>`;
+  }
+  // Refresca la cuadrícula sin los vendidos
+  window._vmPoolView=(window._vmPool||[]).slice();
+  renderVmGrid(); renderVmSel();
 }
 
 async function cancelarVentaMacho(arete){
