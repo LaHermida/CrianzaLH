@@ -2662,6 +2662,10 @@ function renderMachos(){
   const data=(window._desarrollo||[]).filter(r=>esMachoDes(r.hembra));
   const nacMap={}; (window._machos||[]).forEach(m=>{if(m.arete&&m.fecha_nac) nacMap[String(m.arete).trim()]=m.fecha_nac;});
   const ventaMap={}; (window._machos||[]).forEach(m=>{if(m.arete&&m.fecha_venta) ventaMap[String(m.arete).trim()]=m;});
+  const pnMap={}; (window._machos||[]).forEach(m=>{if(m.arete&&m.peso_nac!=null) pnMap[String(m.arete).trim()]=parseFloat(m.peso_nac);});
+  // GDP desde el nacimiento (requiere fecha exacta y peso al nacer)
+  const gdpNac=(ar,fecha,peso)=>{const pn=pnMap[ar], f=nacMap[ar]; if(pn==null||!f||peso==null) return null;
+    const d=Math.round((toD(fecha)-toD(f))/DAY); if(d<7) return null; const g=(peso-pn)/d; return (g>=DES_GDP_MIN&&g<=DES_GDP_MAX)?g:null;};
   if(!data.length&&!Object.keys(nacMap).length){cont.innerHTML='<p style="color:var(--text-muted)">Sin pesadas de machos. Se cargan con el mismo import de Registro Pesajes → 📥 Importar Desarrollo (MEDIR).</p>';return;}
 
   // Llenar filtro de corral (con el corral de la última pesada)
@@ -2709,7 +2713,7 @@ function renderMachos(){
   sel.innerHTML='<option value="">Todos</option>'+corrales.map(c=>`<option value="${c}"${c===corralSel?' selected':''}>${c}</option>`).join('');
 
   const fechaMax=pesadas.reduce((m,x)=>x.fecha>m?x.fecha:m,'');
-  const limite=iso(new Date(toD(fechaMax)-45*DAY));
+  const limite=fechaMax?iso(new Date(toD(fechaMax)-45*DAY)):'';
   const soloAct=document.getElementById('mach-actuales').checked;
   // La evolución mensual conserva el historial de los vendidos; el listado y KPIs solo los activos
   const listaHist=animales.filter(a=>(!corralSel||a.ult.corral===corralSel)&&(!soloAct||a.ult.fecha>=limite));
@@ -2733,6 +2737,8 @@ function renderMachos(){
     (rU?kpiCard(`GDP prom ${mesLbl(meses[0])}`,rU.gdp!=null?`<span class="${adgClass(rU.gdp)}">${rU.gdp.toFixed(3)} kg/día</span>`:'—','',`vs pesada anterior · ${rU.nG} machos`+delta(rU.gdp,rP&&rP.gdp,3),'',false):'')+
     (rU?kpiCard('% con GDP ≥ 0.8',rU.ok!=null?Math.round(rU.ok)+'%':'—','',rU.bajo!=null?`${Math.round(rU.bajo)}% bajo 0.6 kg/día`:'','',false):'')+
     (rU?kpiCard(`Peso prom ${mesLbl(meses[0])}`,f1(rU.peso)+' kg','',rU.edad!=null?`edad prom ${Math.round(rU.edad)}d`:'','',false):'')+
+    (()=>{const gn=lista.map(a=>gdpNac(a.hembra,a.ult.fecha,a.ult.peso)).filter(v=>v!=null);
+      return gn.length?kpiCard('GDP desde nacer (prom)',`<span class="${adgClass(avg(gn))}">${avg(gn).toFixed(3)} kg/día</span>`,'',`${gn.length} con peso al nacer`,'',false):'';})()+
     kpiCard('GDP acumulado (prom)',gTots.length?`<span class="${adgClass(avg(gTots))}">${avg(gTots).toFixed(3)} kg/día</span>`:'—','','de la 1ª a la última pesada','',false)+
   '</div>';
 
@@ -2747,15 +2753,16 @@ function renderMachos(){
 
   html+=`<div class="kpi-group-label">🐂 Listado de machos (${lista.length})</div>
   <div class="table-wrap"><table><thead><tr>
-    <th>Arete</th><th>Corral</th><th>Nacimiento</th><th>Pesadas</th><th>1ª pesada</th><th>Últ. pesada</th><th>Edad</th><th>Último peso</th><th>GDP último</th><th>GDP acumulado</th><th></th></tr></thead><tbody>`+
+    <th>Arete</th><th>Corral</th><th>Nacimiento</th><th>P. nacer</th><th>Pesadas</th><th>1ª pesada</th><th>Últ. pesada</th><th>Edad</th><th>Último peso</th><th>GDP último</th><th>GDP acumulado</th><th>GDP desde nacer</th><th></th></tr></thead><tbody>`+
     (lista.length?lista.map(a=>{const u=a.ult;return `<tr>
       <td class="mono" style="font-weight:600">${a.hembra}</td><td class="mono">${u.corral||'—'}</td>
-      <td class="mono">${a.nac?(a.nacExacta?'':'≈ ')+fmtFecha(a.nac):'—'}</td><td class="mono" style="text-align:center">${a.ps.length}</td>
+      <td class="mono">${a.nac?(a.nacExacta?'':'≈ ')+fmtFecha(a.nac):'—'}</td><td class="mono">${pnMap[a.hembra]!=null?f1(pnMap[a.hembra])+' kg':'—'}</td><td class="mono" style="text-align:center">${a.ps.length}</td>
       <td class="mono">${fmtFecha(a.p0.fecha)} · ${f1(a.p0.peso)} kg</td><td class="mono">${fmtFecha(u.fecha)}</td>
       <td class="mono">${u.dias!=null?u.dias+'d':'—'}</td><td class="mono">${f1(u.peso)} kg</td>
       <td class="mono ${adgClass(u.gdp)}">${u.sosp?'<span class="gdp-bad">⚠️ revisar</span>':f3(u.gdp)}</td>
       <td class="mono ${adgClass(a.gTot)}">${f3(a.gTot)}</td>
-      <td><button class="btn btn-secondary btn-sm" title="Registrar venta" onclick="openVentaMacho('${a.hembra}')">💲</button></td></tr>`;}).join(''):'<tr><td colspan="11" class="empty">Sin machos para el filtro.</td></tr>')+
+      <td class="mono ${adgClass(gdpNac(a.hembra,u.fecha,u.peso))}">${f3(gdpNac(a.hembra,u.fecha,u.peso))}</td>
+      <td><button class="btn btn-secondary btn-sm" title="Registrar venta" onclick="openVentaMacho('${a.hembra}')">💲</button></td></tr>`;}).join(''):'<tr><td colspan="13" class="empty">Sin machos para el filtro.</td></tr>')+
   '</tbody></table></div>'+
   (bajas.length?`<p style="font-size:.78rem;color:var(--text-muted)">Excluidos por no estar en la lista de nacimientos (baja): ${bajas.join(', ')}</p>`:'')+
   (animales.some(a=>!a.nacExacta)?'<p style="font-size:.78rem;color:var(--text-muted)">≈ nacimiento calculado con la EDAD del archivo de pesajes (falta en nacimientos de machos).</p>':'');
@@ -2772,8 +2779,8 @@ function renderMachos(){
     .sort((x,y)=>parseInt(x.arete)-parseInt(y.arete));
   if(sinPesar.length){
     html+=`<br><button class="btn btn-secondary btn-sm" style="margin:1rem 0 .5rem" onclick="toggleDesList('mach-sinpesar',this)">🍼 Machos sin pesar aún (${sinPesar.length}) ▼</button>
-    <div id="mach-sinpesar" style="display:none"><div class="table-wrap" style="max-width:520px"><table><thead><tr><th>Arete</th><th>Nacimiento</th><th>Edad hoy</th></tr></thead><tbody>`+
-    sinPesar.map(s=>`<tr><td class="mono" style="font-weight:600">${s.arete}</td><td class="mono">${fmtFecha(s.fecha)}</td><td class="mono">${s.edad}d</td></tr>`).join('')+
+    <div id="mach-sinpesar" style="display:none"><div class="table-wrap" style="max-width:520px"><table><thead><tr><th>Arete</th><th>Nacimiento</th><th>P. nacer</th><th>Edad hoy</th></tr></thead><tbody>`+
+    sinPesar.map(s=>`<tr><td class="mono" style="font-weight:600">${s.arete}</td><td class="mono">${fmtFecha(s.fecha)}</td><td class="mono">${pnMap[s.arete]!=null?f1(pnMap[s.arete])+' kg':'—'}</td><td class="mono">${s.edad}d</td></tr>`).join('')+
     '</tbody></table></div></div>';
   }
 
@@ -2786,16 +2793,16 @@ function renderMachos(){
     const u=a?a.ps.filter(x=>x.fecha<=m.fecha_venta).slice(-1)[0]:null;
     const pv=m.peso_venta!=null?parseFloat(m.peso_venta):null;
     let gdp=null; if(u&&pv!=null){const dd=Math.round((toD(m.fecha_venta)-toD(u.fecha))/DAY); if(dd>=7){const g=(pv-u.peso)/dd; if(g>=DES_GDP_MIN&&g<=DES_GDP_MAX) gdp=g;}}
-    return {arete:ar,nac,nacExacta:!!m.fecha_nac,fecha:m.fecha_venta,edad,peso:pv,destino:m.destino||'',u,gdp};
+    return {arete:ar,nac,nacExacta:!!m.fecha_nac,fecha:m.fecha_venta,edad,peso:pv,destino:m.destino||'',u,gdp,pn:pnMap[ar],gNac:gdpNac(ar,m.fecha_venta,pv)};
   }).sort((x,y)=>parseInt(x.arete)-parseInt(y.arete));
   if(vendidos.length){
     const pesosV=vendidos.map(v=>v.peso).filter(v=>v!=null), edadesV=vendidos.map(v=>v.edad).filter(v=>v!=null);
     html+=`<br><button class="btn btn-secondary btn-sm" style="margin:1rem 0 .5rem" onclick="toggleDesList('mach-vendidos',this)">💲 Machos vendidos (${vendidos.length}) · peso prom ${pesosV.length?avg(pesosV).toFixed(1)+' kg':'—'} · edad prom ${edadesV.length?Math.round(avg(edadesV))+'d':'—'} ▼</button>
     <div id="mach-vendidos" style="display:none"><div class="table-wrap"><table><thead><tr>
-      <th>Arete</th><th>Nacimiento</th><th>Fecha venta</th><th>Edad venta</th><th>Peso venta</th><th>Últ. pesada</th><th>GDP últ. pesada → venta</th><th>Destino</th><th></th></tr></thead><tbody>`+
+      <th>Arete</th><th>Nacimiento</th><th>P. nacer</th><th>Fecha venta</th><th>Edad venta</th><th>Peso venta</th><th>GDP nacer → venta</th><th>Últ. pesada</th><th>GDP últ. pesada → venta</th><th>Destino</th><th></th></tr></thead><tbody>`+
     vendidos.map(v=>`<tr><td class="mono" style="font-weight:600">${v.arete}</td>
-      <td class="mono">${v.nac?(v.nacExacta?'':'≈ ')+fmtFecha(v.nac):'—'}</td><td class="mono">${fmtFecha(v.fecha)}</td>
-      <td class="mono">${v.edad!=null?v.edad+'d':'—'}</td><td class="mono">${f1(v.peso)} kg</td>
+      <td class="mono">${v.nac?(v.nacExacta?'':'≈ ')+fmtFecha(v.nac):'—'}</td><td class="mono">${v.pn!=null?f1(v.pn)+' kg':'—'}</td><td class="mono">${fmtFecha(v.fecha)}</td>
+      <td class="mono">${v.edad!=null?v.edad+'d':'—'}</td><td class="mono">${f1(v.peso)} kg</td><td class="mono ${adgClass(v.gNac)}">${f3(v.gNac)}</td>
       <td class="mono">${v.u?fmtFecha(v.u.fecha)+' · '+f1(v.u.peso)+' kg':'—'}</td>
       <td class="mono ${adgClass(v.gdp)}">${f3(v.gdp)}</td><td>${escHtmlM(v.destino)||'—'}</td>
       <td><button class="btn btn-secondary btn-sm" title="Editar venta" onclick="openVentaMacho('${v.arete}')">✏️</button>
@@ -2816,26 +2823,39 @@ async function importMachosNac(event){
   const file=event.target.files[0]; if(!file) return; event.target.value='';
   const rows=await readFile(file);
   if(!rows.length){alert('Archivo vacío.');return;}
-  // Formato: ID, FNACI (DD/MM/AAAA), EDADD — se lee por posición: col 0 arete, col 1 fecha
-  const out={}; let bad=0;
+  // Formato: Arete | Fecha nacimiento (DD/MM/AAAA) | Peso al nacer (kg) — por posición.
+  // Compatibilidad: si la 3a columna se llama EDAD (formato viejo ID/FNACI/EDADD) se ignora; la edad la calcula la app.
+  const hdr=Object.keys(rows[0]).filter(k=>!k.startsWith('__'));
+  const conPeso=hdr.length>2&&/peso|kg/i.test(String(hdr[2]||''));
+  const prev=await loadMachos(); const prevMap={}, prevPn={};
+  prev.forEach(m=>{prevMap[String(m.arete)]=m.fecha_nac; prevPn[String(m.arete)]=m.peso_nac;});
+  const out={}; let bad=0, malPeso=0;
   rows.forEach(r=>{
     const c=r.__row||[], raw=r.__raw||c;
     const arete=c[0]!=null?String(c[0]).trim().replace(/\.0+$/,''):'';
     const fecha=parseDateFlex(raw[1]!=null?raw[1]:c[1]);
     if(!/^\d+$/.test(arete)||!fecha){ if(arete||c[1]) bad++; return; }
-    out[arete]={arete,fecha_nac:fecha};
+    const o={arete,fecha_nac:fecha};
+    if(conPeso){
+      let pn=c[2]!=null&&String(c[2]).trim()!==''?parseFloat(String(c[2]).replace(',','.')):null;
+      if(pn!=null&&(isNaN(pn)||pn<10||pn>80)){ malPeso++; pn=null; }
+      o.peso_nac=pn!=null?pn:(prevPn[arete]!=null?prevPn[arete]:null);
+    }
+    out[arete]=o;
   });
   const lista=Object.values(out);
-  if(!lista.length){alert('No encontré filas válidas (Arete | Fecha de nacimiento).');return;}
-  const prev=await loadMachos(); const prevMap={}; prev.forEach(m=>prevMap[m.arete]=m.fecha_nac);
+  if(!lista.length){alert('No encontré filas válidas (Arete | Fecha de nacimiento | Peso al nacer).');return;}
   const nuevos=lista.filter(m=>!prevMap[m.arete]).length;
   const cambian=lista.filter(m=>prevMap[m.arete]&&prevMap[m.arete]!==m.fecha_nac).length;
-  if(!confirm(`🐂 Nacimientos de machos\n\nVálidos: ${lista.length}${bad?`  (omitidos: ${bad})`:''}\nNuevos: ${nuevos}\nCon fecha corregida: ${cambian}\nSin cambio: ${lista.length-nuevos-cambian}\n\n¿Importar?`)) return;
+  const conPn=conPeso?lista.filter(m=>m.peso_nac!=null).length:0;
+  if(!confirm(`🐂 Nacimientos de machos\n\nVálidos: ${lista.length}${bad?`  (omitidos: ${bad})`:''}\nNuevos: ${nuevos}\nCon fecha corregida: ${cambian}\nSin cambio de fecha: ${lista.length-nuevos-cambian}\n`+
+    (conPeso?`Con peso al nacer: ${conPn}${malPeso?`  (pesos fuera de rango 10–80 kg ignorados: ${malPeso})`:''}`:'⚠️ Sin columna de peso al nacer (3a columna)')+`\n\n¿Importar?`)) return;
   const res=await fetch(`${SUPABASE_URL}/rest/v1/machos_crianza?on_conflict=arete`,{method:'POST',headers:{
     'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,
     'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'
   },body:JSON.stringify(lista)});
-  if(!res.ok){alert('⚠️ Error al importar. Revisa consola (F12).');console.error(await res.text());return;}
+  if(!res.ok){const t=await res.text();console.error(t);
+    alert(/peso_nac/i.test(t)?'⚠️ Falta la columna peso_nac en Supabase (machos_crianza).':'⚠️ Error al importar. Revisa consola (F12).');return;}
   alert(`✅ ${lista.length} machos guardados.`);
   await loadMachos(); renderMachos();
 }
@@ -2844,8 +2864,8 @@ function escHtmlM(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&
 
 function downloadMachosTemplate(){
   const wb=XLSX.utils.book_new();
-  const ws=XLSX.utils.aoa_to_sheet([['ID','FNACI','EDADD'],[20001,'15/09/2026',56],[20002,'18/09/2026',53]]);
-  ws['!cols']=[{wch:10},{wch:12},{wch:8}];
+  const ws=XLSX.utils.aoa_to_sheet([['Arete','Fecha nacimiento','Peso al nacer (kg)'],[20001,'15/09/2026',38],[20002,'18/09/2026',41.5]]);
+  ws['!cols']=[{wch:10},{wch:18},{wch:18}];
   XLSX.utils.book_append_sheet(wb,ws,'Nacimientos machos');
   XLSX.writeFile(wb,'Template_Nacimientos_Machos.xlsx');
 }
