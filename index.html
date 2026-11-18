@@ -1239,12 +1239,19 @@ function setQuickDash(preset){
   renderDashboard();
 }
 
+// Becerras compradas: en madre se captura el nombre del rancho de origen (ej. "DESLAC", sin números).
+// No cuentan en el Dashboard Partos; sí en Inventario, GDP, Vacunación, Clínica y Ficha.
+function esComprada(r){
+  const m=String(r.madre_vaca||r.madre_vaquilla||'').trim();
+  return m!==''&&!/\d/.test(m);
+}
 function getGlobalFD(){
+  const propios=allPartos.filter(r=>!esComprada(r));
   const desde=document.getElementById('dash-desde')?.value||'';
   const hasta=document.getElementById('dash-hasta')?.value||'';
   const cmp=document.getElementById('dash-cmp')?.checked;
   if(!cmp){
-    return{single:filterByRange(allPartos,desde,hasta),compare:false};
+    return{single:filterByRange(propios,desde,hasta),compare:false};
   }
   const aDesde=document.getElementById('dash-a-desde')?.value||'';
   const aHasta=document.getElementById('dash-a-hasta')?.value||'';
@@ -1252,8 +1259,8 @@ function getGlobalFD(){
   const bHasta=document.getElementById('dash-b-hasta')?.value||'';
   return{
     compare:true,
-    a:filterByRange(allPartos,aDesde,aHasta),
-    b:filterByRange(allPartos,bDesde,bHasta),
+    a:filterByRange(propios,aDesde,aHasta),
+    b:filterByRange(propios,bDesde,bHasta),
     aLabel:(aDesde&&aHasta)?`${aDesde} → ${aHasta}`:'Periodo A',
     bLabel:(bDesde&&bHasta)?`${bDesde} → ${bHasta}`:'Periodo B',
   };
