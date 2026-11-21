@@ -558,16 +558,19 @@
         <span class="section-title">💰 Venta de Vaquillas</span>
         <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
           <select id="vv-anio" onchange="renderVentaVaquillas()" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"><option value="">Todos los años</option></select>
+          <button class="btn btn-secondary" onclick="downloadTemplateVentasVaq()">📄 Template</button>
+          <button class="btn btn-secondary" onclick="document.getElementById('importVentasVaqFile').click()">📥 Importar Ventas</button>
+          <input type="file" id="importVentasVaqFile" accept=".xlsx,.xls,.csv" class="hidden" onchange="importVentasVaquillas(event)"/>
         </div>
       </div>
       <p style="font-size:.82rem;color:var(--text-muted);margin:-.3rem 0 1rem">Las vaquillas vendidas salen del inventario pero <b>no cuentan como salida</b> en la supervivencia (no son muertes ni descartes).</p>
       <div class="kpi-group-label">➕ Registrar venta</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem;margin-bottom:.5rem;max-width:900px">
-        <div><label style="font-size:.78rem;color:var(--text-muted)">Arete</label><input type="text" id="vv-arete" inputmode="numeric" placeholder="No. arete" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%" oninput="vvInfoArete()" onkeydown="if(event.key==='Enter')document.getElementById('vv-peso').focus()"/></div>
+        <div><label style="font-size:.78rem;color:var(--text-muted)">Arete</label><input type="text" id="vv-arete" inputmode="numeric" placeholder="No. arete" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%" oninput="vvInfoArete()" onkeydown="if(event.key==='Enter')document.getElementById('vv-precio').focus()"/></div>
         <div><label style="font-size:.78rem;color:var(--text-muted)">Fecha de venta</label><input type="date" id="vv-fecha" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%"/></div>
         <div><label style="font-size:.78rem;color:var(--text-muted)">Comprador / destino</label><input type="text" id="vv-destino" list="vv-destinos-list" placeholder="Comprador" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%"/><datalist id="vv-destinos-list"></datalist></div>
-        <div><label style="font-size:.78rem;color:var(--text-muted)">Peso (kg)</label><input type="number" id="vv-peso" step="0.1" min="0" inputmode="decimal" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%" onkeydown="if(event.key==='Enter')document.getElementById('vv-precio').focus()"/></div>
-        <div><label style="font-size:.78rem;color:var(--text-muted)">Precio de venta ($)</label><input type="number" id="vv-precio" step="1" min="0" inputmode="decimal" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%" onkeydown="if(event.key==='Enter')guardarVentaVaquilla()"/></div>
+        
+        <div><label style="font-size:.78rem;color:var(--text-muted)">Precio por cabeza ($)</label><input type="number" id="vv-precio" step="1" min="0" inputmode="decimal" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%" onkeydown="if(event.key==='Enter')guardarVentaVaquilla()"/></div>
       </div>
       <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:1.5rem">
         <button class="btn btn-primary" id="vv-guardar" onclick="guardarVentaVaquilla()">💾 Guardar venta</button>
@@ -576,8 +579,8 @@
       <div class="kpi-group-label">📊 Resumen</div>
       <div id="vv-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
       <div class="kpi-group-label">📋 Vaquillas vendidas</div>
-      <div class="table-wrap"><table><thead><tr><th>Arete</th><th>Raza</th><th>Nacimiento</th><th>Fecha venta</th><th>Edad</th><th>Comprador</th><th>Peso</th><th>Precio</th><th>$/kg</th><th></th></tr></thead>
-        <tbody id="vv-body"><tr><td colspan="10" class="empty">Cargando...</td></tr></tbody></table></div>
+      <div class="table-wrap"><table><thead><tr><th>Arete</th><th>Raza</th><th>Nacimiento</th><th>Fecha venta</th><th>Edad</th><th>Comprador</th><th>Precio ($)</th><th></th></tr></thead>
+        <tbody id="vv-body"><tr><td colspan="8" class="empty">Cargando...</td></tr></tbody></table></div>
     </div>
 
     <div id="tab-inventario" class="hidden">
@@ -3348,36 +3351,99 @@ function vvInfoArete(){
   if(sal) t+=esVentaVaq(sal)?` · ⚠️ ya tiene venta registrada (${fmtFecha(sal.fecha_salida)}), se va a actualizar`:` · ⚠️ tiene salida "${sal.motivo||''}" (${fmtFecha(sal.fecha_salida)}); se cambia a venta`;
   el.innerHTML=t;
 }
+// Arma el registro de salida tipo venta; nac/edad del archivo si vienen, si no de Registro Partos
+function vvRegistro(ar,fecha,destino,precio,nacArchivo,edadArchivo){
+  const p=(window._vvPartos||{})[ar];
+  const nac=nacArchivo||(p?p.fecha_parto:null);
+  let edad=edadArchivo!=null&&!isNaN(edadArchivo)?edadArchivo:null;
+  if(edad==null&&nac) edad=Math.floor((new Date(fecha+'T12:00:00')-new Date(nac+'T12:00:00'))/86400000);
+  const partes=['VENTA VAQUILLA'];
+  if(destino) partes.push('Destino: '+String(destino).replace(/\|/g,'/'));
+  if(precio!=null&&!isNaN(precio)&&precio>0) partes.push('Precio: $'+Math.round(precio));
+  return {hembra:ar,fecha_salida:fecha,fecha_nacimiento:nac,edad_dias:edad,razon_original:partes.join(' | '),motivo:MOTIVO_VENTA_VAQ,etapa:etapaPorEdad(edad)};
+}
+async function vvGuardarReg(reg){
+  const existe=(window._vvSalidas||{})[reg.hembra];
+  const res=existe?await sbFetch(`salidas_crianza?hembra=eq.${encodeURIComponent(reg.hembra)}`,'PATCH',reg):await sbFetch('salidas_crianza','POST',reg);
+  if(!res.ok){const t=await res.text();console.error(reg.hembra,t);throw new Error(t.slice(0,120));}
+}
 async function guardarVentaVaquilla(){
   const ar=document.getElementById('vv-arete').value.trim();
   const fecha=document.getElementById('vv-fecha').value;
-  const destino=document.getElementById('vv-destino').value.trim().replace(/\|/g,'/');
-  const peso=parseFloat(document.getElementById('vv-peso').value);
+  const destino=document.getElementById('vv-destino').value.trim();
   const precio=parseFloat(document.getElementById('vv-precio').value);
   const info=document.getElementById('vv-info');
   if(!/^\d+$/.test(ar)){info.textContent='⚠️ Falta el arete (solo números).';return;}
   if(!fecha){info.textContent='⚠️ Falta la fecha.';return;}
-  const p=(window._vvPartos||{})[ar];
-  if(!p&&!confirm(`El arete ${ar} no está en Registro Partos. ¿Guardar de todos modos?`)) return;
-  const nac=p?p.fecha_parto:null;
-  const edad=nac?Math.floor((new Date(fecha+'T12:00:00')-new Date(nac+'T12:00:00'))/86400000):null;
-  const partes=['VENTA VAQUILLA'];
-  if(destino) partes.push('Destino: '+destino);
-  if(!isNaN(peso)&&peso>0) partes.push('Peso: '+peso+' kg');
-  if(!isNaN(precio)&&precio>0) partes.push('Precio: $'+Math.round(precio));
-  const reg={hembra:ar,fecha_salida:fecha,fecha_nacimiento:nac,edad_dias:edad,razon_original:partes.join(' | '),motivo:MOTIVO_VENTA_VAQ,etapa:etapaPorEdad(edad)};
+  if(!(window._vvPartos||{})[ar]&&!confirm(`El arete ${ar} no está en Registro Partos. ¿Guardar de todos modos?`)) return;
   const btn=document.getElementById('vv-guardar'); btn.disabled=true; info.textContent='Guardando...';
-  try{
-    const existe=(window._vvSalidas||{})[ar];
-    const res=existe?await sbFetch(`salidas_crianza?hembra=eq.${encodeURIComponent(ar)}`,'PATCH',reg):await sbFetch('salidas_crianza','POST',reg);
-    if(!res.ok){const t=await res.text();console.error(t);info.textContent='❌ Error al guardar: '+t.slice(0,120);btn.disabled=false;return;}
-  }catch(e){info.textContent='❌ Error de red';btn.disabled=false;return;}
+  try{ await vvGuardarReg(vvRegistro(ar,fecha,destino,precio)); }
+  catch(e){info.textContent='❌ Error al guardar: '+e.message;btn.disabled=false;return;}
   btn.disabled=false;
-  ['vv-arete','vv-peso','vv-precio'].forEach(id=>document.getElementById(id).value='');
+  ['vv-arete','vv-precio'].forEach(id=>document.getElementById(id).value='');
   info.textContent=`✅ Venta de ${ar} guardada`;
   window._salidas=null; window._salidasDes=null;
   await loadVentaVaquillas();
   document.getElementById('vv-arete').focus();
+}
+async function vvActualizarPrecio(ar,val){
+  const v=(window._vvVentas||[]).find(x=>String(x.hembra).trim()===ar); if(!v) return;
+  const d=vvParse(v); const precio=parseFloat(val);
+  const reg=vvRegistro(ar,v.fecha_salida,d.destino,isNaN(precio)?null:precio,v.fecha_nacimiento,v.edad_dias);
+  const res=await sbFetch(`salidas_crianza?hembra=eq.${encodeURIComponent(ar)}`,'PATCH',{razon_original:reg.razon_original});
+  if(!res.ok){alert('Error al guardar el precio de '+ar);return;}
+  v.razon_original=reg.razon_original; renderVentaVaquillas();
+}
+function downloadTemplateVentasVaq(){
+  const csv='Hembra,Fecha Venta (DD/MM/YYYY),Comprador,Precio por cabeza\n5001,15/11/2026,Rancho X,38000\n5002,15/11/2026,Rancho X,38000\n';
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})); a.download='Template_Venta_Vaquillas.csv'; a.click();
+}
+// Acepta el mismo archivo de salidas del sistema del hato (Vaca col 2, Edad col 4, Fecha Nac col 5, Fecha Salida col 6, Razón col 7, Precio opcional col 8)
+// o el template simple (Hembra, Fecha, Comprador, Precio). Si el arete ya estaba en salidas, se pasa a venta.
+async function importVentasVaquillas(event){
+  if(!await checkPass()){alert('Contraseña incorrecta');event.target.value='';return;}
+  const file=event.target.files[0]; if(!file) return; event.target.value='';
+  const rows=await readFile(file);
+  if(!rows.length){alert('Archivo vacío.');return;}
+  if(!window._vvPartos) await loadVentaVaquillas();
+  const num=v=>{if(v==null||v==='')return null;const n=parseFloat(String(v).replace(/[$,\s]/g,''));return isNaN(n)?null:n;};
+  const esArete=v=>v!=null&&/^\d+$/.test(String(v).trim());
+  const porArete={};
+  rows.forEach(row=>{
+    const p=row.__row||[];
+    let r=null;
+    if(esArete(p[1])&&excelDateToISO(p[5])){        // formato del hato (igual que Importar Salidas)
+      r={ar:String(p[1]).trim(),fecha:excelDateToISO(p[5]),nac:excelDateToISO(p[4]),edad:p[3]!=null&&p[3]!==''?parseInt(p[3]):null,destino:null,precio:num(p[7])};
+    }else if(esArete(p[0])&&excelDateToISO(p[1])){   // template simple
+      r={ar:String(p[0]).trim(),fecha:excelDateToISO(p[1]),nac:null,edad:null,destino:toStr(p[2]),precio:num(p[3])};
+    }
+    if(r) porArete[r.ar]=r;
+  });
+  const items=Object.values(porArete).sort((a,b)=>parseInt(a.ar)-parseInt(b.ar));
+  if(!items.length){alert('No encontré renglones válidos (arete + fecha).');return;}
+  const sal=window._vvSalidas||{};
+  const convertidas=items.filter(x=>sal[x.ar]&&!esVentaVaq(sal[x.ar]));
+  const actualizadas=items.filter(x=>sal[x.ar]&&esVentaVaq(sal[x.ar]));
+  const nuevas=items.filter(x=>!sal[x.ar]);
+  const sinParto=items.filter(x=>!(window._vvPartos||{})[x.ar]).map(x=>x.ar);
+  const lst=a=>a.length>15?a.slice(0,15).join(', ')+'…':a.join(', ');
+  let txt=`💰 Importar ${items.length} venta${items.length===1?'':'s'} de vaquillas\n\nNuevas: ${nuevas.length}`;
+  if(convertidas.length) txt+=`\nQuitar de salidas y pasar a venta: ${convertidas.length} (${lst(convertidas.map(x=>x.ar))})`;
+  if(actualizadas.length) txt+=`\nYa estaban como venta (se actualizan): ${actualizadas.length}`;
+  if(sinParto.length) txt+=`\n\n⚠️ No están en Registro Partos: ${lst(sinParto)}`;
+  if(!confirm(txt+'\n\n¿Continuar?')) return;
+  let ok=0; const err=[];
+  for(let i=0;i<items.length;i+=10){
+    await Promise.all(items.slice(i,i+10).map(async x=>{
+      // conservar comprador/precio previos si el archivo no los trae
+      const prev=sal[x.ar]&&esVentaVaq(sal[x.ar])?vvParse((window._vvVentas||[]).find(v=>String(v.hembra).trim()===x.ar)||{}):{};
+      try{ await vvGuardarReg(vvRegistro(x.ar,x.fecha,x.destino||prev.destino,x.precio!=null?x.precio:prev.precio,x.nac,x.edad)); ok++; }
+      catch(e){ err.push(`${x.ar}: ${e.message}`); }
+    }));
+  }
+  alert(`Ventas guardadas: ${ok}`+(convertidas.length?`\n(${convertidas.length} se quitaron de salidas)`:'')+(err.length?`\n\nErrores (${err.length}):\n${err.slice(0,3).join('\n')}`:''));
+  window._salidas=null; window._salidasDes=null;
+  loadVentaVaquillas();
 }
 async function borrarVentaVaquilla(ar){
   if(!confirm(`¿Borrar la venta de ${ar}? La vaquilla regresa a activas en el inventario.`)) return;
@@ -3398,26 +3464,22 @@ function renderVentaVaquillas(){
     const d=vvParse(v), p=(window._vvPartos||{})[String(v.hembra).trim()];
     return {...v,...d,raza:p?p.raza:null,nac:v.fecha_nacimiento||(p&&p.fecha_parto)};
   }).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
-  const pesos=rows.filter(r=>r.peso).map(r=>r.peso), precios=rows.filter(r=>r.precio).map(r=>r.precio);
+  const precios=rows.filter(r=>r.precio).map(r=>r.precio);
   const edades=rows.filter(r=>r.edad_dias!=null).map(r=>r.edad_dias);
-  const conAmbos=rows.filter(r=>r.peso&&r.precio);
-  const kgAmb=conAmbos.reduce((a,r)=>a+r.peso,0), $Amb=conAmbos.reduce((a,r)=>a+r.precio,0);
   const mx=v=>'$'+Math.round(v).toLocaleString('es-MX');
   document.getElementById('vv-kpis').innerHTML=
     kpiCard('Vaquillas vendidas',rows.length,'',anio?`en ${anio}`:'todas','',false)+
     kpiCard('Ingreso total',precios.length?mx(precios.reduce((a,b)=>a+b,0)):'—','',precios.length<rows.length?`${rows.length-precios.length} sin precio`:'','',false)+
-    kpiCard('Precio promedio',precios.length?mx(avg(precios)):'—','','por vaquilla','',false)+
-    kpiCard('Peso promedio',pesos.length?avg(pesos).toFixed(0)+' kg':'—','','','',false)+
-    kpiCard('Precio por kg',kgAmb?'$'+($Amb/kgAmb).toFixed(1)+' /kg':'—','','de las que tienen peso y precio','',false)+
+    kpiCard('Precio promedio',precios.length?mx(avg(precios)):'—','','por cabeza','',false)+
     kpiCard('Edad promedio a la venta',edades.length?(avg(edades)/30.4).toFixed(1)+' meses':'—','',edades.length?Math.round(avg(edades))+' días':'','',false);
   document.getElementById('vv-body').innerHTML=rows.length?rows.map(r=>`<tr>
       <td class="mono" style="font-weight:600">${r.hembra}</td><td class="mono">${r.raza||'—'}</td>
       <td class="mono">${fmtFecha(r.nac)}</td><td class="mono">${fmtFecha(r.fecha_salida)}</td>
       <td class="mono">${r.edad_dias!=null?r.edad_dias+'d ('+(r.edad_dias/30.4).toFixed(1)+'m)':'—'}</td>
-      <td>${escHtmlM(r.destino||'—')}</td><td class="mono">${r.peso?r.peso+' kg':'—'}</td>
-      <td class="mono">${r.precio?mx(r.precio):'—'}</td><td class="mono">${r.peso&&r.precio?'$'+(r.precio/r.peso).toFixed(1):'—'}</td>
+      <td>${escHtmlM(r.destino||'—')}</td>
+      <td><input type="number" step="1" min="0" inputmode="decimal" value="${r.precio||''}" placeholder="$" style="width:100px" onchange="vvActualizarPrecio('${r.hembra}',this.value)"/></td>
       <td><button class="btn btn-secondary btn-sm" onclick="borrarVentaVaquilla('${r.hembra}')">🗑️</button></td></tr>`).join('')
-    :'<tr><td colspan="10" class="empty">Sin ventas registradas.</td></tr>';
+    :'<tr><td colspan="8" class="empty">Sin ventas registradas.</td></tr>';
 }
 
 // ==================== IMPORT ====================
