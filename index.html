@@ -226,6 +226,7 @@
     <button onclick="showTab('resumen-semanal',this)">📋 Resumen Semanal</button>
     <button onclick="showTab('dash-machos',this)">🐂 Desarrollo Machos</button>
     <button onclick="showTab('inventario',this)">🐮 Inventario</button>
+    <button onclick="showTab('venta-vaquillas',this)">💰 Venta Vaquillas</button>
     <div class="nav-sep"></div>
     <button onclick="showTab('reg-partos',this)">🐄 Registro Partos</button>
     <button onclick="showTab('reg-pesajes',this)">📏 Registro Pesajes</button>
@@ -551,6 +552,34 @@
     </div>
 
     <!-- ===== INVENTARIO ===== -->
+    <!-- ===== VENTA VAQUILLAS ===== -->
+    <div id="tab-venta-vaquillas" class="hidden">
+      <div class="section-header">
+        <span class="section-title">💰 Venta de Vaquillas</span>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+          <select id="vv-anio" onchange="renderVentaVaquillas()" style="padding:.3rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"><option value="">Todos los años</option></select>
+        </div>
+      </div>
+      <p style="font-size:.82rem;color:var(--text-muted);margin:-.3rem 0 1rem">Las vaquillas vendidas salen del inventario pero <b>no cuentan como salida</b> en la supervivencia (no son muertes ni descartes).</p>
+      <div class="kpi-group-label">➕ Registrar venta</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.6rem;margin-bottom:.5rem;max-width:900px">
+        <div><label style="font-size:.78rem;color:var(--text-muted)">Arete</label><input type="text" id="vv-arete" inputmode="numeric" placeholder="No. arete" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%" oninput="vvInfoArete()" onkeydown="if(event.key==='Enter')document.getElementById('vv-peso').focus()"/></div>
+        <div><label style="font-size:.78rem;color:var(--text-muted)">Fecha de venta</label><input type="date" id="vv-fecha" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%"/></div>
+        <div><label style="font-size:.78rem;color:var(--text-muted)">Comprador / destino</label><input type="text" id="vv-destino" list="vv-destinos-list" placeholder="Comprador" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%"/><datalist id="vv-destinos-list"></datalist></div>
+        <div><label style="font-size:.78rem;color:var(--text-muted)">Peso (kg)</label><input type="number" id="vv-peso" step="0.1" min="0" inputmode="decimal" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%" onkeydown="if(event.key==='Enter')document.getElementById('vv-precio').focus()"/></div>
+        <div><label style="font-size:.78rem;color:var(--text-muted)">Precio de venta ($)</label><input type="number" id="vv-precio" step="1" min="0" inputmode="decimal" style="padding:.35rem .6rem;border-radius:6px;border:1px solid var(--border);font-size:.9rem;width:100%" onkeydown="if(event.key==='Enter')guardarVentaVaquilla()"/></div>
+      </div>
+      <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:1.5rem">
+        <button class="btn btn-primary" id="vv-guardar" onclick="guardarVentaVaquilla()">💾 Guardar venta</button>
+        <span id="vv-info" style="font-size:.85rem;color:var(--text-muted)"></span>
+      </div>
+      <div class="kpi-group-label">📊 Resumen</div>
+      <div id="vv-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
+      <div class="kpi-group-label">📋 Vaquillas vendidas</div>
+      <div class="table-wrap"><table><thead><tr><th>Arete</th><th>Raza</th><th>Nacimiento</th><th>Fecha venta</th><th>Edad</th><th>Comprador</th><th>Peso</th><th>Precio</th><th>$/kg</th><th></th></tr></thead>
+        <tbody id="vv-body"><tr><td colspan="10" class="empty">Cargando...</td></tr></tbody></table></div>
+    </div>
+
     <div id="tab-inventario" class="hidden">
       <div class="section-header">
         <span class="section-title">🐮 Inventario & Supervivencia <span id="ultimo-inv" style="font-size:.8rem;font-weight:400;color:var(--text-muted)"></span></span>
@@ -1181,7 +1210,7 @@ async function sbFetch(path,method='GET',body=null){
 function showTab(tab,btn){
   document.querySelectorAll('#mainNav button').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
-  ['dashboard','dash-gdp','dash-machos','dash-morbilidad','dash-leche','resumen-semanal','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','leche','calfexpert','ficha-animal'].forEach(t=>{
+  ['dashboard','dash-gdp','dash-machos','dash-morbilidad','dash-leche','resumen-semanal','venta-vaquillas','reg-partos','reg-pesajes','refractometria','inventario','clin-activas','clin-vacunas','clin-admin','corrales','leche','calfexpert','ficha-animal'].forEach(t=>{
     const el=document.getElementById('tab-'+t);
     if(el) el.classList.add('hidden');
   });
@@ -1192,6 +1221,7 @@ function showTab(tab,btn){
   if(tab==='dash-leche') loadLecheKpis();
   if(tab==='resumen-semanal') loadResumenSemanal();
   if(tab==='inventario') loadInventario();
+  if(tab==='venta-vaquillas') loadVentaVaquillas();
   if(tab==='clin-activas') loadClinActivas();
   if(tab==='clin-vacunas') loadClinVacunas();
   if(tab==='clin-admin') loadClinAdmin();
@@ -3122,7 +3152,7 @@ async function loadInventario(){
   if(hasta) q+=`&fecha_parto=lte.${hasta}`;
   const [partos, todasSalidas] = await Promise.all([
     sbFetch(q),
-    sbFetch('salidas_crianza?order=fecha_salida.asc&limit=5000')
+    sbFetchAll('salidas_crianza?order=fecha_salida.asc,hembra.asc')
   ]);
   // Filter salidas to only hembras born in the date range
   const hembraSet=new Set((partos||[]).map(p=>p.hembra).filter(Boolean));
@@ -3196,10 +3226,12 @@ function renderInventario(partos, salidas){
   // Global KPIs
   const totalNacidas=hembras.length;
   const hembraSet=new Set(hembras.map(p=>p.hembra));
-  const salidasFiltradas=salidas.filter(s=>hembraSet.has(s.hembra));
+  const salidasTodas=salidas.filter(s=>hembraSet.has(s.hembra));
+  const ventasVaq=salidasTodas.filter(esVentaVaq);
+  const salidasFiltradas=salidasTodas.filter(s=>!esVentaVaq(s)); // ventas de vaquillas no cuentan como salida
   const totalSalidas=salidasFiltradas.length;
-  const totalActivas=totalNacidas-totalSalidas;
-  const pctSuperv=totalNacidas?Math.round(totalActivas/totalNacidas*100):0;
+  const totalActivas=totalNacidas-totalSalidas-ventasVaq.length;
+  const pctSuperv=totalNacidas?Math.round((totalNacidas-totalSalidas)/totalNacidas*100):0;
 
   // Show ultimo arete activo y ultima salida
   const ultActiva=hembras.filter(p=>!salidaMap[p.hembra]).sort((a,b)=>parseInt(b.hembra)-parseInt(a.hembra))[0];
@@ -3214,8 +3246,10 @@ function renderInventario(partos, salidas){
 
   document.getElementById('inv-kpis').innerHTML=
     kpiCard('Total Nacidas (hembras)',totalNacidas,'','','',false)+
-    kpiCard('Activas en Hato',`${totalActivas} (${pctSuperv}%)`,'','% supervivencia','',false)+
-    kpiCard('Total Salidas',totalSalidas,'','','',false);
+    kpiCard('Activas en Hato',totalActivas,'',totalNacidas?`${Math.round(totalActivas/totalNacidas*100)}% de las nacidas`:'','',false)+
+    kpiCard('% Supervivencia',`${pctSuperv}%`,'','vendidas como vaquilla cuentan como vivas','',false)+
+    kpiCard('Total Salidas',totalSalidas,'','sin contar ventas de vaquillas','',false)+
+    kpiCard('Vendidas como vaquilla',ventasVaq.length,'','','',false);
 
   // Etapa table - calculate how many reached each stage
   const etapasDef=[
@@ -3235,7 +3269,7 @@ function renderInventario(partos, salidas){
   etapaBody.innerHTML=etapasDef.map((etapa,idx)=>{
     const iniciaronN = totalNacidas - acumuladaSalidas;
     const todasSalidasEtapa=salidasFiltradas.filter(s=>s.etapa===etapa.nombre).length;
-    acumuladaSalidas+=todasSalidasEtapa;
+    acumuladaSalidas+=todasSalidasEtapa+ventasVaq.filter(s=>s.etapa===etapa.nombre).length;
     const pct=iniciaronN?Math.round(todasSalidasEtapa/iniciaronN*100):0;
     const pctClass=pct>=15?'gdp-bad':pct>=8?'gdp-warn':'gdp-ok';
 
@@ -3251,9 +3285,10 @@ function renderInventario(partos, salidas){
   if(!lotes.length){loteBody.innerHTML='<tr><td colspan="6" class="empty">Sin datos.</td></tr>';return;}
   loteBody.innerHTML=lotes.map(lote=>{
     const n=lote.nacidas.length;
-    const s=lote.salidas;
-    const activas=n-s.length;
-    const pct=n?Math.round(activas/n*100):0;
+    const s=lote.salidas.filter(x=>!esVentaVaq(x));
+    const vend=lote.salidas.length-s.length;
+    const activas=n-lote.salidas.length;
+    const pct=n?Math.round((n-s.length)/n*100):0;
     const totalSalidasLote=s.length;
     // Arete range
     const aretesN=lote.nacidas.map(p=>parseInt(p.hembra)).filter(n=>!isNaN(n)).sort((a,b)=>a-b);
@@ -3265,9 +3300,124 @@ function renderInventario(partos, salidas){
       <td class="mono" style="text-align:center">${n}</td>
       <td class="mono" style="text-align:center">${activas}</td>
       <td class="mono ${pctClass}" style="text-align:center">${pct}%</td>
-      <td class="mono" style="text-align:center">${totalSalidasLote} (${n?Math.round(totalSalidasLote/n*100):0}%)</td>
+      <td class="mono" style="text-align:center">${totalSalidasLote} (${n?Math.round(totalSalidasLote/n*100):0}%)${vend?` <small style="color:var(--text-muted)">· ${vend} vend.</small>`:''}</td>
     </tr>`;
   }).join('');
+}
+
+// ==================== VENTA DE VAQUILLAS ====================
+// Se guardan en salidas_crianza con motivo 'Venta vaquilla'; destino, peso y precio van en razon_original.
+// En Inventario/Resumen salen del hato pero NO cuentan como salida para la supervivencia.
+const MOTIVO_VENTA_VAQ='Venta vaquilla';
+function esVentaVaq(s){return s&&s.motivo===MOTIVO_VENTA_VAQ;}
+function vvParse(s){
+  const t=s.razon_original||'';
+  const g=re=>{const m=t.match(re);return m?m[1].trim():null;};
+  const num=v=>v!=null&&v!==''?parseFloat(String(v).replace(/[$,]/g,'')):null;
+  return {destino:g(/Destino:\s*([^|]*)/),peso:num(g(/Peso:\s*([\d.,]+)/)),precio:num(g(/Precio:\s*\$?([\d.,]+)/))};
+}
+function etapaPorEdad(d){
+  if(d==null) return null;
+  if(d<=65) return 'Etapa 1 - Leche (0-65d)';
+  if(d<=90) return 'Etapa 2 - Jaulas (66-90d)';
+  if(d<=150) return 'Etapa 3 - AYC (91-150d)';
+  if(d<=365) return 'Etapa 4 - 5-11m (151-365d)';
+  return 'Etapa 5 - 12m a Gestación';
+}
+async function loadVentaVaquillas(){
+  const [ventas,partos,salidas]=await Promise.all([
+    sbFetchAll(`salidas_crianza?motivo=eq.${encodeURIComponent(MOTIVO_VENTA_VAQ)}&order=fecha_salida.desc,hembra.asc`),
+    sbFetchAll('partos_crianza?sexo=eq.H&select=hembra,raza,fecha_parto&order=hembra.asc'),
+    sbFetchAll('salidas_crianza?select=hembra,motivo,fecha_salida&order=hembra.asc')
+  ]);
+  window._vvVentas=ventas||[];
+  window._vvPartos={}; (partos||[]).forEach(p=>{if(p.hembra) window._vvPartos[String(p.hembra).trim()]=p;});
+  window._vvSalidas={}; (salidas||[]).forEach(x=>{if(x.hembra) window._vvSalidas[String(x.hembra).trim()]=x;});
+  const f=document.getElementById('vv-fecha'); if(f&&!f.value) f.value=new Date().toISOString().slice(0,10);
+  const dest=[...new Set(window._vvVentas.map(v=>vvParse(v).destino).filter(Boolean))].sort();
+  document.getElementById('vv-destinos-list').innerHTML=dest.map(d=>`<option value="${escHtmlM(d)}">`).join('');
+  renderVentaVaquillas();
+}
+function vvInfoArete(){
+  const ar=document.getElementById('vv-arete').value.trim(), el=document.getElementById('vv-info');
+  if(!ar){el.textContent='';return;}
+  const p=(window._vvPartos||{})[ar], sal=(window._vvSalidas||{})[ar];
+  if(!p){el.innerHTML='⚠️ Ese arete no está en Registro Partos';return;}
+  const dias=Math.floor((new Date()-new Date(p.fecha_parto+'T12:00:00'))/86400000);
+  let t=`${p.raza==='J'?'Jersey':p.raza==='H'?'Holstein':(p.raza||'')} · nació ${fmtFecha(p.fecha_parto)} · ${dias} días (${(dias/30.4).toFixed(1)} meses)`;
+  if(sal) t+=esVentaVaq(sal)?` · ⚠️ ya tiene venta registrada (${fmtFecha(sal.fecha_salida)}), se va a actualizar`:` · ⚠️ tiene salida "${sal.motivo||''}" (${fmtFecha(sal.fecha_salida)}); se cambia a venta`;
+  el.innerHTML=t;
+}
+async function guardarVentaVaquilla(){
+  const ar=document.getElementById('vv-arete').value.trim();
+  const fecha=document.getElementById('vv-fecha').value;
+  const destino=document.getElementById('vv-destino').value.trim().replace(/\|/g,'/');
+  const peso=parseFloat(document.getElementById('vv-peso').value);
+  const precio=parseFloat(document.getElementById('vv-precio').value);
+  const info=document.getElementById('vv-info');
+  if(!/^\d+$/.test(ar)){info.textContent='⚠️ Falta el arete (solo números).';return;}
+  if(!fecha){info.textContent='⚠️ Falta la fecha.';return;}
+  const p=(window._vvPartos||{})[ar];
+  if(!p&&!confirm(`El arete ${ar} no está en Registro Partos. ¿Guardar de todos modos?`)) return;
+  const nac=p?p.fecha_parto:null;
+  const edad=nac?Math.floor((new Date(fecha+'T12:00:00')-new Date(nac+'T12:00:00'))/86400000):null;
+  const partes=['VENTA VAQUILLA'];
+  if(destino) partes.push('Destino: '+destino);
+  if(!isNaN(peso)&&peso>0) partes.push('Peso: '+peso+' kg');
+  if(!isNaN(precio)&&precio>0) partes.push('Precio: $'+Math.round(precio));
+  const reg={hembra:ar,fecha_salida:fecha,fecha_nacimiento:nac,edad_dias:edad,razon_original:partes.join(' | '),motivo:MOTIVO_VENTA_VAQ,etapa:etapaPorEdad(edad)};
+  const btn=document.getElementById('vv-guardar'); btn.disabled=true; info.textContent='Guardando...';
+  try{
+    const existe=(window._vvSalidas||{})[ar];
+    const res=existe?await sbFetch(`salidas_crianza?hembra=eq.${encodeURIComponent(ar)}`,'PATCH',reg):await sbFetch('salidas_crianza','POST',reg);
+    if(!res.ok){const t=await res.text();console.error(t);info.textContent='❌ Error al guardar: '+t.slice(0,120);btn.disabled=false;return;}
+  }catch(e){info.textContent='❌ Error de red';btn.disabled=false;return;}
+  btn.disabled=false;
+  ['vv-arete','vv-peso','vv-precio'].forEach(id=>document.getElementById(id).value='');
+  info.textContent=`✅ Venta de ${ar} guardada`;
+  window._salidas=null; window._salidasDes=null;
+  await loadVentaVaquillas();
+  document.getElementById('vv-arete').focus();
+}
+async function borrarVentaVaquilla(ar){
+  if(!confirm(`¿Borrar la venta de ${ar}? La vaquilla regresa a activas en el inventario.`)) return;
+  if(!await checkPass()){alert('Contraseña incorrecta');return;}
+  const res=await sbFetch(`salidas_crianza?hembra=eq.${encodeURIComponent(ar)}&motivo=eq.${encodeURIComponent(MOTIVO_VENTA_VAQ)}`,'DELETE');
+  if(!res.ok){alert('Error al borrar');return;}
+  window._salidas=null; window._salidasDes=null;
+  loadVentaVaquillas();
+}
+function renderVentaVaquillas(){
+  const all=window._vvVentas||[];
+  const selA=document.getElementById('vv-anio');
+  const anios=[...new Set(all.map(v=>(v.fecha_salida||'').slice(0,4)).filter(Boolean))].sort().reverse();
+  const cur=selA.value;
+  selA.innerHTML='<option value="">Todos los años</option>'+anios.map(y=>`<option value="${y}"${y===cur?' selected':''}>${y}</option>`).join('');
+  const anio=anios.includes(cur)?cur:'';
+  const rows=all.filter(v=>!anio||(v.fecha_salida||'').startsWith(anio)).map(v=>{
+    const d=vvParse(v), p=(window._vvPartos||{})[String(v.hembra).trim()];
+    return {...v,...d,raza:p?p.raza:null,nac:v.fecha_nacimiento||(p&&p.fecha_parto)};
+  }).sort((a,b)=>parseInt(a.hembra)-parseInt(b.hembra));
+  const pesos=rows.filter(r=>r.peso).map(r=>r.peso), precios=rows.filter(r=>r.precio).map(r=>r.precio);
+  const edades=rows.filter(r=>r.edad_dias!=null).map(r=>r.edad_dias);
+  const conAmbos=rows.filter(r=>r.peso&&r.precio);
+  const kgAmb=conAmbos.reduce((a,r)=>a+r.peso,0), $Amb=conAmbos.reduce((a,r)=>a+r.precio,0);
+  const mx=v=>'$'+Math.round(v).toLocaleString('es-MX');
+  document.getElementById('vv-kpis').innerHTML=
+    kpiCard('Vaquillas vendidas',rows.length,'',anio?`en ${anio}`:'todas','',false)+
+    kpiCard('Ingreso total',precios.length?mx(precios.reduce((a,b)=>a+b,0)):'—','',precios.length<rows.length?`${rows.length-precios.length} sin precio`:'','',false)+
+    kpiCard('Precio promedio',precios.length?mx(avg(precios)):'—','','por vaquilla','',false)+
+    kpiCard('Peso promedio',pesos.length?avg(pesos).toFixed(0)+' kg':'—','','','',false)+
+    kpiCard('Precio por kg',kgAmb?'$'+($Amb/kgAmb).toFixed(1)+' /kg':'—','','de las que tienen peso y precio','',false)+
+    kpiCard('Edad promedio a la venta',edades.length?(avg(edades)/30.4).toFixed(1)+' meses':'—','',edades.length?Math.round(avg(edades))+' días':'','',false);
+  document.getElementById('vv-body').innerHTML=rows.length?rows.map(r=>`<tr>
+      <td class="mono" style="font-weight:600">${r.hembra}</td><td class="mono">${r.raza||'—'}</td>
+      <td class="mono">${fmtFecha(r.nac)}</td><td class="mono">${fmtFecha(r.fecha_salida)}</td>
+      <td class="mono">${r.edad_dias!=null?r.edad_dias+'d ('+(r.edad_dias/30.4).toFixed(1)+'m)':'—'}</td>
+      <td>${escHtmlM(r.destino||'—')}</td><td class="mono">${r.peso?r.peso+' kg':'—'}</td>
+      <td class="mono">${r.precio?mx(r.precio):'—'}</td><td class="mono">${r.peso&&r.precio?'$'+(r.precio/r.peso).toFixed(1):'—'}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="borrarVentaVaquilla('${r.hembra}')">🗑️</button></td></tr>`).join('')
+    :'<tr><td colspan="10" class="empty">Sin ventas registradas.</td></tr>';
 }
 
 // ==================== IMPORT ====================
@@ -5020,6 +5170,7 @@ async function loadResumenSemanal(){
 
     // Cargar datos si no están en memoria
     if(!window._partos||!window._partos.length) await loadPartos();
+    if(!window._salidas) window._salidas=await sbFetchAll('salidas_crianza?order=fecha_salida.asc,hembra.asc');
     if(!window._clinPartosH||!window._clinPartosH.length) await loadClinVacunas();
     if(!window._clinEventos||!window._clinEventos.length) await loadClinActivas();
 
@@ -5041,8 +5192,9 @@ async function loadResumenSemanal(){
     const todasHembras=todosPartos.filter(p=>p.sexo==='H');
     const totalNacidas=todasHembras.length;
     const activas=todasHembras.filter(p=>!salidaSet.has(String(p.hembra))).length;
-    const salidasEste=todasSalidas.filter(s=>s.fecha_salida>=desde&&s.fecha_salida<=hasta);
-    const supervivencia=totalNacidas?Math.round(activas/totalNacidas*100):0;
+    const salidasEste=todasSalidas.filter(s=>!esVentaVaq(s)&&s.fecha_salida>=desde&&s.fecha_salida<=hasta);
+    const muertasDesc=todasSalidas.filter(s=>!esVentaVaq(s)).length;
+    const supervivencia=totalNacidas?Math.round((totalNacidas-muertasDesc)/totalNacidas*100):0;
 
     // Vacunación — igual que renderVacLotes
     const aplicadasMap={};
