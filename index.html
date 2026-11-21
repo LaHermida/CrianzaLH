@@ -302,6 +302,8 @@
         <div id="pt-partero"></div>
         <div class="kpi-group-label">🧪 Calostro — Ordeñas</div>
         <div id="po-kpis" class="kpi-grid"></div>
+        <div class="kpi-group-label" style="margin-top:1rem">⚖️ Calostro — Litros ordeñados vs litros dados en toma (por mes)</div>
+        <div id="po-balance"></div>
       </div>
 
       <!-- TODAS LAS GRÁFICAS JUNTAS -->
@@ -498,7 +500,13 @@
       <div id="gdp-kpis" class="kpi-grid" style="margin-bottom:1.5rem"></div>
 
       <!-- Tabla por semana -->
-      <div class="kpi-group-label">📅 Etapa leche — GDP por Lote Mensual de Nacimiento</div>
+      <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.5rem">
+        <div class="kpi-group-label" style="margin:0">📅 Etapa leche — GDP por Lote Mensual de Nacimiento</div>
+        <select id="leche-lote-raza" onchange="renderDashGDP()" style="padding:.25rem .5rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem">
+          <option value="">Todas las razas</option><option value="H">Holstein</option><option value="J">Jersey</option>
+        </select>
+        <select id="leche-lote-anio" onchange="renderDashGDP()" style="padding:.25rem .5rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem"><option value="">Todos los años</option></select>
+      </div>
       <div class="table-wrap">
         <table id="gdp-semana-table">
           <thead>
@@ -1665,10 +1673,48 @@ function renderDashOrdenas(fd){
       mkChart(cid,'bar',mA,[{label:'Prom. Lts',data:vA,backgroundColor:color}]);
     }
   }
+  renderBalanceCalostro(dataA, compare?fd.aLabel:'');
   monthOrdChart('ch-po-lts1','o1_lts','rgba(199,120,0,.7)',fd.aLabel,dataB,fd.bLabel);
   monthOrdChart('ch-po-lts2','o2_lts','rgba(198,40,40,.7)',fd.aLabel,dataB,fd.bLabel);
   monthOrdChart('ch-po-cal1','o1_calidad','rgba(199,120,0,.5)',fd.aLabel,dataB,fd.bLabel);
   monthOrdChart('ch-po-cal2','o2_calidad','rgba(198,40,40,.5)',fd.aLabel,dataB,fd.bLabel);
+}
+
+// Balance mensual: litros ordeñados (1ª + 2ª ordeña) vs litros dados (1ª + 2ª toma).
+// En gemelas la ordeña va solo en el primer registro, así que no se duplica.
+function renderBalanceCalostro(data, etiqueta){
+  const el=document.getElementById('po-balance'); if(!el) return;
+  const n=v=>{const x=parseFloat(v); return isNaN(x)?0:x;};
+  const mesesN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const byM={};
+  data.forEach(r=>{
+    if(!r.fecha_parto) return;
+    const k=r.fecha_parto.slice(0,7);
+    const m=byM[k]=byM[k]||{k,partos:0,ord:0,dado:0,conOrd:0,conToma:0};
+    m.partos++;
+    const o=n(r.o1_lts)+n(r.o2_lts), t=n(r.c1_lts)+n(r.c2_lts);
+    m.ord+=o; m.dado+=t;
+    if(o>0) m.conOrd++;
+    if(t>0) m.conToma++;
+  });
+  const ms=Object.values(byM).sort((a,b)=>b.k.localeCompare(a.k));
+  if(!ms.length){el.innerHTML='<p style="color:var(--text-muted)">Sin datos en el periodo.</p>';return;}
+  const tot=ms.reduce((a,m)=>({partos:a.partos+m.partos,ord:a.ord+m.ord,dado:a.dado+m.dado,conOrd:a.conOrd+m.conOrd,conToma:a.conToma+m.conToma}),{partos:0,ord:0,dado:0,conOrd:0,conToma:0});
+  const f0=v=>Math.round(v).toLocaleString('es-MX');
+  const pct=(d,o)=>o>0?Math.round(d/o*100):null;
+  const pctCls=p=>p==null?'':p>=95&&p<=105?'gdp-ok':p>=85&&p<=115?'gdp-warn':'gdp-bad';
+  const fila=(lbl,m,bold)=>{const dif=m.ord-m.dado, p=pct(m.dado,m.ord);
+    return `<tr${bold?' style="font-weight:700;border-top:2px solid var(--border)"':''}><td style="font-weight:600;white-space:nowrap">${lbl}</td>
+      <td class="mono">${m.partos}</td><td class="mono">${f0(m.ord)} L</td><td class="mono">${f0(m.dado)} L</td>
+      <td class="mono ${dif<0?'gdp-bad':''}">${dif>=0?'+':''}${f0(dif)} L</td>
+      <td class="mono ${pctCls(p)}">${p!=null?p+'%':'—'}</td>
+      <td class="mono">${m.conOrd?(m.ord/m.conOrd).toFixed(1)+' L':'—'}</td>
+      <td class="mono">${m.conToma?(m.dado/m.conToma).toFixed(1)+' L':'—'}</td></tr>`;};
+  el.innerHTML=(etiqueta?`<p style="font-size:.78rem;color:var(--text-muted)">${etiqueta}</p>`:'')+
+    `<div class="table-wrap" style="margin-bottom:.4rem"><table><thead><tr><th>Mes</th><th>Partos</th><th>L ordeñados<br><small>1ª + 2ª ordeña</small></th><th>L dados<br><small>1ª + 2ª toma</small></th><th>Diferencia<br><small>ordeñado − dado</small></th><th>% dado<br><small>de lo ordeñado</small></th><th>Ordeñado por vaca<br><small>con dato</small></th><th>Dado por becerra<br><small>con dato</small></th></tr></thead><tbody>`+
+    ms.map(m=>{const [y,mm]=m.k.split('-'); return fila(`${mesesN[parseInt(mm)-1]} ${y}`,m,false);}).join('')+
+    fila('Total periodo',tot,true)+
+    `</tbody></table></div><p style="font-size:.76rem;color:var(--text-muted);margin-bottom:1rem">Diferencia positiva = sobró calostro (banco / desperdicio). Negativa = se dio más de lo ordeñado (salió del banco). % dado: verde 95–105%, naranja 85–115%, rojo fuera de eso. No incluye becerras compradas.</p>`;
 }
 
 // ==================== STATS MINI (REG TAB) ====================
@@ -2181,7 +2227,20 @@ function renderDashGDP(){
     loteMap[k].items.push(s);
   });
 
-  const lotes=Object.values(loteMap).sort((a,b)=>a.k.localeCompare(b.k));
+  // Selectores propios de la tabla: raza y año
+  const selRazaL=document.getElementById('leche-lote-raza')?.value||'';
+  const selAnioEl=document.getElementById('leche-lote-anio');
+  const aniosL=[...new Set(Object.values(loteMap).map(l=>l.yr))].sort((a,b)=>b-a);
+  if(selAnioEl){
+    const cur=selAnioEl.value;
+    selAnioEl.innerHTML='<option value="">Todos los años</option>'+aniosL.map(y=>`<option value="${y}"${String(y)===cur?' selected':''}>${y}</option>`).join('');
+  }
+  const selAnioL=selAnioEl?.value||'';
+  const lotes=Object.values(loteMap)
+    .filter(l=>!selAnioL||String(l.yr)===selAnioL)
+    .map(l=>({...l,items:selRazaL?l.items.filter(s=>s.parto&&s.parto.raza===selRazaL):l.items}))
+    .filter(l=>l.items.length)
+    .sort((a,b)=>a.k.localeCompare(b.k));
   const tbody=document.getElementById('gdp-semana-body');
   if(!lotes.length){tbody.innerHTML='<tr><td colspan="8" class="empty">Sin datos de pesajes.</td></tr>';return;}
 
@@ -2463,12 +2522,18 @@ function renderDesarrollo(){
     if(!pb.some(Boolean)) return;
     const k=a.nac.slice(0,7); (lotesD[k]=lotesD[k]||[]).push({a,pb});
   });
-  const kLotes=Object.keys(lotesD).sort();
+  const aniosD=[...new Set(Object.keys(lotesD).map(k=>k.slice(0,4)))].sort().reverse();
+  const anioLote=aniosD.includes(window._desLoteAnio)?window._desLoteAnio:'';
+  const kLotes=Object.keys(lotesD).filter(k=>!anioLote||k.startsWith(anioLote)).sort();
   const optR=(v,l)=>`<option value="${v}"${razaLote===v?' selected':''}>${l}</option>`;
+  const optA=(v,l)=>`<option value="${v}"${anioLote===v?' selected':''}>${l}</option>`;
   html+=`<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-top:.5rem;margin-bottom:.5rem">
     <div class="kpi-group-label" style="margin:0">📅 Etapa desarrollo — Peso y GDP por Lote Mensual de Nacimiento</div>
     <select onchange="window._desLoteRaza=this.value;renderDesarrollo()" style="padding:.25rem .5rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem">
       ${optR('','Todas las razas')}${optR('H','Holstein')}${optR('J','Jersey')}
+    </select>
+    <select onchange="window._desLoteAnio=this.value;renderDesarrollo()" style="padding:.25rem .5rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem">
+      ${optA('','Todos los años')}${aniosD.map(y=>optA(y,y)).join('')}
     </select></div>
   <div class="table-wrap" style="margin-bottom:.4rem"><table><thead>
     <tr><th rowspan="2">Lote</th><th rowspan="2">Becerras</th><th rowspan="2">Aretes</th>${BANDAS.map(b=>`<th colspan="2" style="text-align:center">${b.lbl}</th>`).join('')}</tr>
