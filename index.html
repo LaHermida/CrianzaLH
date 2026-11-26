@@ -1337,14 +1337,16 @@ function renderCalostroMadre(){
   const vals=(d,f)=>d.map(r=>num(r[f])).filter(v=>v!=null);
   const st=d=>{
     const rf=vals(d,'o1_refrac'), o1=vals(d,'o1_lts'), o2=vals(d,'o2_lts');
-    const ord=d.reduce((a,r)=>a+(num(r.o1_lts)||0)+(num(r.o2_lts)||0),0);
-    const dado=d.reduce((a,r)=>a+(num(r.c1_lts)||0)+(num(r.c2_lts)||0),0);
+    // Solo partos que tienen capturada ordeña Y toma (si no, se mezcla calostro de banco o registros incompletos)
+    const ambos=d.filter(r=>((num(r.o1_lts)||0)+(num(r.o2_lts)||0))>0&&((num(r.c1_lts)||0)+(num(r.c2_lts)||0))>0);
+    const ord=ambos.reduce((a,r)=>a+(num(r.o1_lts)||0)+(num(r.o2_lts)||0),0);
+    const dado=ambos.reduce((a,r)=>a+(num(r.c1_lts)||0)+(num(r.c2_lts)||0),0);
     return {n:d.length,
       o1:avg(o1),o2:avg(o2),o1cal:avg(vals(d,'o1_calidad')),
       pct2:o1.length?Math.round(o2.length/o1.length*100):null,
       rf:avg(rf),rfOk:rf.length?Math.round(rf.filter(v=>v>=9).length/rf.length*100):null,rfN:rf.length,
       c1:avg(vals(d,'c1_lts')),c2:avg(vals(d,'c2_lts')),c1cal:avg(vals(d,'c1_calidad')),c2cal:avg(vals(d,'c2_calidad')),
-      pctDado:ord>0?Math.round(dado/ord*100):null};
+      o2cal:avg(vals(d,'o2_calidad')),pctDado:ord>0?Math.round(dado/ord*100):null,nAmbos:ambos.length};
   };
   const A=st(G.VQ), B=st(G.VACA);
   const f=(v,d=1)=>v==null?'—':v.toFixed(d);
@@ -1360,18 +1362,15 @@ function renderCalostroMadre(){
     <tr><td colspan="3" style="background:var(--surface-2,#f4f4f4);font-weight:600;font-size:.8rem">Ordeña</td></tr>
     ${fila('Lts 1ª ordeña (prom)',A.o1,B.o1,lts)}
     ${fila('Lts 2ª ordeña (prom)',A.o2,B.o2,lts)}
-    ${fila('Calidad 1ª ordeña (prom)',A.o1cal,B.o1cal,v=>f(v,1))}
+    ${fila('Calidad 1ª ordeña (prom)',A.o1cal,B.o1cal,v=>f(v,0))}
+    ${fila('Calidad 2ª ordeña (prom)',A.o2cal,B.o2cal,v=>f(v,0))}
     ${fila('% ordeñadas 2 veces',A.pct2,B.pct2,pct)}
-    <tr><td colspan="3" style="background:var(--surface-2,#f4f4f4);font-weight:600;font-size:.8rem">Refractometría</td></tr>
-    ${fila('Refrac. promedio (°Brix)',A.rf,B.rf,v=>f(v,1))}
-    ${fila('% refrac. ≥ 9',A.rfOk,B.rfOk,pct)}
-    <tr><td style="color:var(--text-muted);font-size:.8rem">Partos con refrac.</td><td class="mono" style="color:var(--text-muted)">${A.rfN}</td><td class="mono" style="color:var(--text-muted)">${B.rfN}</td></tr>
     <tr><td colspan="3" style="background:var(--surface-2,#f4f4f4);font-weight:600;font-size:.8rem">Tomas a la becerra</td></tr>
     ${fila('Lts 1ª toma (prom)',A.c1,B.c1,lts)}
     ${fila('Lts 2ª toma (prom)',A.c2,B.c2,lts)}
     ${fila('Calidad 1ª toma (prom)',A.c1cal,B.c1cal,v=>f(v,0))}
     ${fila('Calidad 2ª toma (prom)',A.c2cal,B.c2cal,v=>f(v,0))}
-    <tr><td>% dado de lo ordeñado</td><td class="mono">${pct(A.pctDado)}</td><td class="mono">${pct(B.pctDado)}</td></tr>
+    <tr><td>% dado de lo ordeñado<br><small style="color:var(--text-muted)">solo partos con ordeña y toma capturadas</small></td><td class="mono">${pct(A.pctDado)} <small style="color:var(--text-muted)">(${A.nAmbos})</small></td><td class="mono">${pct(B.pctDado)} <small style="color:var(--text-muted)">(${B.nAmbos})</small></td></tr>
     </tbody></table></div>
     <p style="font-size:.76rem;color:var(--text-muted);margin:.3rem 0 0">Vaquilla = parto con "Madre Vaquilla (1ª lact.)" capturada; Vaca = con "Madre Vaca". En verde el mejor de los dos.${sinDato?` ${sinDato} parto${sinDato===1?'':'s'} sin madre capturada no entran.`:''}${fd.compare?' (Periodo A: '+fd.aLabel+')':''}</p>`;
 }
