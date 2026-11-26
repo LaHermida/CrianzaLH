@@ -298,6 +298,13 @@
         <div id="dp-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
         <div class="kpi-group-label">⚖️ Pesos al Nacer</div>
         <div id="pp-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
+        <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.4rem">
+          <div class="kpi-group-label" style="margin:0">🐄 Calostro por tipo de madre — Vaquillas (1er parto) vs Vacas (2+ partos)</div>
+          <select id="cal-madre-raza" onchange="renderCalostroMadre()" style="padding:.25rem .5rem;border-radius:6px;border:1px solid var(--border);font-size:.85rem">
+            <option value="">Todas las razas</option><option value="H">Holstein</option><option value="J">Jersey</option>
+          </select>
+        </div>
+        <div id="cal-madre" style="margin-bottom:1.2rem"></div>
         <div class="kpi-group-label">🥛 Calostro — Tomas</div>
         <div id="pt-kpis" class="kpi-grid" style="margin-bottom:1rem"></div>
         <div id="pt-partero"></div>
@@ -1313,6 +1320,60 @@ function renderDashboard(){
   renderDashPesos(fd);
   renderDashTomas(fd);
   renderDashOrdenas(fd);
+  window._calMadreFD=fd;
+  renderCalostroMadre();
+}
+
+// Calostro separado por tipo de madre: madre_vaquilla = primípara (VQ), madre_vaca = 2+ partos
+function renderCalostroMadre(){
+  const el=document.getElementById('cal-madre'); const fd=window._calMadreFD;
+  if(!el||!fd) return;
+  const raza=document.getElementById('cal-madre-raza')?.value||'';
+  const data=(fd.compare?fd.a:fd.single).filter(r=>!raza||r.raza===raza);
+  const tipo=r=>String(r.madre_vaquilla||'').trim()?'VQ':String(r.madre_vaca||'').trim()?'VACA':null;
+  const G={VQ:data.filter(r=>tipo(r)==='VQ'),VACA:data.filter(r=>tipo(r)==='VACA')};
+  const sinDato=data.length-G.VQ.length-G.VACA.length;
+  const num=v=>{const x=parseFloat(v);return isNaN(x)?null:x;};
+  const vals=(d,f)=>d.map(r=>num(r[f])).filter(v=>v!=null);
+  const st=d=>{
+    const rf=vals(d,'o1_refrac'), o1=vals(d,'o1_lts'), o2=vals(d,'o2_lts');
+    const ord=d.reduce((a,r)=>a+(num(r.o1_lts)||0)+(num(r.o2_lts)||0),0);
+    const dado=d.reduce((a,r)=>a+(num(r.c1_lts)||0)+(num(r.c2_lts)||0),0);
+    return {n:d.length,
+      o1:avg(o1),o2:avg(o2),o1cal:avg(vals(d,'o1_calidad')),
+      pct2:o1.length?Math.round(o2.length/o1.length*100):null,
+      rf:avg(rf),rfOk:rf.length?Math.round(rf.filter(v=>v>=9).length/rf.length*100):null,rfN:rf.length,
+      c1:avg(vals(d,'c1_lts')),c2:avg(vals(d,'c2_lts')),c1cal:avg(vals(d,'c1_calidad')),c2cal:avg(vals(d,'c2_calidad')),
+      pctDado:ord>0?Math.round(dado/ord*100):null};
+  };
+  const A=st(G.VQ), B=st(G.VACA);
+  const f=(v,d=1)=>v==null?'—':v.toFixed(d);
+  const fila=(lbl,a,b,fmt,mejorAlto=true)=>{
+    let ca='',cb='';
+    if(a!=null&&b!=null&&a!==b){const aGana=mejorAlto?a>b:a<b; if(aGana) ca='font-weight:700;color:#2d6a4f'; else cb='font-weight:700;color:#2d6a4f';}
+    return `<tr><td>${lbl}</td><td class="mono" style="${ca}">${fmt(a)}</td><td class="mono" style="${cb}">${fmt(b)}</td></tr>`;
+  };
+  const pct=v=>v==null?'—':v+'%', lts=v=>v==null?'—':v.toFixed(2)+' L';
+  el.innerHTML=`<div class="table-wrap" style="max-width:640px"><table>
+    <thead><tr><th>Indicador</th><th>🐄 Vaquillas (1er parto)</th><th>🐮 Vacas (2+ partos)</th></tr></thead><tbody>
+    <tr><td>Partos</td><td class="mono">${A.n}</td><td class="mono">${B.n}</td></tr>
+    <tr><td colspan="3" style="background:var(--surface-2,#f4f4f4);font-weight:600;font-size:.8rem">Ordeña</td></tr>
+    ${fila('Lts 1ª ordeña (prom)',A.o1,B.o1,lts)}
+    ${fila('Lts 2ª ordeña (prom)',A.o2,B.o2,lts)}
+    ${fila('Calidad 1ª ordeña (prom)',A.o1cal,B.o1cal,v=>f(v,1))}
+    ${fila('% ordeñadas 2 veces',A.pct2,B.pct2,pct)}
+    <tr><td colspan="3" style="background:var(--surface-2,#f4f4f4);font-weight:600;font-size:.8rem">Refractometría</td></tr>
+    ${fila('Refrac. promedio (°Brix)',A.rf,B.rf,v=>f(v,1))}
+    ${fila('% refrac. ≥ 9',A.rfOk,B.rfOk,pct)}
+    <tr><td style="color:var(--text-muted);font-size:.8rem">Partos con refrac.</td><td class="mono" style="color:var(--text-muted)">${A.rfN}</td><td class="mono" style="color:var(--text-muted)">${B.rfN}</td></tr>
+    <tr><td colspan="3" style="background:var(--surface-2,#f4f4f4);font-weight:600;font-size:.8rem">Tomas a la becerra</td></tr>
+    ${fila('Lts 1ª toma (prom)',A.c1,B.c1,lts)}
+    ${fila('Lts 2ª toma (prom)',A.c2,B.c2,lts)}
+    ${fila('Calidad 1ª toma (prom)',A.c1cal,B.c1cal,v=>f(v,0))}
+    ${fila('Calidad 2ª toma (prom)',A.c2cal,B.c2cal,v=>f(v,0))}
+    <tr><td>% dado de lo ordeñado</td><td class="mono">${pct(A.pctDado)}</td><td class="mono">${pct(B.pctDado)}</td></tr>
+    </tbody></table></div>
+    <p style="font-size:.76rem;color:var(--text-muted);margin:.3rem 0 0">Vaquilla = parto con "Madre Vaquilla (1ª lact.)" capturada; Vaca = con "Madre Vaca". En verde el mejor de los dos.${sinDato?` ${sinDato} parto${sinDato===1?'':'s'} sin madre capturada no entran.`:''}${fd.compare?' (Periodo A: '+fd.aLabel+')':''}</p>`;
 }
 
 // Filter data by date range
