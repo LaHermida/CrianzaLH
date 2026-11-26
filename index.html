@@ -1337,6 +1337,8 @@ function renderCalostroMadre(){
   const sinDato=data.length-G.VQ.length-G.VACA.length;
   const num=v=>{const x=parseFloat(v);return isNaN(x)?null:x;};
   const vals=(d,f)=>d.map(r=>num(r[f])).filter(v=>v!=null);
+  // Ordeñada = tiene litros o calidad de 1ª ordeña capturados
+  const ordenada=r=>(num(r.o1_lts)||0)>0||num(r.o1_calidad)!=null;
   const st=d=>{
     const rf=vals(d,'o1_refrac'), o1=vals(d,'o1_lts'), o2=vals(d,'o2_lts');
     // Solo partos que tienen capturada ordeña Y toma (si no, se mezcla calostro de banco o registros incompletos)
@@ -1350,7 +1352,7 @@ function renderCalostroMadre(){
       c1:avg(vals(d,'c1_lts')),c2:avg(vals(d,'c2_lts')),c1cal:avg(vals(d,'c1_calidad')),c2cal:avg(vals(d,'c2_calidad')),
       o2cal:avg(vals(d,'o2_calidad')),pctDado:ord>0?Math.round(dado/ord*100):null,nAmbos:ambos.length,
       ...(()=>{ // % de madres ordeñadas: una por madre+fecha (gemelos no cuentan doble)
-        const m={}; d.forEach(r=>{const k=String(r.madre_vaquilla||r.madre_vaca||'').trim()+'|'+r.fecha_parto; m[k]=m[k]||((num(r.o1_lts)||0)>0);});
+        const m={}; d.forEach(r=>{const k=String(r.madre_vaquilla||r.madre_vaca||'').trim()+'|'+String(r.fecha_parto).slice(0,10); m[k]=m[k]||ordenada(r);});
         const t=Object.keys(m).length, o=Object.values(m).filter(Boolean).length;
         return {madres:t,ordenadas:o,pctOrd:t?Math.round(o/t*100):null};
       })()};
@@ -1367,13 +1369,27 @@ function renderCalostroMadre(){
     <thead><tr><th>Indicador</th><th>🐄 Vaquillas (1er parto)</th><th>🐮 Vacas (2+ partos)</th></tr></thead><tbody>
     <tr><td>Partos</td><td class="mono">${A.n}</td><td class="mono">${B.n}</td></tr>
     <tr><td colspan="3" style="background:var(--surface-2,#f4f4f4);font-weight:600;font-size:.8rem">Ordeña</td></tr>
-    <tr><td>% madres ordeñadas<br><small style="color:var(--text-muted)">con 1ª ordeña capturada</small></td><td class="mono" style="${A.pctOrd!=null&&B.pctOrd!=null&&A.pctOrd>B.pctOrd?'font-weight:700;color:#2d6a4f':''}">${pct(A.pctOrd)} <small style="color:var(--text-muted)">(${A.ordenadas} de ${A.madres})</small></td><td class="mono" style="${A.pctOrd!=null&&B.pctOrd!=null&&B.pctOrd>A.pctOrd?'font-weight:700;color:#2d6a4f':''}">${pct(B.pctOrd)} <small style="color:var(--text-muted)">(${B.ordenadas} de ${B.madres})</small></td></tr>
+    <tr><td>% madres ordeñadas<br><small style="color:var(--text-muted)">con litros o calidad de 1ª ordeña</small></td><td class="mono" style="${A.pctOrd!=null&&B.pctOrd!=null&&A.pctOrd>B.pctOrd?'font-weight:700;color:#2d6a4f':''}">${pct(A.pctOrd)} <small style="color:var(--text-muted)">(${A.ordenadas} de ${A.madres})</small></td><td class="mono" style="${A.pctOrd!=null&&B.pctOrd!=null&&B.pctOrd>A.pctOrd?'font-weight:700;color:#2d6a4f':''}">${pct(B.pctOrd)} <small style="color:var(--text-muted)">(${B.ordenadas} de ${B.madres})</small></td></tr>
     ${fila('Lts 1ª ordeña (prom)',A.o1,B.o1,lts)}
     ${fila('Lts 2ª ordeña (prom)',A.o2,B.o2,lts)}
     ${fila('Calidad 1ª ordeña (prom)',A.o1cal,B.o1cal,v=>f(v,0))}
     ${fila('Calidad 2ª ordeña (prom)',A.o2cal,B.o2cal,v=>f(v,0))}
     ${fila('% ordeñadas 2 veces',A.pct2,B.pct2,pct)}
     </tbody></table></div>
+    ${(()=>{ // % ordeñadas por mes
+      const mesesN=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+      const by={};
+      ['VQ','VACA'].forEach(t=>G[t].forEach(r=>{
+        const mk=String(r.fecha_parto).slice(0,7), k=String(r.madre_vaquilla||r.madre_vaca||'').trim()+'|'+String(r.fecha_parto).slice(0,10);
+        const b=by[mk]=by[mk]||{VQ:{},VACA:{}}; b[t][k]=b[t][k]||ordenada(r);
+      }));
+      const c=o=>{const t=Object.keys(o).length,n=Object.values(o).filter(Boolean).length;return t?`${Math.round(n/t*100)}% <small style="color:var(--text-muted)">(${n} de ${t})</small>`:'—';};
+      const ks=Object.keys(by).sort().reverse();
+      return ks.length?`<details style="margin:.5rem 0"><summary style="cursor:pointer;font-size:.85rem;font-weight:600">📅 % madres ordeñadas por mes</summary>
+        <div class="table-wrap" style="max-width:640px;margin-top:.4rem"><table><thead><tr><th>Mes</th><th>Vaquillas</th><th>Vacas</th></tr></thead><tbody>
+        ${ks.map(k=>{const [y,m]=k.split('-');return `<tr><td style="font-weight:600">${mesesN[parseInt(m)-1]} ${y}</td><td class="mono">${c(by[k].VQ)}</td><td class="mono">${c(by[k].VACA)}</td></tr>`;}).join('')}
+        </tbody></table></div></details>`:'';
+    })()}
     <p style="font-size:.76rem;color:var(--text-muted);margin:.3rem 0 0">Vaquilla = parto con "Madre Vaquilla (1ª lact.)" capturada; Vaca = con "Madre Vaca". En verde el mejor de los dos.${sinDato?` ${sinDato} parto${sinDato===1?'':'s'} sin madre capturada no entran.`:''}${fd.compare?' (Periodo A: '+fd.aLabel+')':''}</p>`;
   const elT=document.getElementById('cal-madre-tomas');
   if(elT) elT.innerHTML=`<div class="table-wrap" style="max-width:640px"><table>
